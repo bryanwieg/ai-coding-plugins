@@ -1,0 +1,16 @@
+{
+  "name": "ai-coding-plugins",
+  "owner": {
+    "name": "Bryan"
+  },
+  "metadata": {
+    "description": "Personal coding-agent plugins for Claude Code and Codex."
+  },
+  "plugins": [
+    {
+      "name": "phased-delivery",
+      "source": "./plugins/phased-delivery",
+      "description": "Plan work as self-contained phases, then implement it phase by phase."
+    }
+  ]
+}

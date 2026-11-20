@@ -1,0 +1,61 @@
+name: Model report
+
+# Refresh plugins/phased-delivery/model-report.json (read by
+# scripts/select-models.py) and model-report.md (for people) from Artificial
+# Analysis once a day. Commits when the data changed, or every 3 days as a
+# heartbeat so the Checked date shows the job is alive (the selector treats a
+# report older than 7 days as stale).
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: model-report
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DIR: plugins/phased-delivery
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch report
+        env:
+          ARTIFICIAL_ANALYSIS_API_KEY: ${{ secrets.ARTIFICIAL_ANALYSIS_API_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/report"
+          python3 -I "$DIR/scripts/fetch-model-report.py" "$RUNNER_TEMP/report"
+
+      - name: Decide whether to commit
+        id: decide
+        run: |
+          strip() { grep -v '"checked":' "$1" 2>/dev/null || true; }
+          old="$DIR/model-report.json"
+          new="$RUNNER_TEMP/report/model-report.json"
+          if [ ! -f "$old" ] || [ "$(strip "$old")" != "$(strip "$new")" ]; then
+            echo "commit=data changed" >> "$GITHUB_OUTPUT"
+          else
+            last=$(git log -1 --format=%ct -- "$old")
+            age_days=$(( ( $(date +%s) - ${last:-0} ) / 86400 ))
+            if [ "$age_days" -ge 3 ]; then
+              echo "commit=heartbeat" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          cp "$RUNNER_TEMP/report/model-report.json" "$RUNNER_TEMP/report/model-report.md" "$DIR/"
+
+      - name: Commit
+        if: steps.decide.outputs.commit != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DIR/model-report.json" "$DIR/model-report.md"
+          git commit -m "model-report: refresh (${{ steps.decide.outputs.commit }})"
+          git push

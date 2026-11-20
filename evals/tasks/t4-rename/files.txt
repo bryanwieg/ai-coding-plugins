@@ -1,0 +1,4 @@
+# Files the brief allows to change (repo-relative). Used by the scope check.
+plugins/phased-delivery/skills/implement-in-phases/phase-reviewer.md
+plugins/phased-delivery/skills/implement-in-phases/phase-review.md
+plugins/phased-delivery/skills/implement-in-phases/SKILL.md

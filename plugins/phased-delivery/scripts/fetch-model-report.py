@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Write model-report.json and model-report.md from the Artificial Analysis
+free language-model API.
+
+Usage:
+  ARTIFICIAL_ANALYSIS_API_KEY=... fetch-model-report.py OUT_DIR
+  fetch-model-report.py OUT_DIR --input saved-response.json   (offline)
+
+Keeps Anthropic and OpenAI models, one row per model and thinking level.
+The JSON is what select-models.py reads; the Markdown is for people.
+Fails without writing anything if the API call or the response is wrong.
+"""
+
+import datetime
+import json
+import os
+import sys
+import urllib.request
+
+API_URL = "https://artificialanalysis.ai/api/v2/language/models/free"
+CREATORS = {"anthropic", "openai"}
+MAX_PAGES = 20
+
+
+def fetch_pages(api_key):
+    pages = []
+    for page in range(1, MAX_PAGES + 1):
+        request = urllib.request.Request(
+            f"{API_URL}?page={page}",
+            headers={"x-api-key": api_key, "Accept": "application/json"},
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            body = json.load(response)
+        pages.append(body)
+        if not body.get("pagination", {}).get("has_more"):
+            return pages
+    raise SystemExit(f"more than {MAX_PAGES} pages; raise MAX_PAGES")
+
+
+def split_name(name):
+    """'GPT-6 Luna (Max, Default Fallback)' -> ('GPT-6 Luna', 'max', 'Max, Default Fallback')."""
+    if name.endswith(")") and " (" in name:
+        base, variant = name[:-1].split(" (", 1)
+        effort = variant.split(",")[0].strip().lower()
+        return base, effort, variant
+    return name, None, None
+
+
+def rows_from(pages):
+    rows = []
+    for body in pages:
+        for model in body["data"]:
+            creator = model["model_creator"]["name"]
+            if creator.lower() not in CREATORS:
+                continue
+            base, effort, variant = split_name(model["name"])
+            evaluations = model.get("evaluations") or {}
+            pricing = model.get("pricing") or {}
+            cost = model.get("artificial_analysis_intelligence_index_cost") or {}
+            speed = model.get("performance_v3") or {}
+            rows.append({
+                "creator": creator,
+                "model": base,
+                "effort": effort,
+                "variant": variant,
+                "name": model["name"],
+                "slug": model["slug"],
+                "released": model.get("release_date"),
+                "intelligence_index": evaluations.get("artificial_analysis_intelligence_index"),
+                "engineering_index": evaluations.get("artificial_analysis_engineering_index"),
+                "benchmark_run_cost_usd": cost.get("total_cost"),
+                "price_in_per_1m_usd": pricing.get("price_1m_input_tokens"),
+                "price_out_per_1m_usd": pricing.get("price_1m_output_tokens"),
+                "output_tokens_per_second": speed.get("mean_output_tokens_per_second"),
+            })
+    return sorted(rows, key=lambda r: (r["creator"], r["model"], r["name"]))
+
+
+def cell(value, digits):
+    return "" if value is None else f"{value:.{digits}f}"
+
+
+def render_markdown(report):
+    header = (
+        "| Creator | Model | Effort | Variant | Slug | Released | Intelligence"
+        " | Engineering | Benchmark run cost (USD) | Price in / out ($ per 1M)"
+        " | Output tokens/s |\n"
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+    )
+    lines = []
+    for r in report["rows"]:
+        prices = ""
+        if r["price_in_per_1m_usd"] is not None or r["price_out_per_1m_usd"] is not None:
+            prices = f"{cell(r['price_in_per_1m_usd'], 2)} / {cell(r['price_out_per_1m_usd'], 2)}"
+        lines.append(
+            f"| {r['creator']} | {r['model']} | {r['effort'] or ''} | {r['variant'] or ''}"
+            f" | {r['slug']} | {r['released'] or ''} | {cell(r['intelligence_index'], 1)}"
+            f" | {cell(r['engineering_index'], 1)} | {cell(r['benchmark_run_cost_usd'], 2)}"
+            f" | {prices} | {cell(r['output_tokens_per_second'], 0)} |"
+        )
+    return (
+        "# Model report\n\n"
+        "Generated daily by `.github/workflows/model-report.yml` from\n"
+        "`model-report.json`; do not edit by hand. `scripts/select-models.py` reads\n"
+        "the JSON; this file is for people.\n\n"
+        f"Checked: {report['checked']}\n"
+        f"Intelligence index version: {report['intelligence_index_version']}\n"
+        f"Rows: {len(report['rows'])} (Anthropic and OpenAI, one per model and thinking level)\n\n"
+        "Effort comes from the name's suffix, for example \"(Max)\". Benchmark run cost\n"
+        "is what running the whole intelligence benchmark cost at that model and\n"
+        "level, so it counts the tokens the level spends, not only the price.\n\n"
+        + header + "\n".join(lines) + "\n\n"
+        f"Data: [Artificial Analysis]({report['source']})\n"
+    )
+
+
+def main(argv):
+    if len(argv) == 2:
+        api_key = os.environ.get("ARTIFICIAL_ANALYSIS_API_KEY")
+        if not api_key:
+            raise SystemExit("ARTIFICIAL_ANALYSIS_API_KEY is not set")
+        pages = fetch_pages(api_key)
+    elif len(argv) == 4 and argv[2] == "--input":
+        with open(argv[3]) as saved:
+            loaded = json.load(saved)
+        pages = loaded if isinstance(loaded, list) else [loaded]
+    else:
+        raise SystemExit(__doc__)
+    rows = rows_from(pages)
+    if not rows:
+        raise SystemExit("no Anthropic or OpenAI models in the response")
+    report = {
+        "checked": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"),
+        "source": "https://artificialanalysis.ai",
+        "attribution": "Data: Artificial Analysis (https://artificialanalysis.ai)",
+        "intelligence_index_version": pages[0].get("intelligence_index_version"),
+        "rows": rows,
+    }
+    out_dir = argv[1]
+    with open(os.path.join(out_dir, "model-report.json"), "w") as out:
+        json.dump(report, out, indent=2)
+        out.write("\n")
+    with open(os.path.join(out_dir, "model-report.md"), "w") as out:
+        out.write(render_markdown(report))
+    print(f"wrote {len(rows)} rows to {out_dir}/model-report.json and .md")
+
+
+if __name__ == "__main__":
+    main(sys.argv)

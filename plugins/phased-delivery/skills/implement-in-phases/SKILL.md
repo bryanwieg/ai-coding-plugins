@@ -1,0 +1,172 @@
+---
+name: implement-in-phases
+description: "Build a written phased plan one phase at a time: revise the next phase file against the repository, hand its stage briefs to agents in the planned order, review the actual diff, make one local commit per stage (with model, effort and token trailers), then stop and report. Use whenever the user asks to implement, build, execute, start, continue or resume a phased plan or a numbered phase (\"implement phase 2\", \"build the next phase\", \"continue the plan\", \"start on the plan\"), or when a plan directory of NN-name.md phase files exists and the user wants it built. Requires a complete plan; if phase files or stage briefs are missing, use plan-in-phases first. Use proactively, without being asked, whenever the work at hand is described by phase files (their header says \"Implement with the implement-in-phases skill\"); never build them without this skill. Never pushes unless asked."
+---
+
+# Implement in phases
+
+Companion to [plan-in-phases](../plan-in-phases/SKILL.md). The plan's phase
+files hold the structure, contracts and stage briefs; the implementer owns how
+each stage's code works inside its brief. The planner's simplicity rules apply
+unchanged.
+
+## Before the first phase
+
+1. Read the project instructions, specification, design and every phase file.
+2. Check that all phase files exist with complete stage briefs. If not, stop
+   and complete the plan with plan-in-phases first; implementation never fills
+   planning gaps.
+3. Note the starting git state and any edits already present, so they are not
+   mistaken for this work. Record the commit the plan's work starts from in
+   the first phase's Notes as `Plan start: <commit>`; the work report counts
+   from it. On resume, find where the phase left off from its
+   status line and stage table.
+4. Project rules (testing, size limits, what may be run) apply throughout.
+   Writing code gives no permission to run it, and delegating to another agent
+   does not lift any rule.
+
+## Each phase
+
+### 1. Revise the phase file
+
+Before building, check the phase file against what actually exists: earlier
+phases may have changed names, paths or details. Update its context, contracts
+and briefs so each stage is correct for the repository as it is, and record each
+adjustment in the phase's Notes. Check each open assumption in the phase's
+Assumptions section against the code now: mark it verified with where it was
+checked, or, if it is wrong, revise the plan through plan-in-phases' revision
+rules before building. For a small plan, also confirm its Size criteria still
+hold; if not, the plan must become a full plan first. Planning-level changes
+inside the approved design need no approval. A change to the specification or design, or work the
+design lacks, goes to the user first.
+
+### 2. Build the stages
+
+Follow the stage table's order. Hand each stage to a subagent with
+[stage-builder.md](stage-builder.md) unchanged and its inputs filled in; run
+stages marked parallel together. Small or tightly coupled stages may be built
+directly, under the same directions. Delegation keeps each agent's context
+focused on its brief.
+
+Before the phase's first dispatch, refresh the plan's
+`models-available.json` from the running tool and rerun
+`scripts/select-models.py` to regenerate `models.md`, as
+[model-selection.md](../plan-in-phases/model-selection.md) describes; note
+any change in the phase's Notes. Then choose each subagent's tier: start from the
+brief's `Model basis` scores, re-score against the revised brief and the code
+as it now is, record any change in the Notes, and use the model and thinking
+level `models.md` gives for that tier, where the tool lets you choose; never
+above the model's thinking-level ceiling in model-selection.md. When a builder fails or
+finds the stage harder than its tier, rerun it one tier higher; when it stops
+because the brief is wrong, revise the plan instead.
+
+When the plan has `models-codex.md`, refresh it the same way, then route
+each stage by "Builders in another tool" in model-selection.md: a narrow
+stage (F = 0 and R = 0) with room left in the Codex plan goes to Codex. Write
+stage-builder.md and its filled-in inputs to a prompt file outside the
+repository and run `scripts/codex-build.sh <repo> <prompt> <model> <effort>
+<outdir>`, with the model and effort `models-codex.md` gives for the tier.
+Read its report from `<outdir>/report.md`; it prints the token count for
+the commit. Accept it exactly as a subagent's work.
+
+For a `small` stage, never take the builder's report as evidence: rerun its
+"Done when" commands yourself and read its diff before accepting it.
+
+When a stage is accepted, mark its status in the table and commit it (see
+"Commit each stage" below).
+
+### Commit each stage
+
+One local commit per stage, so each model's work can be traced and counted.
+Stage only that stage's files; keep edits that were already present out of
+it. Stages built in parallel are still committed one by one; if two must
+share a commit, give it one set of trailers per stage. Subject: the stage
+number and title, plus the project's required annotations (such as
+`[skip ci]`). End the message with these trailers:
+
+```
+Stage: 02.3
+Plan: <path to the phase file>
+Tier: small
+Tool: <tool that built it, such as claude-code or codex>
+Model: <model as dispatched>
+Effort: <thinking level as dispatched, or "default">
+Attempt: 1
+Tokens: <total tokens for this attempt, or "unknown">
+Tool-Calls: <count, or "unknown">
+```
+
+- **Model, Effort** are what was dispatched; "orchestrator" when the stage
+  was built directly.
+- **Tokens, Tool-Calls** come from the subagent tool's own usage report
+  (in Claude Code, the subagent's completion notice; for Codex, the line
+  `codex-build.sh` prints), never from the builder's report. Use "unknown" when the tool gives none.
+- **Attempt** counts dispatches of this stage, including reruns at a higher
+  tier; commit only the accepted attempt, and list earlier ones as
+  `Earlier-Attempt: <model> <effort> <tokens> <why it failed>`.
+- A change made later to fix a committed stage, from the phase review or
+  later work, gets its own commit with `Fixes-Stage: <stage>`,
+  `Model:`, `Effort:` and `Tokens:` of whoever made the fix.
+
+`scripts/stage-stats.sh` turns these trailers into the work report (see
+"Report the models' work" below).
+
+### 3. Review the phase
+
+Hand the review to a new subagent that built none of the phase, with
+[phase-reviewer.md](phase-reviewer.md) unchanged and its inputs filled in, on
+the `top` candidate from the plan's `models.md`. It reads the actual diff and code, not
+the builders' reports. Then read the diff yourself and decide on each
+finding.
+
+The review may remove, simplify or fix deviations. Anything it wants to add
+goes in the report as a question. Problems the plan does not cover go back
+through plan-in-phases' revision rules before any code changes.
+
+### 4. Commit and stop
+
+Commit each review fix as described in "Commit each stage". Then update the
+phase's status line and Notes and commit them on their own, with the
+trailer `Phase: <phase file>`. Never push or publish unless asked.
+
+Stop and report to the user:
+
+- each stage: done or not, and where to see it;
+- deviations from the briefs, or "none";
+- what was verified by running something versus only by reading code, and what
+  could not be verified;
+- plan adjustments made in the Notes;
+- the models' work in this phase: the table from
+  `scripts/stage-stats.sh <phase start>..HEAD`;
+- questions, and the next phase.
+
+Continue to the next phase only when the user says so. An explicit user stop
+always wins.
+
+## Report the models' work
+
+After the last phase is committed, write `work-report.md` in the plan
+directory, commit it with the trailer `Phase: <plan directory>`, and give
+the user its tables and Reading.
+
+1. Generate it, never by hand: `sh scripts/stage-stats.sh <plan start>..HEAD`.
+   Per model and effort it gives stages, first-try and clean counts, failed
+   tries, fixes needed, tokens spent and wasted, and tokens per stage, with
+   every rerun and fix listed.
+2. Add a short **Reading** section judging each candidate by those numbers:
+   - **Effectiveness** is the clean rate: stages accepted on the first
+     dispatch and never fixed afterwards. Failed tries and fixes needed
+     count against it, and so do review findings on its stages.
+   - **Cost** is tokens per clean stage, counting wasted tokens and the
+     tokens others spent fixing its work.
+   - Name what the reruns and fixes had in common (the measure that was
+     under-scored, or the kind of mistake), and whether a tier's candidate
+     should change, citing the counts. Too few stages to judge is a valid
+     answer; say how many.
+3. List any "unknown" token counts and why they are unknown.
+
+## Corrections
+
+Fix exactly what the user raised. Remove accidental edits rather than expanding
+the plan to keep them. If the same point comes back a second time, stop and
+discuss the instruction itself; the brief or a rule is probably unclear.

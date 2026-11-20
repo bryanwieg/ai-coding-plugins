@@ -1,0 +1,4 @@
+# Files the brief allows to change (repo-relative). Used by the scope check.
+plugins/phased-delivery/scripts/select-models.py
+plugins/phased-delivery/skills/plan-in-phases/model-selection.md
+plugins/phased-delivery/tests/test_effort.py

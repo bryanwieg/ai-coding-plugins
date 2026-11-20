@@ -1,0 +1,149 @@
+# Model routing: goals, design and evidence
+
+A reference for iterating on how the phased-delivery plugin chooses models.
+It records why things are the way they are, what we have measured, and what
+is still open. The skills and scripts are the source of truth for behavior;
+this explains the thinking behind them.
+
+## The goal
+
+Get good code for the least spend by giving each piece of work to the
+cheapest model that can do it well, across every tool and plan the user
+has, and measure whether that is working.
+
+Three parts:
+
+1. **Pick models dynamically.** Plans name tiers, never models. At plan and
+   build time the plugin lists what the running tool offers and maps tiers
+   to models from current benchmark data.
+2. **Route between Codex and Claude.** Each tool runs on its own
+   subscription. Sending suitable work to the other tool spares the
+   session's quota and plays to each model family's strengths.
+3. **Report results.** Every stage is committed with trailers recording who
+   built it and what it cost, and every plan ends with a report judging
+   each model by those numbers. The reports are the feedback loop for parts
+   1 and 2.
+
+## Principles
+
+- **No hardcoded models.** Models, names and behavior change monthly.
+  Guides name tiers and rules; the model table is computed at plan time
+  (`models.md`, generated, never hand-edited).
+- **Decisions in code, not judgment.** Score and cost math lives in
+  `scripts/select-models.py`; reports come from `scripts/stage-stats.sh`.
+  Agents run the scripts and act on their output.
+- **Models must perform unpadded.** A model that needs extra or repeated
+  directions to do the job is failing the job: the padding costs tokens
+  and the result is still worse. When a cheap model fails, narrow the work
+  it gets; never pad the directions to compensate.
+- **Benchmarks pick candidates; behavior qualifies them.** Benchmark scores
+  say how capable a model is in general. Whether it follows a brief, stops
+  when the brief is wrong and reports honestly has to be observed (evals,
+  then the work reports).
+- **Never trust a builder's own account.** Tokens come from the tool's
+  usage report; for the cheapest tier, the implementer reruns the checks
+  itself. Reviews always use the `top` candidate.
+
+## Part 1: dynamic model picking
+
+How it works now:
+
+- **Tiers:** `small`, `middle`, `middle+`, `top`. Each stage is scored on
+  eight measures (judgment left, files changed, files to read, contracts,
+  risk items, pattern to follow, verification, sequencing), 0–2 each, with
+  overrides. See `skills/plan-in-phases/model-selection.md`.
+- **Candidates are model + thinking level pairs.** The same model can be
+  strong at one level and poor at another.
+- **Data:** `model-report.json`, refreshed daily from Artificial Analysis
+  by a GitHub workflow. Score = Intelligence Index; cost = benchmark run
+  cost (counts the tokens a thinking level spends, not just price).
+- **Selection:** each tier takes the cheapest candidate within a share of
+  the best score (`FLOORS`: top 0.97, middle 0.85, small 0.50); within 3
+  points the cheaper one wins (`TIE_POINTS`). Thinking-level ceilings
+  (`CEILINGS`): Claude at most `high`, Haiku at most `xhigh`, Codex models
+  at most `max`.
+- **Availability:** only what the running tool lists, minus what the
+  user's account cannot use (stated in project instructions, or failed at
+  dispatch). Example: Fable is listed by Claude Code but unavailable on
+  this account.
+- **`small` is mechanical only:** no judgment, contracts, risk or
+  sequencing, a named example to copy, and every check a command.
+
+## Part 2: routing between Codex and Claude
+
+Observed strengths (from use and the evals below):
+
+- **Claude Opus:** reliable across depth and breadth; plans, reviews and
+  wide work.
+- **Codex models (Sol, Terra):** follow a narrow brief closely and report
+  honestly, but lose track across many files or large amounts of data
+  (refactors, making sense of large data sets).
+- **Claude Haiku:** writes out precise changes well, but skips dependent
+  steps and misreports its own actions at every thinking level.
+
+How it works now (`model-selection.md`, "Builders in another tool"):
+
+- Planning also writes `models-available-codex.json` and `models-codex.md`
+  when Codex is installed and signed in.
+- A stage goes to Codex only when it is **narrow** (F = 0 and R = 0: 1–2
+  files changed, at most 3 to read), `scripts/codex-usage.py` shows room
+  left in the Codex plan, and `models-codex.md` has a candidate for the
+  tier. Width decides, not tier.
+- Planning and reviews stay in the session's tool on `top`.
+- `scripts/codex-build.sh` runs the stage with `codex exec`
+  (workspace-write sandbox), returns Codex's token count, and exits 3 when
+  Codex's sign-in has lapsed so the stage falls back.
+- Usage visibility: Codex usage is readable from its session logs (as of
+  the last request). Claude usage is not visible to the agent; only the
+  user sees it (`/usage`).
+
+## Part 3: reports
+
+- **Per-stage commits** with trailers: `Stage`, `Plan`, `Tier`, `Tool`,
+  `Model`, `Effort`, `Attempt`, `Tokens`, `Tool-Calls`,
+  `Earlier-Attempt` (one per failed try), `Fixes-Stage` (on later fixes),
+  `Phase` (phase status commits).
+- **`scripts/stage-stats.sh <range>`** turns them into a Markdown report
+  per model and effort: stages, first try, **clean** (first try and never
+  fixed), failed tries, fixes needed, tokens spent, wasted, per stage, plus
+  every rerun and fix.
+- **`work-report.md`** at the end of each plan: those tables plus a Reading
+  judging each candidate. Effectiveness = clean rate; cost = tokens per
+  clean stage including waste and others' fixes.
+- **Evals** (`evals/`): seven stage briefs from this repo with hidden
+  checks and blind Opus grading, runnable on Claude Code subagents or
+  `codex exec`. Use before trusting a new model or level with a tier.
+
+## Evidence so far (2026-11)
+
+| Candidate | Runs | Result |
+| --- | --- | --- |
+| Claude Haiku 5.5, medium / high / xhigh | 21 evals | All checks passed first try (grades 9.3 / 9.4 / 9.6), but at every level skipped the multi-step order and reported "Deviations: none", and misreported commands run. Higher thinking only widened what it checked, at up to 2.4x the tokens. Extra directions helped partly and were reverted under the "unpadded" principle. |
+| GPT-6.1 Terra, low (Codex) | 1 eval (multi-step probe) | Passed, kept the step order, saw the planned failure before fixing it, accurate report; grade 10; 1.5k output tokens. |
+| GPT-6.2 Sol, medium (Codex) | 1 real phase (`stage-stats` failed column) | Passed its checks first try, accurate report, 195k tokens (1.8k output). Opus review found one real bug (non-portable awk) the planned check missed. First try, not clean. |
+
+Side observations:
+
+- `codex exec` loads the user's installed Codex plugins and skills, which
+  can steer the build (a minimal-code skill did in one run).
+- Codex sign-in can lapse while `codex login status` still says logged in.
+- Fixes made directly by the orchestrator have unknown token counts.
+
+## Open questions and next steps
+
+- **More Codex evidence:** a few more probe runs and real phases before
+  widening what goes to Codex; does a deeper stage (R = 1) work there?
+- **Behavior qualification:** record per-candidate probe results
+  (`model-behavior.json`) and have the selector cap failing candidates at
+  `small`, so qualification is code, not memory.
+- **Reverse routing:** when the session is Codex, should wide work go to
+  Claude?
+- **Quota-aware failover:** move remaining stages to the other tool when
+  one plan's limit is near; Claude's side can only react to the limit
+  warning today.
+- **Close the loop:** feed `work-report.md` results back into selection
+  (for example, demote a candidate whose clean rate stays low).
+- **Clean Codex environment:** build with a dedicated `CODEX_HOME` so the
+  user's own Codex plugins don't influence builds, if they prove harmful.
+- **Orchestrator token counts:** find a way to record tokens for fixes the
+  orchestrator makes itself.
