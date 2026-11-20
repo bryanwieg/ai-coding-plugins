@@ -3,7 +3,7 @@
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md); Codex
 builders in [models-codex.md](models-codex.md).
-Status: planned
+Status: built 02825e2
 Before: the agent cannot see Claude's plan usage. Codex usage is read by
 `plugins/phased-delivery/scripts/codex-usage.py`. No `statusLine` is set in
 `~/.claude/settings.json`.
@@ -71,7 +71,7 @@ how fast Claude's plan is being used (approved by the user, 2026-11-20):
 | --- | --- | --- | --- | --- |
 | 01.4 | `codex-build.sh` can skip Codex's sandbox and reports when it cannot start | top | first | done |
 | 01.1 | `claude-usage.py` reports Claude's usage level, with tests | middle | after 01.4, parallel with 01.3 | done |
-| 01.2 | User's status line saves its JSON for the script | top | after 01.1 | planned |
+| 01.2 | User's status line saves its JSON for the script | top | after 01.1 | done |
 | 01.3 | `codex-usage.py` ignores windows that have reset, with tests | top | after 01.4, parallel with 01.1 | done |
 
 ## 01.4 codex-build.sh: sandbox option
@@ -94,8 +94,11 @@ Contracts:
   `danger-full-access` only when the caller itself runs in a sandbox (a
   container) that is the security boundary. Codex rejects invalid values
   itself.
-- New exit code 5: `events.jsonl` contains
-  `bwrap: No permissions to create a new namespace`. Print to stderr
+- New exit code 5: a command's output in `events.jsonl` starts with the
+  error, matched as
+  `"aggregated_output":"bwrap: No permissions to create a new namespace`
+  (a file that merely quotes the error, such as this phase file, must not
+  match). Print to stderr
   `Codex's sandbox cannot start here (no user namespaces); if this session
   already runs in a sandbox, set CODEX_BUILD_SANDBOX=danger-full-access`,
   still print the `Tokens:` line, and exit 5. Checked after the exit 3
@@ -115,9 +118,9 @@ validates it) and Codex's event log (matched by a fixed string).
 
 Done when:
 - `sh -n plugins/phased-delivery/scripts/codex-build.sh` passes.
-- Rerunning with the failed 01.1 output: a copy of
-  `/tmp/qf/out-01.1/events.jsonl` makes the exit 5 check match (`grep -q`
-  with the same string).
+- The exit 5 match finds the reproduced failure in
+  `/tmp/qf/out-fail/events.jsonl` and none of the successful runs'
+  `events.jsonl` (`out-01.1`, `out-01.3`, `out-smoke`).
 - With `CODEX_BUILD_SANDBOX=danger-full-access`, a Codex run that prints
   `ok` from a shell command in the repository succeeds.
 
@@ -312,6 +315,16 @@ yet to copy). Narrow (F0 R0): Codex-eligible.
 
 ## Notes
 - Plan start: e0fbd56
+- 2026-11-20: 01.2 done by the orchestrator: `statusLine` added to
+  `~/.claude/settings.json` (other keys unchanged; backup was
+  /tmp/qf/settings.backup.json); `claude-usage.py` exits 1 on live data.
+  Work step 3 checks passed (rerun by the phase reviewer).
+- 2026-11-20: 01.4's first match string also hit successful builds (Codex
+  read this file, which quotes the error); fixed in 7728ad2 to match only a
+  command output starting with it; contract and Done when updated.
+- 2026-11-20: phase review: `claude-usage.py` treated usage above 100% as
+  no data; fixed to keep it (nearly out); `codex-build.sh` header notes
+  `CODEX_BUILD_SANDBOX`.
 - 2026-11-20: first Codex dispatch of 01.1 (gpt-6.2-sol medium, 70869
   tokens) and 01.3 (gpt-6.2-astra high, 99410 tokens) failed: Codex's
   sandbox cannot start in this container. Added 01.4 (user's choice); both
