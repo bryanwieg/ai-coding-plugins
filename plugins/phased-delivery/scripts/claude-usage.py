@@ -55,7 +55,7 @@ def main(argv):
                 raise ValueError(f"invalid {name} data")
             used, resets = window.get("used_percentage"), window.get("resets_at")
             if not (
-                type(used) in (int, float) and 0 <= used <= 100
+                type(used) in (int, float) and used >= 0
                 and type(resets) in (int, float) and -float("inf") < resets < float("inf")
             ):
                 raise ValueError(f"invalid {name} data")

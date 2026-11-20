@@ -51,6 +51,7 @@ def test_no_data(tmp_path, monkeypatch, contents):
         ({"five_hour": (85, HOUR)}, 1, ("5h window 85% used",), "ahead of pace"),
         ({"seven_day": (92, 5 * DAY)}, 2, ("weekly 92% used, 29% of window elapsed",), "nearly out"),
         ({"five_hour": (95, HOUR)}, 2, ("5h window 95% used",), "nearly out"),
+        ({"five_hour": (100.5, HOUR)}, 2, ("5h window 100.5% used",), "nearly out"),
         (
             {"seven_day": (90, 8 * DAY), "five_hour": (80, HOUR)},
             2,
