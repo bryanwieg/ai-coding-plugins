@@ -42,12 +42,14 @@ on what the user means, not on what the documents happen to say.
 Raise your own concerns too, not only questions. If you see a security
 problem, a fundamental architectural flaw, an approach that will not meet the
 spec's goals, or a much simpler way to meet them, say so plainly: what the
-concern is, the evidence (code you read, a concrete failure case), and what
-you would do instead. Push back once, clearly, then let the user decide. If
-they keep their approach, plan it as they decided and record the concern and
-their decision in the affected phase's Notes. Do not raise concerns about
-taste or style, and do not re-argue a settled point unless new evidence
-appears.
+concern is and the evidence (code you read, a concrete failure case). Then
+ask why the user chose this approach. They may know something you do not, or
+you may see something they missed. Discuss it together until the reason is
+clear and you agree which way is better: theirs, yours, or a third option
+neither started with. Change your view when their reasons hold; keep making
+your case while they do not. The user makes the final call. Record the
+concern, the reasoning and the outcome in the affected phase's Notes. Do not
+raise concerns about taste or style.
 
 Stop when no question or concern is left whose answer would change the plan.
 A small change may need only a few questions; ask none just to fill the step.
