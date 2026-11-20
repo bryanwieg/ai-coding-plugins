@@ -14,10 +14,11 @@
 # Prints "Tokens: N" (input + output, from Codex's own usage report) for
 # the stage commit.
 #
-# Exit: 0 built; 3 Codex needs `codex login` again; other non-zero: the
-# codex exit status. Never commits; the orchestrator does.
+# Exit: 0 built; 3 Codex needs `codex login` again; 5 Codex's sandbox
+# cannot start here; other non-zero: the codex exit status. Never commits;
+# the orchestrator does.
 set -u
-[ $# -eq 5 ] || { sed -n '2,18p' "$0" >&2; exit 2; }
+[ $# -eq 5 ] || { sed -n '2,19p' "$0" >&2; exit 2; }
 REPO=$1; PROMPT=$2; MODEL=$3; EFFORT=$4; OUT=$5
 SANDBOX=${CODEX_BUILD_SANDBOX:-workspace-write}
 case "$SANDBOX" in
@@ -34,6 +35,11 @@ status=$?
 if grep -q 'could not be refreshed\|Please log out and sign in again\|Not logged in' "$OUT/stderr.txt"; then
   echo "Codex sign-in has lapsed: run 'codex logout && codex login --device-auth'" >&2
   exit 3
+fi
+# Match only a command whose output starts with the error, not a file that quotes it.
+if grep -q '"aggregated_output":"bwrap: No permissions to create a new namespace' "$OUT/events.jsonl"; then
+  echo "Codex's sandbox cannot start here (no user namespaces); if this session already runs in a sandbox, set CODEX_BUILD_SANDBOX=danger-full-access" >&2
+  status=5
 fi
 python3 - "$OUT/events.jsonl" <<'PY'
 import json, sys
