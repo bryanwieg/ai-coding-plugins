@@ -57,17 +57,76 @@ how fast Claude's plan is being used (approved by the user, 2026-11-20):
 - Verified: `scripts/codex-usage.py` is the pattern to copy: stdlib only,
   docstring as usage text, one printed line, exit code as the result.
 - Verified: the plugin has no `tests/` directory yet; pytest is installed.
-- Open: the user's plan actually emits `rate_limits` (Pro/Max/Ultra). Check
-  in 01.2 after the first refresh; if absent, `claude-usage.py` reports "no
-  data" and routing stays as today, which is the designed fallback.
+- Verified (2026-11-20, first dispatch of 01.1 and 01.3): inside a sandbox
+  container that blocks user namespaces, `codex-build.sh`'s
+  `--sandbox workspace-write` cannot start a shell. Codex exits 0, its
+  report says it could not read the prompt, and `events.jsonl` contains
+  `bwrap: No permissions to create a new namespace`.
+- Verified (2026-11-20): the user's plan emits `rate_limits`; after 01.2's
+  setting, `~/.claude/claude-usage.json` held `five_hour` and `seven_day`.
 
 ## Stages
 
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
-| 01.1 | `claude-usage.py` reports Claude's usage level, with tests | middle | first, parallel with 01.3 | planned |
+| 01.4 | `codex-build.sh` can skip Codex's sandbox and reports when it cannot start | top | first | planned |
+| 01.1 | `claude-usage.py` reports Claude's usage level, with tests | middle | after 01.4, parallel with 01.3 | planned |
 | 01.2 | User's status line saves its JSON for the script | top | after 01.1 | planned |
-| 01.3 | `codex-usage.py` ignores windows that have reset, with tests | top | parallel with 01.1 | planned |
+| 01.3 | `codex-usage.py` ignores windows that have reset, with tests | top | after 01.4, parallel with 01.1 | planned |
+
+## 01.4 codex-build.sh: sandbox option
+
+Goal: an orchestrator that already runs inside a sandbox can build with
+Codex, and a Codex sandbox that cannot start is reported, not accepted.
+
+Context: `plugins/phased-delivery/scripts/codex-build.sh` runs
+`codex exec ... --sandbox workspace-write ...`, writes `events.jsonl` and
+`stderr.txt` in OUTDIR, exits 3 on lapsed sign-in (a `grep` of
+`stderr.txt`), otherwise prints `Tokens: N` and exits with Codex's status.
+The failure this fixes is in this phase's Assumptions. The user chose this
+option (2026-11-20) over running Codex unsandboxed ad hoc or building in
+Claude.
+
+Contracts:
+- Environment variable `CODEX_BUILD_SANDBOX`: its value is passed to
+  `codex exec --sandbox` unchanged; unset or empty means
+  `workspace-write` (today's behavior). Meant to be set to
+  `danger-full-access` only when the caller itself runs in a sandbox (a
+  container) that is the security boundary. Codex rejects invalid values
+  itself.
+- New exit code 5: `events.jsonl` contains
+  `bwrap: No permissions to create a new namespace`. Print to stderr
+  `Codex's sandbox cannot start here (no user namespaces); if this session
+  already runs in a sandbox, set CODEX_BUILD_SANDBOX=danger-full-access`,
+  still print the `Tokens:` line, and exit 5. Checked after the exit 3
+  check.
+- The header comment documents the variable and exit 5. Everything else
+  is unchanged.
+
+Files: `plugins/phased-delivery/scripts/codex-build.sh`
+
+Work:
+1. Use `"${CODEX_BUILD_SANDBOX:-workspace-write}"` for `--sandbox`.
+2. Add the exit 5 check and header lines; keep the usage `sed` range
+   covering the whole header.
+
+External inputs: the environment variable (passed through; Codex
+validates it) and Codex's event log (matched by a fixed string).
+
+Done when:
+- `sh -n plugins/phased-delivery/scripts/codex-build.sh` passes.
+- Rerunning with the failed 01.1 output: a copy of
+  `/tmp/qf/out-01.1/events.jsonl` makes the exit 5 check match (`grep -q`
+  with the same string).
+- With `CODEX_BUILD_SANDBOX=danger-full-access`, a Codex run that prints
+  `ok` from a shell command in the repository succeeds.
+
+Out of scope: the routing rule and docs (phase 02 covers mentioning the
+variable), other scripts.
+
+Model basis: J0 F0 R0 C1 K2 P0 V1 S1 = 5 -> override 1 (K = 2: turns off a
+sandbox; no tests cover the script) -> top. Built directly by the
+orchestrator: Codex cannot run here until this stage exists.
 
 ## 01.1 claude-usage.py
 
@@ -252,6 +311,13 @@ another system's logs, and changes code no test covers; P: no tests exist
 yet to copy). Narrow (F0 R0): Codex-eligible.
 
 ## Notes
+- Plan start: e0fbd56
+- 2026-11-20: first Codex dispatch of 01.1 (gpt-6.2-sol medium, 70869
+  tokens) and 01.3 (gpt-6.2-astra high, 99410 tokens) failed: Codex's
+  sandbox cannot start in this container. Added 01.4 (user's choice); both
+  stages rerun after it. 01.2's settings were applied early (only its
+  final check needs 01.1); the open `rate_limits` assumption is verified:
+  the saved JSON has `five_hour` and `seven_day`.
 - 2026-11-20: review round 3: 01.3 re-scored K2 -> top.
 - 2026-11-20: review round 2: each status line run sweeps leftover temp
   files older than a minute (a trap was tested and does not fire while

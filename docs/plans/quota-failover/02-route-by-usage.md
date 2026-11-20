@@ -116,7 +116,12 @@ Work:
 4. SKILL.md, "### 4. Commit and stop": add that a stop from the routing rule
    reports both scripts' output lines and the stages left, and the
    review-pending status and resume rule.
-5. phase-reviewer.md header: change "Use the `top` candidate from the plan's
+5. model-selection.md, "Builders in another tool": add a bullet:
+   `codex-build.sh` exit 5 means Codex's sandbox cannot start here; build
+   the stage in the session and tell the user that, if the session already
+   runs in a sandbox, they can set `CODEX_BUILD_SANDBOX=danger-full-access`
+   (for example in the sandbox's agent environment).
+6. phase-reviewer.md header: change "Use the `top` candidate from the plan's
    `models.md`" to add "or from `models-codex.md` when the routing rule in
    model-selection.md sends the review to Codex". Nothing below `---`
    changes.
@@ -145,6 +150,7 @@ Goal: README and `docs/model-routing.md` describe usage-based routing and
 its setup, and the plugin version is 0.5.0.
 
 Context: 02.1's text in model-selection.md is the rule to describe;
+`codex-build.sh`'s header (01.4) documents `CODEX_BUILD_SANDBOX`;
 phase 01's 01.2 has the `statusLine` setting to document.
 
 Contracts: the routing rule above; the `statusLine` command from
@@ -162,7 +168,10 @@ Work:
    a sentence that `bash "$d/ponytail-statusline.sh" < "$t"` stands for the
    user's own status line command, which reads `< "$t"`, or is dropped if
    they have none. Say it needs a Pro/Max/Ultra plan and that without it
-   routing stays as before.
+   routing stays as before. Add one sentence on `CODEX_BUILD_SANDBOX`
+   (phase 01 stage 01.4): set it to `danger-full-access` only when Claude
+   Code itself runs in a sandbox container where Codex's own sandbox
+   cannot start.
 2. `docs/model-routing.md` Part 2, "How it works now": replace the bullets
    "A stage goes to Codex only when it is **narrow** ..." and "Planning and
    reviews stay in the session's tool on `top`." (lines 88–92) with the
