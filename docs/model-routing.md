@@ -98,7 +98,9 @@ How it works now (`model-selection.md`, "Builders in another tool"):
 - Inside a container that is itself the boundary (the ai-coding-sandbox
   agent image), Codex's bubblewrap sandbox cannot start, so the container
   sets `CODEX_BUILD_SANDBOX=danger-full-access` and Codex runs unsandboxed
-  within it, as interactive sessions there already do.
+  within it, with plugin hooks untrusted-but-enabled, as interactive
+  sessions there already do. The builder uses Codex's own state (sign-in,
+  memories, plugins), since the container mounts both agents' state.
 - Usage visibility: Codex usage is readable from its session logs (as of
   the last request). Claude usage is not visible to the agent; only the
   user sees it (`/usage`).

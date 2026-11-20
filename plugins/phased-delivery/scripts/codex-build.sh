@@ -9,23 +9,25 @@
 # CODEX_BUILD_SANDBOX sets Codex's sandbox mode (default workspace-write).
 # A container that is itself the boundary, where Codex's own bubblewrap
 # sandbox cannot start, sets it to danger-full-access; Codex then has the
-# whole container rather than REPO alone.
+# whole container rather than REPO alone, and its plugin hooks run without
+# per-hook trust review, as in that container's own Codex sessions.
 # Prints "Tokens: N" (input + output, from Codex's own usage report) for
 # the stage commit.
 #
 # Exit: 0 built; 3 Codex needs `codex login` again; other non-zero: the
 # codex exit status. Never commits; the orchestrator does.
 set -u
-[ $# -eq 5 ] || { sed -n '2,17p' "$0" >&2; exit 2; }
+[ $# -eq 5 ] || { sed -n '2,18p' "$0" >&2; exit 2; }
 REPO=$1; PROMPT=$2; MODEL=$3; EFFORT=$4; OUT=$5
 SANDBOX=${CODEX_BUILD_SANDBOX:-workspace-write}
 case "$SANDBOX" in
-  workspace-write|danger-full-access) ;;
+  workspace-write) set -- ;;
+  danger-full-access) set -- --dangerously-bypass-hook-trust ;;
   *) echo "CODEX_BUILD_SANDBOX must be workspace-write or danger-full-access, not '$SANDBOX'" >&2; exit 2 ;;
 esac
 mkdir -p "$OUT"
 codex exec -m "$MODEL" -c model_reasoning_effort="$EFFORT" \
-  --cd "$REPO" --sandbox "$SANDBOX" --json -o "$OUT/report.md" \
+  --cd "$REPO" --sandbox "$SANDBOX" "$@" --json -o "$OUT/report.md" \
   "Your complete directions are in $PROMPT. Read that file first and follow it exactly. Your final message is your report." \
   > "$OUT/events.jsonl" 2> "$OUT/stderr.txt"
 status=$?
