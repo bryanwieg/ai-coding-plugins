@@ -9,7 +9,8 @@ Codex request, not live.
 
 Prints one line, then exits 0 when both limits are below the maximums
 (defaults: 80% of the short window, 90% of the weekly one), 1 when either is
-at or above, 2 when no usage data is found.
+at or above, 2 when no usage data is found. A window that has reset since
+the last Codex request counts as 0% used.
 """
 
 import datetime
@@ -17,6 +18,7 @@ import glob
 import json
 import os
 import sys
+import time
 
 
 def latest_limits():
@@ -68,11 +70,22 @@ def main(argv):
         print("no Codex usage data found; run any Codex request first")
         return 2
     primary, weekly = found["primary"], found.get("secondary")
-    parts = [describe(f"{primary['window_minutes'] // 60}h window", primary)]
-    over = primary["used_percent"] >= limits["--max-window"]
-    if weekly:
-        parts.append(describe("weekly", weekly))
-        over = over or weekly["used_percent"] >= limits["--max-weekly"]
+    now = time.time()
+    parts = []
+    over = False
+    for name, window, maximum in (
+        (f"{primary['window_minutes'] // 60}h window", primary, limits["--max-window"]),
+        ("weekly", weekly, limits["--max-weekly"]),
+    ):
+        if not window:
+            continue
+        used = window["used_percent"]
+        if window["resets_at"] <= now:
+            parts.append(f"{name} reset since last Codex request")
+            used = 0
+        else:
+            parts.append(describe(name, window))
+        over = over or used >= maximum
     print("; ".join(parts) + ("; over the maximum" if over else "; room left"))
     return 1 if over else 0
 

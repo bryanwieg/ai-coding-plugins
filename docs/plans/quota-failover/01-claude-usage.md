@@ -72,7 +72,7 @@ how fast Claude's plan is being used (approved by the user, 2026-11-20):
 | 01.4 | `codex-build.sh` can skip Codex's sandbox and reports when it cannot start | top | first | done |
 | 01.1 | `claude-usage.py` reports Claude's usage level, with tests | middle | after 01.4, parallel with 01.3 | done |
 | 01.2 | User's status line saves its JSON for the script | top | after 01.1 | planned |
-| 01.3 | `codex-usage.py` ignores windows that have reset, with tests | top | after 01.4, parallel with 01.1 | planned |
+| 01.3 | `codex-usage.py` ignores windows that have reset, with tests | top | after 01.4, parallel with 01.1 | done |
 
 ## 01.4 codex-build.sh: sandbox option
 
