@@ -42,7 +42,7 @@ level, so it counts the tokens the level spends, not only the price.
 | Anthropic | Claude Fable 5.1 | xhigh | Xhigh, Default Fallback | claude-fable-5-1-xhigh | 2026-09-01 | 50.0 | 57.2 | 10096.62 | 10.00 / 50.00 | 86 |
 | Anthropic | Claude Fable 5.2 | high | High, Default Fallback | claude-fable-5-2-high | 2026-11-09 | 61.8 | 69.6 | 7105.77 | 8.00 / 40.00 | 107 |
 | Anthropic | Claude Fable 5.2 | low | Low, Default Fallback | claude-fable-5-2-low | 2026-11-09 | 53.9 | 61.6 | 2861.78 | 8.00 / 40.00 | 108 |
-| Anthropic | Claude Fable 5.2 | max | Max, Default Fallback | claude-fable-5-2 | 2026-11-09 | 64.6 | 72.6 | 22191.42 | 8.00 / 40.00 | 110 |
+| Anthropic | Claude Fable 5.2 | max | Max, Default Fallback | claude-fable-5-2 | 2026-11-09 | 64.6 | 72.6 | 22191.42 | 8.00 / 40.00 | 109 |
 | Anthropic | Claude Fable 5.2 | medium | Medium, Default Fallback | claude-fable-5-2-medium | 2026-11-09 | 56.4 | 64.7 | 3359.66 | 8.00 / 40.00 | 110 |
 | Anthropic | Claude Fable 5.2 | xhigh | Xhigh, Default Fallback | claude-fable-5-2-xhigh | 2026-11-09 | 62.2 | 70.2 | 11741.62 | 8.00 / 40.00 | 110 |
 | Anthropic | Claude Haiku 5.5 | high | High | claude-haiku-5-5-high | 2026-10-07 | 29.9 | 36.5 | 121.41 | 0.10 / 0.50 | 226 |
@@ -65,7 +65,7 @@ level, so it counts the tokens the level spends, not only the price.
 | Anthropic | Claude Opus 5 | xhigh | Xhigh | claude-opus-5-xhigh | 2026-07-24 |  |  |  | 5.00 / 25.00 | 80 |
 | Anthropic | Claude Opus 5.5 | high | High, Default Fallback | claude-opus-5-5-high | 2026-09-22 | 51.8 | 57.8 | 2715.98 | 4.00 / 20.00 | 106 |
 | Anthropic | Claude Opus 5.5 | low | Low, Default Fallback | claude-opus-5-5-low | 2026-09-22 | 34.8 | 43.2 | 979.66 | 4.00 / 20.00 | 103 |
-| Anthropic | Claude Opus 5.5 | max | Max, Default Fallback | claude-opus-5-5 | 2026-09-22 | 59.1 | 65.3 | 8909.67 | 4.00 / 20.00 | 112 |
+| Anthropic | Claude Opus 5.5 | max | Max, Default Fallback | claude-opus-5-5 | 2026-09-22 | 59.1 | 65.3 | 8909.67 | 4.00 / 20.00 | 113 |
 | Anthropic | Claude Opus 5.5 | medium | Medium, Default Fallback | claude-opus-5-5-medium | 2026-09-22 | 48.2 | 53.7 | 2031.27 | 4.00 / 20.00 | 106 |
 | Anthropic | Claude Opus 5.5 | xhigh | Xhigh, Default Fallback | claude-opus-5-5-xhigh | 2026-09-22 | 57.4 | 62.9 | 4765.91 | 4.00 / 20.00 | 107 |
 | Anthropic | Claude Sonnet 4.6 | max | Max | claude-sonnet-4-6-adaptive | 2026-02-17 |  |  |  | 3.00 / 15.00 | 59 |
@@ -119,7 +119,7 @@ level, so it counts the tokens the level spends, not only the price.
 | OpenAI | GPT-5.2 | non-reasoning | Non-reasoning | gpt-5-2-non-reasoning | 2025-12-11 |  |  |  | 1.75 / 14.00 | 57 |
 | OpenAI | GPT-5.2 | xhigh | Xhigh | gpt-5-2 | 2025-12-11 |  |  |  | 1.75 / 14.00 | 68 |
 | OpenAI | GPT-5.2 Codex | xhigh | Xhigh | gpt-5-2-codex | 2025-12-11 |  |  |  | 1.75 / 14.00 | 73 |
-| OpenAI | GPT-5.3 Codex | xhigh | Xhigh | gpt-5-3-codex | 2026-02-05 |  |  |  | 1.75 / 14.00 | 74 |
+| OpenAI | GPT-5.3 Codex | xhigh | Xhigh | gpt-5-3-codex | 2026-02-05 |  |  |  | 1.75 / 14.00 | 75 |
 | OpenAI | GPT-5.4 | low | Low | gpt-5-4-low | 2026-03-05 |  |  |  | 2.50 / 15.00 | 54 |
 | OpenAI | GPT-5.4 | non-reasoning | Non-reasoning | gpt-5-4-non-reasoning | 2026-03-05 |  |  |  | 2.50 / 15.00 | 44 |
 | OpenAI | GPT-5.4 | xhigh | Xhigh | gpt-5-4 | 2026-03-05 |  |  |  | 2.50 / 15.00 | 64 |
@@ -161,12 +161,12 @@ level, so it counts the tokens the level spends, not only the price.
 | OpenAI | GPT-6 Astra | max | Max | gpt-6-astra | 2026-09-03 | 56.9 | 61.8 | 5661.18 | 10.00 / 50.00 | 40 |
 | OpenAI | GPT-6 Astra | medium | Medium | gpt-6-astra-medium | 2026-09-03 | 51.6 | 56.8 | 2638.29 | 10.00 / 50.00 | 45 |
 | OpenAI | GPT-6 Astra | xhigh | Xhigh | gpt-6-astra-xhigh | 2026-09-03 | 55.3 | 60.4 | 3746.22 | 10.00 / 50.00 | 42 |
-| OpenAI | GPT-6 Luna | high | High | gpt-6-luna-high | 2026-09-22 | 21.4 | 27.3 | 62.58 | 0.10 / 0.50 | 89 |
+| OpenAI | GPT-6 Luna | high | High | gpt-6-luna-high | 2026-09-22 | 21.4 | 27.3 | 62.58 | 0.10 / 0.50 | 90 |
 | OpenAI | GPT-6 Luna | low | Low | gpt-6-luna-low | 2026-09-22 | 9.7 | 18.7 | 9.09 | 0.10 / 0.50 | 87 |
-| OpenAI | GPT-6 Luna | max | Max | gpt-6-luna | 2026-09-22 | 27.9 | 33.3 | 136.06 | 0.10 / 0.50 | 100 |
+| OpenAI | GPT-6 Luna | max | Max | gpt-6-luna | 2026-09-22 | 27.9 | 33.3 | 136.06 | 0.10 / 0.50 | 101 |
 | OpenAI | GPT-6 Luna | medium | Medium | gpt-6-luna-medium | 2026-09-22 | 18.5 | 24.9 | 39.55 | 0.10 / 0.50 | 91 |
-| OpenAI | GPT-6 Luna | non-reasoning | Non-reasoning | gpt-6-luna-non-reasoning | 2026-09-22 | 9.4 | 16.6 | 53.14 | 0.10 / 0.50 | 81 |
-| OpenAI | GPT-6 Luna | xhigh | Xhigh | gpt-6-luna-xhigh | 2026-09-22 | 23.5 | 29.0 | 85.74 | 0.10 / 0.50 | 97 |
+| OpenAI | GPT-6 Luna | non-reasoning | Non-reasoning | gpt-6-luna-non-reasoning | 2026-09-22 | 9.4 | 16.6 | 53.14 | 0.10 / 0.50 | 82 |
+| OpenAI | GPT-6 Luna | xhigh | Xhigh | gpt-6-luna-xhigh | 2026-09-22 | 23.5 | 29.0 | 85.74 | 0.10 / 0.50 | 98 |
 | OpenAI | GPT-6 Sol | daybreak blue | Daybreak Blue, max | gpt-6-sol-daybreak-blue | 2026-09-22 |  |  |  | 2.00 / 10.00 |  |
 | OpenAI | GPT-6 Sol | high | High | gpt-6-sol-high | 2026-09-22 |  |  |  | 2.00 / 10.00 | 100 |
 | OpenAI | GPT-6 Sol | low | Low | gpt-6-sol-low | 2026-09-22 |  |  |  | 2.00 / 10.00 | 88 |
@@ -183,27 +183,27 @@ level, so it counts the tokens the level spends, not only the price.
 | OpenAI | GPT-6.1 Terra | low | Low | gpt-6-1-terra-low | 2026-10-26 | 29.4 | 35.2 | 111.16 | 1.00 / 5.00 | 54 |
 | OpenAI | GPT-6.1 Terra | max | Max | gpt-6-1-terra | 2026-10-26 | 51.3 | 54.7 | 972.34 | 1.00 / 5.00 | 62 |
 | OpenAI | GPT-6.1 Terra | medium | Medium | gpt-6-1-terra-medium | 2026-10-26 | 38.2 | 42.6 | 190.36 | 1.00 / 5.00 | 58 |
-| OpenAI | GPT-6.1 Terra | non-reasoning | Non-reasoning | gpt-6-1-terra-non-reasoning | 2026-10-26 | 30.5 | 32.8 | 213.33 | 1.00 / 5.00 | 57 |
+| OpenAI | GPT-6.1 Terra | non-reasoning | Non-reasoning | gpt-6-1-terra-non-reasoning | 2026-10-26 | 30.5 | 32.8 | 213.33 | 1.00 / 5.00 | 58 |
 | OpenAI | GPT-6.1 Terra | xhigh | Xhigh | gpt-6-1-terra-xhigh | 2026-10-26 | 45.3 | 49.4 | 400.18 | 1.00 / 5.00 | 59 |
-| OpenAI | GPT-6.2 Astra | high | High | gpt-6-2-astra-high | 2026-11-17 | 60.1 | 63.6 | 2006.78 | 8.00 / 40.00 | 48 |
+| OpenAI | GPT-6.2 Astra | high | High | gpt-6-2-astra-high | 2026-11-17 | 60.1 | 63.6 | 2006.78 | 8.00 / 40.00 | 47 |
 | OpenAI | GPT-6.2 Astra | low | Low | gpt-6-2-astra-low | 2026-11-17 | 45.7 | 50.5 | 794.01 | 8.00 / 40.00 | 44 |
 | OpenAI | GPT-6.2 Astra | max | Max | gpt-6-2-astra | 2026-11-17 | 62.1 | 66.6 | 4530.46 | 8.00 / 40.00 | 48 |
 | OpenAI | GPT-6.2 Astra | medium | Medium | gpt-6-2-astra-medium | 2026-11-17 | 57.0 | 59.9 | 1456.80 | 8.00 / 40.00 | 45 |
 | OpenAI | GPT-6.2 Astra | xhigh | Xhigh | gpt-6-2-astra-xhigh | 2026-11-17 | 61.6 | 65.1 | 2483.62 | 8.00 / 40.00 | 48 |
-| OpenAI | GPT-6.2 Sol | high | High | gpt-6-2-sol-high | 2026-11-17 | 54.9 | 58.7 | 552.68 | 2.00 / 10.00 | 68 |
-| OpenAI | GPT-6.2 Sol | low | Low | gpt-6-2-sol-low | 2026-11-17 | 40.6 | 44.4 | 224.22 | 2.00 / 10.00 | 62 |
-| OpenAI | GPT-6.2 Sol | max | Max | gpt-6-2-sol | 2026-11-17 | 57.3 | 61.2 | 1108.28 | 2.00 / 10.00 | 72 |
-| OpenAI | GPT-6.2 Sol | medium | Medium | gpt-6-2-sol-medium | 2026-11-17 | 52.7 | 56.2 | 405.17 | 2.00 / 10.00 | 66 |
-| OpenAI | GPT-6.2 Sol | xhigh | Xhigh | gpt-6-2-sol-xhigh | 2026-11-17 | 55.7 | 59.9 | 698.10 | 2.00 / 10.00 | 70 |
+| OpenAI | GPT-6.2 Sol | high | High | gpt-6-2-sol-high | 2026-11-17 | 54.9 | 58.7 | 552.68 | 2.00 / 10.00 | 67 |
+| OpenAI | GPT-6.2 Sol | low | Low | gpt-6-2-sol-low | 2026-11-17 | 40.6 | 44.4 | 224.22 | 2.00 / 10.00 | 61 |
+| OpenAI | GPT-6.2 Sol | max | Max | gpt-6-2-sol | 2026-11-17 | 57.3 | 61.2 | 1108.28 | 2.00 / 10.00 | 70 |
+| OpenAI | GPT-6.2 Sol | medium | Medium | gpt-6-2-sol-medium | 2026-11-17 | 52.7 | 56.2 | 405.17 | 2.00 / 10.00 | 64 |
+| OpenAI | GPT-6.2 Sol | xhigh | Xhigh | gpt-6-2-sol-xhigh | 2026-11-17 | 55.7 | 59.9 | 698.10 | 2.00 / 10.00 | 68 |
 | OpenAI | gpt-oss-120b | high | High | gpt-oss-120b | 2025-08-05 | 3.8 | 11.2 | 264.99 | 0.15 / 0.60 | 214 |
-| OpenAI | gpt-oss-120b | low | Low | gpt-oss-120b-low | 2025-08-05 |  |  |  | 0.12 / 0.59 | 175 |
-| OpenAI | gpt-oss-20b | high | High | gpt-oss-20b | 2025-08-05 |  |  |  | 0.05 / 0.22 | 98 |
-| OpenAI | gpt-oss-20b | low | Low | gpt-oss-20b-low | 2025-08-05 |  |  |  | 0.07 / 0.30 | 89 |
+| OpenAI | gpt-oss-120b | low | Low | gpt-oss-120b-low | 2025-08-05 |  |  |  | 0.12 / 0.59 | 177 |
+| OpenAI | gpt-oss-20b | high | High | gpt-oss-20b | 2025-08-05 |  |  |  | 0.05 / 0.22 | 101 |
+| OpenAI | gpt-oss-20b | low | Low | gpt-oss-20b-low | 2025-08-05 |  |  |  | 0.07 / 0.30 | 90 |
 | OpenAI | o1 |  |  | o1 | 2024-12-05 |  |  |  | 15.00 / 60.00 |  |
 | OpenAI | o1-mini |  |  | o1-mini | 2024-09-12 |  |  |  |  |  |
 | OpenAI | o1-preview |  |  | o1-preview | 2024-09-12 |  |  |  | 16.50 / 66.00 |  |
 | OpenAI | o1-pro |  |  | o1-pro | 2025-03-19 |  |  |  | 150.00 / 600.00 |  |
-| OpenAI | o3 |  |  | o3 | 2025-04-16 |  |  |  | 2.00 / 8.00 | 114 |
+| OpenAI | o3 |  |  | o3 | 2025-04-16 |  |  |  | 2.00 / 8.00 | 113 |
 | OpenAI | o3-mini |  |  | o3-mini | 2025-01-31 |  |  |  | 1.10 / 4.40 | 185 |
 | OpenAI | o3-mini | high | High | o3-mini-high | 2025-01-31 |  |  |  | 1.10 / 4.40 | 205 |
 | OpenAI | o3-pro |  |  | o3-pro | 2025-06-10 |  |  |  | 20.00 / 80.00 |  |

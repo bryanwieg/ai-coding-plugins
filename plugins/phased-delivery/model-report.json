@@ -407,7 +407,7 @@
       "benchmark_run_cost_usd": 7105.77,
       "price_in_per_1m_usd": 8,
       "price_out_per_1m_usd": 40,
-      "output_tokens_per_second": 107.42
+      "output_tokens_per_second": 107.4
     },
     {
       "creator": "Anthropic",
@@ -422,7 +422,7 @@
       "benchmark_run_cost_usd": 2861.78,
       "price_in_per_1m_usd": 8,
       "price_out_per_1m_usd": 40,
-      "output_tokens_per_second": 108.22
+      "output_tokens_per_second": 108.19
     },
     {
       "creator": "Anthropic",
@@ -437,7 +437,7 @@
       "benchmark_run_cost_usd": 22191.42,
       "price_in_per_1m_usd": 8,
       "price_out_per_1m_usd": 40,
-      "output_tokens_per_second": 109.88
+      "output_tokens_per_second": 108.72
     },
     {
       "creator": "Anthropic",
@@ -452,7 +452,7 @@
       "benchmark_run_cost_usd": 3359.66,
       "price_in_per_1m_usd": 8,
       "price_out_per_1m_usd": 40,
-      "output_tokens_per_second": 110.5
+      "output_tokens_per_second": 110.34
     },
     {
       "creator": "Anthropic",
@@ -467,7 +467,7 @@
       "benchmark_run_cost_usd": 11741.62,
       "price_in_per_1m_usd": 8,
       "price_out_per_1m_usd": 40,
-      "output_tokens_per_second": 110.03
+      "output_tokens_per_second": 110.02
     },
     {
       "creator": "Anthropic",
@@ -482,7 +482,7 @@
       "benchmark_run_cost_usd": 121.41,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 225.74
+      "output_tokens_per_second": 225.63
     },
     {
       "creator": "Anthropic",
@@ -497,7 +497,7 @@
       "benchmark_run_cost_usd": 39.6,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 216.1
+      "output_tokens_per_second": 215.73
     },
     {
       "creator": "Anthropic",
@@ -512,7 +512,7 @@
       "benchmark_run_cost_usd": 339.47,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 251.52
+      "output_tokens_per_second": 251.69
     },
     {
       "creator": "Anthropic",
@@ -527,7 +527,7 @@
       "benchmark_run_cost_usd": 72.7,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 220.84
+      "output_tokens_per_second": 220.89
     },
     {
       "creator": "Anthropic",
@@ -542,7 +542,7 @@
       "benchmark_run_cost_usd": 192.7,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 238.22
+      "output_tokens_per_second": 237.69
     },
     {
       "creator": "Anthropic",
@@ -752,7 +752,7 @@
       "benchmark_run_cost_usd": 2715.98,
       "price_in_per_1m_usd": 4,
       "price_out_per_1m_usd": 20,
-      "output_tokens_per_second": 106.15
+      "output_tokens_per_second": 106.33
     },
     {
       "creator": "Anthropic",
@@ -767,7 +767,7 @@
       "benchmark_run_cost_usd": 979.66,
       "price_in_per_1m_usd": 4,
       "price_out_per_1m_usd": 20,
-      "output_tokens_per_second": 103.01
+      "output_tokens_per_second": 103.11
     },
     {
       "creator": "Anthropic",
@@ -782,7 +782,7 @@
       "benchmark_run_cost_usd": 8909.67,
       "price_in_per_1m_usd": 4,
       "price_out_per_1m_usd": 20,
-      "output_tokens_per_second": 112.33
+      "output_tokens_per_second": 112.53
     },
     {
       "creator": "Anthropic",
@@ -797,7 +797,7 @@
       "benchmark_run_cost_usd": 2031.27,
       "price_in_per_1m_usd": 4,
       "price_out_per_1m_usd": 20,
-      "output_tokens_per_second": 105.95
+      "output_tokens_per_second": 106
     },
     {
       "creator": "Anthropic",
@@ -812,7 +812,7 @@
       "benchmark_run_cost_usd": 4765.91,
       "price_in_per_1m_usd": 4,
       "price_out_per_1m_usd": 20,
-      "output_tokens_per_second": 106.84
+      "output_tokens_per_second": 106.95
     },
     {
       "creator": "Anthropic",
@@ -962,7 +962,7 @@
       "benchmark_run_cost_usd": 1268.3,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 136.3
+      "output_tokens_per_second": 136.32
     },
     {
       "creator": "Anthropic",
@@ -977,7 +977,7 @@
       "benchmark_run_cost_usd": 499.2,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 133.45
+      "output_tokens_per_second": 133.38
     },
     {
       "creator": "Anthropic",
@@ -992,7 +992,7 @@
       "benchmark_run_cost_usd": 7980.63,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 144.36
+      "output_tokens_per_second": 144.47
     },
     {
       "creator": "Anthropic",
@@ -1007,7 +1007,7 @@
       "benchmark_run_cost_usd": 679.16,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 135.94
+      "output_tokens_per_second": 135.89
     },
     {
       "creator": "Anthropic",
@@ -1022,7 +1022,7 @@
       "benchmark_run_cost_usd": 2902.5,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 140.63
+      "output_tokens_per_second": 140.67
     },
     {
       "creator": "OpenAI",
@@ -1592,7 +1592,7 @@
       "benchmark_run_cost_usd": null,
       "price_in_per_1m_usd": 1.75,
       "price_out_per_1m_usd": 14,
-      "output_tokens_per_second": 74.31
+      "output_tokens_per_second": 74.55
     },
     {
       "creator": "OpenAI",
@@ -1832,7 +1832,7 @@
       "benchmark_run_cost_usd": null,
       "price_in_per_1m_usd": 5,
       "price_out_per_1m_usd": 30,
-      "output_tokens_per_second": 124.46
+      "output_tokens_per_second": 123.97
     },
     {
       "creator": "OpenAI",
@@ -2222,7 +2222,7 @@
       "benchmark_run_cost_usd": 62.58,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 88.6
+      "output_tokens_per_second": 89.63
     },
     {
       "creator": "OpenAI",
@@ -2237,7 +2237,7 @@
       "benchmark_run_cost_usd": 9.09,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 86.69
+      "output_tokens_per_second": 87.17
     },
     {
       "creator": "OpenAI",
@@ -2252,7 +2252,7 @@
       "benchmark_run_cost_usd": 136.06,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 100.3
+      "output_tokens_per_second": 101.28
     },
     {
       "creator": "OpenAI",
@@ -2267,7 +2267,7 @@
       "benchmark_run_cost_usd": 39.55,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 90.7
+      "output_tokens_per_second": 91.37
     },
     {
       "creator": "OpenAI",
@@ -2282,7 +2282,7 @@
       "benchmark_run_cost_usd": 53.14,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 80.89
+      "output_tokens_per_second": 82.08
     },
     {
       "creator": "OpenAI",
@@ -2297,7 +2297,7 @@
       "benchmark_run_cost_usd": 85.74,
       "price_in_per_1m_usd": 0.1,
       "price_out_per_1m_usd": 0.5,
-      "output_tokens_per_second": 97.03
+      "output_tokens_per_second": 98.03
     },
     {
       "creator": "OpenAI",
@@ -2492,7 +2492,7 @@
       "benchmark_run_cost_usd": 266.79,
       "price_in_per_1m_usd": 1,
       "price_out_per_1m_usd": 5,
-      "output_tokens_per_second": 59.23
+      "output_tokens_per_second": 59.48
     },
     {
       "creator": "OpenAI",
@@ -2507,7 +2507,7 @@
       "benchmark_run_cost_usd": 111.16,
       "price_in_per_1m_usd": 1,
       "price_out_per_1m_usd": 5,
-      "output_tokens_per_second": 53.93
+      "output_tokens_per_second": 53.84
     },
     {
       "creator": "OpenAI",
@@ -2522,7 +2522,7 @@
       "benchmark_run_cost_usd": 972.34,
       "price_in_per_1m_usd": 1,
       "price_out_per_1m_usd": 5,
-      "output_tokens_per_second": 61.7
+      "output_tokens_per_second": 62.12
     },
     {
       "creator": "OpenAI",
@@ -2537,7 +2537,7 @@
       "benchmark_run_cost_usd": 190.36,
       "price_in_per_1m_usd": 1,
       "price_out_per_1m_usd": 5,
-      "output_tokens_per_second": 58.15
+      "output_tokens_per_second": 58.41
     },
     {
       "creator": "OpenAI",
@@ -2552,7 +2552,7 @@
       "benchmark_run_cost_usd": 213.33,
       "price_in_per_1m_usd": 1,
       "price_out_per_1m_usd": 5,
-      "output_tokens_per_second": 57.31
+      "output_tokens_per_second": 57.9
     },
     {
       "creator": "OpenAI",
@@ -2567,7 +2567,7 @@
       "benchmark_run_cost_usd": 400.18,
       "price_in_per_1m_usd": 1,
       "price_out_per_1m_usd": 5,
-      "output_tokens_per_second": 58.57
+      "output_tokens_per_second": 59.27
     },
     {
       "creator": "OpenAI",
@@ -2582,7 +2582,7 @@
       "benchmark_run_cost_usd": 2006.78,
       "price_in_per_1m_usd": 8,
       "price_out_per_1m_usd": 40,
-      "output_tokens_per_second": 47.88
+      "output_tokens_per_second": 47.47
     },
     {
       "creator": "OpenAI",
@@ -2597,7 +2597,7 @@
       "benchmark_run_cost_usd": 794.01,
       "price_in_per_1m_usd": 8,
       "price_out_per_1m_usd": 40,
-      "output_tokens_per_second": 44.47
+      "output_tokens_per_second": 43.57
     },
     {
       "creator": "OpenAI",
@@ -2612,7 +2612,7 @@
       "benchmark_run_cost_usd": 4530.46,
       "price_in_per_1m_usd": 8,
       "price_out_per_1m_usd": 40,
-      "output_tokens_per_second": 47.9
+      "output_tokens_per_second": 48.09
     },
     {
       "creator": "OpenAI",
@@ -2627,7 +2627,7 @@
       "benchmark_run_cost_usd": 1456.8,
       "price_in_per_1m_usd": 8,
       "price_out_per_1m_usd": 40,
-      "output_tokens_per_second": 45.44
+      "output_tokens_per_second": 45.13
     },
     {
       "creator": "OpenAI",
@@ -2657,7 +2657,7 @@
       "benchmark_run_cost_usd": 552.68,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 67.71
+      "output_tokens_per_second": 66.65
     },
     {
       "creator": "OpenAI",
@@ -2672,7 +2672,7 @@
       "benchmark_run_cost_usd": 224.22,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 61.94
+      "output_tokens_per_second": 61.24
     },
     {
       "creator": "OpenAI",
@@ -2687,7 +2687,7 @@
       "benchmark_run_cost_usd": 1108.28,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 71.55
+      "output_tokens_per_second": 70.36
     },
     {
       "creator": "OpenAI",
@@ -2702,7 +2702,7 @@
       "benchmark_run_cost_usd": 405.17,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 65.82
+      "output_tokens_per_second": 64.35
     },
     {
       "creator": "OpenAI",
@@ -2717,7 +2717,7 @@
       "benchmark_run_cost_usd": 698.1,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 10,
-      "output_tokens_per_second": 70.09
+      "output_tokens_per_second": 68.44
     },
     {
       "creator": "OpenAI",
@@ -2732,7 +2732,7 @@
       "benchmark_run_cost_usd": 264.99,
       "price_in_per_1m_usd": 0.15,
       "price_out_per_1m_usd": 0.6,
-      "output_tokens_per_second": 213.96
+      "output_tokens_per_second": 214.44
     },
     {
       "creator": "OpenAI",
@@ -2747,7 +2747,7 @@
       "benchmark_run_cost_usd": null,
       "price_in_per_1m_usd": 0.125,
       "price_out_per_1m_usd": 0.595,
-      "output_tokens_per_second": 175.18
+      "output_tokens_per_second": 177.12
     },
     {
       "creator": "OpenAI",
@@ -2762,7 +2762,7 @@
       "benchmark_run_cost_usd": null,
       "price_in_per_1m_usd": 0.05,
       "price_out_per_1m_usd": 0.22,
-      "output_tokens_per_second": 98.27
+      "output_tokens_per_second": 100.74
     },
     {
       "creator": "OpenAI",
@@ -2777,7 +2777,7 @@
       "benchmark_run_cost_usd": null,
       "price_in_per_1m_usd": 0.07,
       "price_out_per_1m_usd": 0.3,
-      "output_tokens_per_second": 88.96
+      "output_tokens_per_second": 90.03
     },
     {
       "creator": "OpenAI",
@@ -2852,7 +2852,7 @@
       "benchmark_run_cost_usd": null,
       "price_in_per_1m_usd": 2,
       "price_out_per_1m_usd": 8,
-      "output_tokens_per_second": 113.52
+      "output_tokens_per_second": 113.11
     },
     {
       "creator": "OpenAI",
