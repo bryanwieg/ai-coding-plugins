@@ -29,15 +29,20 @@ file; plan status and Notes are committed here. The work report runs
 and puts both tables in `work-report.md`. Stages are Codex-eligible as
 scored; a Codex build passes the sandbox checkout as `codex-build.sh`'s
 REPO, so its writes stay inside one repository. Stages are accepted on
-their local checks. The user asked (2026-11-21) for the work to end with
-pull requests up and CI passing: after the phase review, push the branch
-and open a pull request, set the status to `built <commit> (CI pending)`,
-and record the CI result in Notes; a CI failure is fixed with a
-`Fixes-Stage` commit and pushed again. The plugin repository's
-branch `quota-failover` is pushed and its pull request opened after
-phase 02's review, and pushed again after this phase's status and
-work-report commits; that repository has no pull request CI, so "CI
-passing" applies to the sandbox pull request only. No Dockerfile, Compose, proxy
+their local checks. Route and build them by phase 02's rules as built
+on the `quota-failover` branch: follow that checkout's
+`model-selection.md` and run its `plugins/phased-delivery/scripts/`
+(`codex-usage.py`, `claude-usage.py`, `codex-build.sh`), not the
+installed plugin, which is still 0.4.0.
+
+The user asked (2026-11-21) for the work to end with pull requests up and
+CI passing. In order, after the phase review: push the sandbox branch and
+open its pull request; wait for CI and fix failures with `Fixes-Stage`
+commits until it passes; set the status to `built <final commit>` and
+record the CI result in Notes; write the work report; then push the
+plugin repository's `quota-failover` again (its pull request was opened
+after phase 02). That repository has no pull request CI, so "CI passing"
+applies to the sandbox pull request. No Dockerfile, Compose, proxy
 or session-rules change is planned; one needed means stop and ask the
 user (its "Changes to the security boundary").
 
@@ -143,7 +148,7 @@ only).
 Done when:
 - `shellcheck -S warning sandbox/image/sandbox-start sandbox/tests/test-session-agent-launch.sh`
   passes.
-- Checked after the push (phase status `CI pending` until then): the pull
+- Checked after the push: the pull
   request's "Session image tests" CI step passes, including the new case
   (the image cannot be built in this session).
 
@@ -249,6 +254,8 @@ rules, plugin docs.
 Model basis: J1 F0 R1 C0 K0 P1 V1 S0 = 4 -> middle.
 
 ## Notes
+- 2026-11-21: plan review round 4: push order ends with CI green before
+  the work report; phase 03 uses the branch's phase 02 rules and scripts.
 - 2026-11-21: plan review round 3: ponytail fallback to its marketplace
   clone; plugin repository push points.
 - 2026-11-21: plan review round 2: push and PR on the user's request;

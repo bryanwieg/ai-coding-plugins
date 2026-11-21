@@ -33,12 +33,14 @@ Codex is **off** for the rest of the session when any of these holds, and
   when one of them goes to Codex.
 - **A failed Codex build** (exit 3, 5, 6 or 7) leaves no accepted work.
   Before each Codex dispatch, snapshot the checkout passed as REPO:
-  `git status --porcelain --untracked-files=all`, plus `git hash-object`
-  of every path it lists. On failure, before anything else: restore to
-  `HEAD` every tracked path that is clean in the snapshot and changed now;
-  delete every untracked path not in the snapshot; for a path listed in
-  the snapshot whose hash now differs, stop and ask the user instead of
-  restoring it.
+  every path `git status --porcelain --untracked-files=all` lists (both
+  sides of a rename), with its `git hash-object` or `absent` when the file
+  does not exist. On failure, before anything else, compare with the
+  paths listed now: a path listed now but not in the snapshot is Codex's;
+  restore it to `HEAD` (`git restore --source=HEAD --staged --worktree`),
+  or delete it when `HEAD` lacks it. A path in the snapshot whose hash or
+  `absent` state now differs: stop and ask the user instead of restoring
+  it.
 - **After a failed build:** exit 3 and the user signs in again
   (`codex-usage.py` no longer exits 4): rerun the stage on Codex as the
   next attempt. Otherwise (exit 3 skipped or repeated, 5, 6, 7) the stage
@@ -87,8 +89,8 @@ hit the limit reports exit 7.
   When the stop comes at the check before the phase review, set
   `Status: in progress (stages done: all; review pending)`; resuming
   starts with the review, after checking availability and the rule again.
-- At level 2, Codex turning off or failing a build (exit 3, 5, 6 or 7)
-  means "Codex has no room": the failed stage is not rebuilt in the
+- At level 2, Codex turning off or failing a build (exit 3 that is
+  skipped or repeated, 5, 6 or 7) means "Codex has no room": the failed stage is not rebuilt in the
   session; restore it as above, leave it `planned`, stop and report, with
   the cause.
 - **Session-only stages** (those that must write outside the repository,
@@ -103,6 +105,13 @@ hit the limit reports exit 7.
   today.
 - When the level changes during a phase, record it in the phase's Notes
   with both scripts' output lines.
+
+## When the phase is done
+
+After the phase review and the status commit, push the branch
+`quota-failover` and open its pull request against `main` (the user asked
+for it, 2026-11-21). This repository has no pull request CI. Phase 03
+pushes it again at the end.
 
 ## Assumptions
 - Verified: routing lives in
@@ -417,6 +426,10 @@ Model basis: J1 F1 R1 C0 K0 P1 V2 S0 = 6 -> middle; override 3 (V = 2) ->
 middle+.
 
 ## Notes
+- 2026-11-21: plan review round 4: level-2 exit 3 only when skipped or
+  repeated; one snapshot rule covering staged, renamed and deleted paths;
+  phase 02 push point. Round 4's findings were local and are fixed; no
+  further plan round (the phase review checks the built result).
 - 2026-11-21: plan review round 3: Codex dispatches run alone; failed
   builds restore from a status-and-hash snapshot of REPO; a re-sign-in
   reruns the stage on Codex.
