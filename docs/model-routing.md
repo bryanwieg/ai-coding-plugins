@@ -85,16 +85,26 @@ How it works now (`model-selection.md`, "Builders in another tool"):
 
 - Planning also writes `models-available-codex.json` and `models-codex.md`
   when Codex is installed and signed in.
-- A stage goes to Codex only when it is **narrow** (F = 0 and R = 0: 1–2
-  files changed, at most 3 to read), `scripts/codex-usage.py` shows room
-  left in the Codex plan, and `models-codex.md` has a candidate for the
-  tier. Width decides, not tier.
-- Planning and reviews stay in the session's tool on `top`.
+- Availability: before each phase, `scripts/codex-usage.py` reports Codex
+  off (`AI_CODEX=off`, or `codex` not installed) or not signed in (the user
+  signs in or skips). Off lasts the session and also follows a build that
+  cannot run; the phase then runs as it would without Codex.
+- Routing by usage: before every stage dispatch and the phase review,
+  `scripts/claude-usage.py` gives Claude's level and `codex-usage.py`
+  whether Codex has room. Claude on pace (or no data): narrow stages
+  (F = 0, R = 0) go to Codex; ahead of pace: F <= 1 and R <= 1; nearly
+  out: every build stage and the phase review. Codex without room: build
+  in the session, or stop and report when Claude is nearly out too.
+  Planning, plan reviews and session-only stages stay in the session. The
+  rule is in `model-selection.md`, "The routing rule".
 - `scripts/codex-build.sh` runs the stage with `codex exec`
   (workspace-write sandbox), returns Codex's token count, and exits 3 when
-  Codex's sign-in has lapsed so the stage falls back. `codex exec` cannot
-  ask the orchestrator anything mid-run: a builder that is stuck ends with
-  its question as the report, and the stage brief is fixed and rerun.
+  Codex's sign-in has lapsed, 5 when Codex's sandbox cannot start, 6 when
+  Codex ran no turn (subscription, account or service problem) and 7 when
+  Codex is out of quota, so the orchestrator reroutes the stage or turns
+  Codex off. `codex exec` cannot ask the orchestrator anything mid-run: a
+  builder that is stuck ends with its question as the report, and the
+  stage brief is fixed and rerun.
 - Inside a container that is itself the boundary (the ai-coding-sandbox
   agent image), Codex's bubblewrap sandbox cannot start, so the container
   sets `CODEX_BUILD_SANDBOX=danger-full-access` and Codex runs unsandboxed
@@ -102,8 +112,9 @@ How it works now (`model-selection.md`, "Builders in another tool"):
   sessions there already do. The builder uses Codex's own state (sign-in,
   memories, plugins), since the container mounts both agents' state.
 - Usage visibility: Codex usage is readable from its session logs (as of
-  the last request). Claude usage is not visible to the agent; only the
-  user sees it (`/usage`).
+  the last request). Claude usage is read from the status line's JSON,
+  which the status line saves to `claude-usage.json`; it is as fresh as
+  the last status line refresh in any session.
 
 ## Part 3: reports
 
@@ -146,9 +157,11 @@ Side observations:
   `small`, so qualification is code, not memory.
 - **Reverse routing:** when the session is Codex, should wide work go to
   Claude?
-- **Quota-aware failover:** move remaining stages to the other tool when
-  one plan's limit is near; Claude's side can only react to the limit
-  warning today.
+- **Routing thresholds:** tune the usage levels and width caps from
+  `work-report.md` results.
+- **Unusable Codex (exit 6):** narrow it to the observed messages once a
+  real expired-plan error is seen, so a transient failure does not turn
+  Codex off.
 - **Close the loop:** feed `work-report.md` results back into selection
   (for example, demote a candidate whose clean rate stays low).
 - **Clean Codex environment:** build with a dedicated `CODEX_HOME` so the
