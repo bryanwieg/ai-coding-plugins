@@ -33,7 +33,7 @@ mkdir -p "$OUT"
 codex exec -m "$MODEL" -c model_reasoning_effort="$EFFORT" \
   --cd "$REPO" --sandbox "$SANDBOX" "$@" --json -o "$OUT/report.md" \
   "Your complete directions are in $PROMPT. Read that file first and follow it exactly. Your final message is your report." \
-  > "$OUT/events.jsonl" 2> "$OUT/stderr.txt"
+  < /dev/null > "$OUT/events.jsonl" 2> "$OUT/stderr.txt"
 status=$?
 if grep -q 'could not be refreshed\|Please log out and sign in again\|Not logged in\|authentication token has expired' "$OUT/stderr.txt"; then
   echo "Codex sign-in has lapsed: run 'codex logout && codex login --device-auth'" >&2
