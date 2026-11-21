@@ -3,7 +3,7 @@
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md); Codex
 builders in [models-codex.md](models-codex.md).
-Status: built 02825e2
+Status: built 059d8d4
 Before: the agent cannot see Claude's plan usage. Codex usage is read by
 `plugins/phased-delivery/scripts/codex-usage.py`. No `statusLine` is set in
 `~/.claude/settings.json`.

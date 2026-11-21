@@ -3,7 +3,7 @@
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md); Codex
 builders in [models-codex.md](models-codex.md).
-Status: built eea540b
+Status: built e7f1ceb
 Before: phase 01 built `scripts/claude-usage.py` (exit 0 on pace, 1 ahead
 of pace, 2 nearly out, 3 no data, 4 bad arguments) and the status line
 capture. Routing sends only narrow stages (F = 0, R = 0) to Codex, and
@@ -457,6 +457,9 @@ Model basis: J1 F1 R1 C0 K0 P1 V2 S0 = 6 -> middle; override 3 (V = 2) ->
 middle+.
 
 ## Notes
+- 2026-11-21: branch commits rewritten to the GitHub noreply author email
+  (the repository's own); hashes before this point in Notes (phase 01's
+  7728ad2, 02825e2 and others) no longer exist; status lines updated.
 - 2026-11-21: Codex off for this phase in practice: its sign-in token had
   expired (see 02.1 below); every stage was built in Claude.
 - 2026-11-21: phase review (opus high): ready, 0 blocking; fixed: SKILL.md
