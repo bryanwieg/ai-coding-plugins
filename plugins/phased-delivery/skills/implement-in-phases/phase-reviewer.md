@@ -1,9 +1,10 @@
 # Phase reviewer directions
 
 Give this file, unchanged, to a new subagent that reviews a built phase,
-followed by the inputs below. Use the `top` candidate from the plan's `models.md` (see
-[model-selection.md](../plan-in-phases/model-selection.md)). It must not be
-an agent that built any stage of the phase.
+followed by the inputs below. Use the `top` candidate from the plan's
+`models.md`, or from `models-codex.md` when the routing rule in
+[model-selection.md](../plan-in-phases/model-selection.md) sends the review
+to Codex. It must not be an agent that built any stage of the phase.
 
 Inputs the orchestrator fills in:
 

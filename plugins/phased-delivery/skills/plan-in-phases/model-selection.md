@@ -176,8 +176,9 @@ R = 2, check whether the stage should be split.
 
 ## Fixed choices
 
-- **Reviews use the `top` candidate**, whatever the tier of the work under
-  review. A review exists to catch what the author missed, including bad
+- **Reviews use the `top` candidate**, of `models-codex.md` when the
+  routing rule sends the review to Codex, whatever the tier of the work
+  under review. A review exists to catch what the author missed, including bad
   assumptions; a weaker reviewer defeats the point.
 - **Planning and plan revision** use `top`.
 - Never dispatch below the tier the scores give without a written reason in
@@ -185,28 +186,112 @@ R = 2, check whether the stage should be split.
 
 ## Builders in another tool
 
-When the session is not Codex but Codex is installed and signed in
-(`codex login status`), stages may be built there with
-`scripts/codex-build.sh`. Codex runs on its own plan, so this spares the
-session's quota, and Codex models follow a brief closely when it is narrow.
-They lose track across many files and large amounts of data, so width
-decides, not tier.
+When the session is not Codex and Codex is on (see below), stages may be
+built there with `scripts/codex-build.sh`. Codex runs on its own plan, so
+this spares the session's quota, and Codex models follow a brief closely
+when it is narrow. How much goes to Codex depends on both tools' usage.
 
-- **Plan time:** also write `models-available-codex.json` (`tool`: `codex`,
-  models and efforts from `codex debug models`, `subagent_model_choice`:
-  `allowed`, since `codex-build.sh` sets the model) and generate
-  `models-codex.md` from it with the selector. All tier rules and ceilings
-  apply unchanged.
-- **Send a stage to Codex only when all hold:**
-  - it is narrow: F = 0 and R = 0 (1–2 files changed, at most 3 to read).
-    Refactors, renames across files and stages that must make sense of a
-    large data set stay in the session's tool, whatever their tier;
-  - `scripts/codex-usage.py` exits 0 (room left in the Codex plan);
-  - `models-codex.md` has a candidate for the stage's tier.
-- Otherwise build it in the session's tool. Planning and reviews stay in
-  the session's tool on `top`.
-- If `codex-build.sh` exits 3, tell the user Codex needs `codex login`
-  again, and build the stage in the session's tool meanwhile.
+### Codex availability
+
+Codex is **off** for the rest of the session when any of these holds, and
+**on** otherwise:
+
+| Cause | Detected by | Action |
+| --- | --- | --- |
+| `AI_CODEX=off` in the environment | `codex-usage.py` exit 3 | off, no prompt |
+| `codex` not installed | `codex-usage.py` exit 3 | off, no prompt |
+| not signed in | `codex-usage.py` exit 4 | ask the user: sign in (`! codex login --device-auth`), then check again; or skip, which turns it off |
+| Codex cannot be used (expired subscription, account error) | `codex-build.sh` exit 6 | off |
+| Codex's sandbox cannot start here | `codex-build.sh` exit 5 | off; tell the user to set `CODEX_BUILD_SANDBOX=danger-full-access` only if the session already runs in a sandbox container (the ai-coding sandbox sets it already) |
+| sign-in lapsed during a build | `codex-build.sh` exit 3 | ask the user: sign in again (`! codex logout && codex login --device-auth`, the command the script prints) or skip; a second exit 3 in the session turns it off |
+
+- **A Codex dispatch runs alone:** no other stage is built in the same
+  checkout while it runs; stages marked parallel run one after another
+  when one of them goes to Codex.
+- **A failed Codex build** (exit 3, 5, 6 or 7) leaves no accepted work.
+  Before each Codex dispatch, snapshot the checkout passed as REPO:
+  every path `git status --porcelain --untracked-files=all` lists (both
+  sides of a rename), with its `git hash-object` or `absent` when the file
+  does not exist. On failure, before anything else, compare with the
+  paths listed now: a path listed now but not in the snapshot is Codex's;
+  restore it to `HEAD` (`git restore --source=HEAD --staged --worktree`),
+  or delete it when `HEAD` lacks it. A path in the snapshot whose hash or
+  `absent` state now differs: stop and ask the user instead of restoring
+  it.
+- **After a failed build:** exit 3 and the user signs in again
+  (`codex-usage.py` no longer exits 4): rerun the stage on Codex as the
+  next attempt. Otherwise (exit 3 skipped or repeated, 5, 6, 7) the stage
+  is built by the routing rule as if Codex had no room.
+- **Exit 7, Codex out of quota during a build**, is not "off": it is "no
+  room" for this dispatch (see the routing rule).
+- **When:** at the start of each phase, before refreshing
+  `models-available-codex.json` and `models-codex.md`, and whenever a
+  dispatch result above turns it off. Only when the plan has
+  `models-codex.md` and the session is not Codex.
+- **Off means not loaded:** no refresh of the Codex model files, no usage
+  scripts, no routing table; the phase runs as it would without Codex.
+  Record `Codex off this session: <cause and the script's line>` in the
+  phase's Notes and in the phase report.
+- **Session scope:** off lasts until the session ends; a new session (or a
+  resume in one) checks again. The Notes line is history, not a switch.
+- **No quota is not "off":** it stays the per-dispatch "no room" in the
+  routing rule (from `codex-usage.py` exit 1 or `codex-build.sh` exit 7),
+  because Codex's windows reset within hours.
+- `AI_CODEX` is the user's switch, shared with the ai-coding sandbox:
+  `off` turns Codex off; unset or any other value leaves it to detection.
+- **Plan time:** when the session is not Codex and Codex is on by the
+  table above, also write `models-available-codex.json` (`tool`: `codex`, models and efforts from
+  `codex debug models`, `subagent_model_choice`: `allowed`, since
+  `codex-build.sh` sets the model) and generate `models-codex.md` from it
+  with the selector. All tier rules and ceilings apply unchanged. When
+  Codex is off, write neither.
+
+### The routing rule
+
+Only while Codex is on. Checked before **every** stage dispatch and before
+the phase review. Run `scripts/claude-usage.py` (Claude level) and
+`scripts/codex-usage.py` (exit 0 or 2 means room; exit 1 means no room;
+exit 3 or 4 is handled by the availability table first). No usage data
+(exit 2: Codex has not run yet) counts as room, since a build that does
+hit the limit reports exit 7.
+
+| Claude level (exit) | Codex has room | Codex has no room |
+| --- | --- | --- |
+| on pace (0) or no data (3) | narrow stages (F = 0, R = 0) to Codex | build in session |
+| ahead of pace (1) | stages with F <= 1 and R <= 1 to Codex | build in session |
+| nearly out (2) | every build stage **and** the phase review to Codex | stop and report |
+
+Width caps what goes to Codex until Claude is nearly out, because Codex
+models lose track across many files and large amounts of data; only when
+the session cannot continue does sparing its quota outweigh that.
+
+- A stage goes to Codex only when `models-codex.md` has a candidate for
+  its tier; otherwise it is built in the session.
+- Codex builds use the tier's candidate in `models-codex.md`; a Codex review
+  uses its `top` candidate, through `scripts/codex-build.sh` with
+  phase-reviewer.md as the prompt file.
+- **Stop and report:** finish and commit the stage in progress, update the
+  phase status line and Notes, commit them, and stop. Report the stages
+  done and left and both scripts' output lines (usage and reset times).
+  When the stop comes at the check before the phase review, set
+  `Status: in progress (stages done: all; review pending)`; resuming
+  starts with the review, after checking availability and the rule again.
+- At level 2, Codex turning off or failing a build (exit 3 that is
+  skipped or repeated, 5, 6 or 7) means "Codex has no room": the failed
+  stage is not rebuilt in the session; restore it as above, leave it
+  `planned`, stop and report, with the cause.
+- **Session-only stages** (those that must write outside the repository,
+  or whose brief says it is built in the session or by the orchestrator)
+  are built in the session at every level, including level 2; the rule
+  never sends them to Codex.
+- Planning, plan revision, plan-review rounds and the orchestrator's own
+  work stay in the session at every level; only stage builds and the phase
+  review are routed (`codex-build.sh` can write only the repository and
+  /tmp, hence the session-only stages above).
+- Without `models-codex.md` (no Codex at plan time), none of this
+  applies: every stage and the review are built in the session.
+- When the level changes during a phase, record it in the phase's Notes
+  with both scripts' output lines.
 
 ## Adjust while working
 

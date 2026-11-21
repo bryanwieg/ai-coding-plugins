@@ -60,11 +60,16 @@ above the model's thinking-level ceiling in model-selection.md. When a builder f
 finds the stage harder than its tier, rerun it one tier higher; when it stops
 because the brief is wrong, revise the plan instead.
 
-When the plan has `models-codex.md`, refresh it the same way, then route
-each stage by "Builders in another tool" in model-selection.md: a narrow
-stage (F = 0 and R = 0) with room left in the Codex plan goes to Codex. Write
-stage-builder.md and its filled-in inputs to a prompt file outside the
-repository and run `scripts/codex-build.sh <repo> <prompt> <model> <effort>
+When the plan has `models-codex.md` and the session is not Codex, first
+check Codex availability by "Builders in another tool" in
+model-selection.md, before the phase's first dispatch and ahead of
+refreshing `models-codex.md`; when Codex is off, skip the rest of this
+paragraph and record why in the Notes. While Codex is on, refresh
+`models-codex.md` the same way, then before each dispatch run
+`scripts/claude-usage.py` and `scripts/codex-usage.py` and route the stage
+by the routing table there, following its rules for failed Codex builds.
+For a Codex build, write stage-builder.md and its filled-in inputs to a
+prompt file outside the repository and run `scripts/codex-build.sh <repo> <prompt> <model> <effort>
 <outdir>`, with the model and effort `models-codex.md` gives for the tier.
 Read its report from `<outdir>/report.md`; it prints the token count for
 the commit. Accept it exactly as a subagent's work.
@@ -115,7 +120,11 @@ Tool-Calls: <count, or "unknown">
 
 Hand the review to a new subagent that built none of the phase, with
 [phase-reviewer.md](phase-reviewer.md) unchanged and its inputs filled in, on
-the `top` candidate from the plan's `models.md`. It reads the actual diff and code, not
+the `top` candidate from the plan's `models.md`. While Codex is on, check
+the routing rule first; when it sends the review to Codex, write
+phase-reviewer.md and its inputs to a prompt file outside the repository
+and run `scripts/codex-build.sh` with the `top` candidate of
+`models-codex.md`. It reads the actual diff and code, not
 the builders' reports. Then read the diff yourself and decide on each
 finding.
 
@@ -138,7 +147,15 @@ Stop and report to the user:
 - plan adjustments made in the Notes;
 - the models' work in this phase: the table from
   `scripts/stage-stats.sh <phase start>..HEAD`;
+- whether Codex was on or off this phase, and why;
 - questions, and the next phase.
+
+When the routing rule stops the phase (both tools nearly out), stop the
+same way after committing the stage in progress, and also report the
+stages left and both usage scripts' output lines (usage and reset times).
+A stop at the check before the review sets
+`Status: in progress (stages done: all; review pending)`; resuming starts
+with the review, after checking availability and the routing rule again.
 
 Continue to the next phase only when the user says so. An explicit user stop
 always wins.
