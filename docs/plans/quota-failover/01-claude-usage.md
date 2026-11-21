@@ -318,7 +318,7 @@ another system's logs, and changes code no test covers; P: no tests exist
 yet to copy). Narrow (F0 R0): Codex-eligible.
 
 ## Notes
-- Plan start: e0fbd56
+- Plan start: 6a000a1 (e0fbd56 before the 2026-11-21 rebase onto origin/main)
 - 2026-11-20: 01.2 done by the orchestrator: `statusLine` added to
   `~/.claude/settings.json` (other keys unchanged; backup was
   /tmp/qf/settings.backup.json); `claude-usage.py` exits 1 on live data.

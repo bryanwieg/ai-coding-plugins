@@ -129,9 +129,11 @@ hit the limit reports exit 7.
   by the image (`ai-coding-sandbox/sandbox/Dockerfile`, `ENV` block); the
   user need not set it there.
 - Verified: user-facing descriptions are README.md "### Building with Codex
-  from Claude Code" (lines 88–98) and `docs/model-routing.md` "## Part 2",
-  bullets "A stage goes to Codex only when it is **narrow**" through
-  "Claude usage is not visible to the agent" (lines 88–99), and the open
+  from Claude Code" and `docs/model-routing.md` "## Part 2", "How it works
+  now" bullets (after the 2026-11-21 rebase: "A stage goes to Codex only
+  when it is **narrow**", "Planning and reviews stay ...", the
+  `codex-build.sh` bullet, upstream's container bullet naming
+  `CODEX_BUILD_SANDBOX`, and "Usage visibility"), and the open
   question "Quota-aware failover" in "## Open questions and next steps";
   plugin version is in `plugins/phased-delivery/.claude-plugin/plugin.json`
   (`0.4.0`).
@@ -379,12 +381,12 @@ Work:
    Code itself runs in a sandbox container where Codex's own sandbox
    cannot start (the ai-coding sandbox already sets it).
 2. `docs/model-routing.md` Part 2, "How it works now": replace the
-   bullets from "A stage goes to Codex only when it is **narrow**" through
-   "Claude usage is not visible to the agent; only the user sees it
-   (`/usage`)." with: the availability check, the routing summary citing
-   `model-selection.md`, and how Claude usage is read now (status line
-   JSON, as fresh as the last refresh in any session); keep the
-   `codex-build.sh` bullet, adding exits 5, 6 and 7. In "Open questions",
+   "narrow" and "Planning and reviews stay" bullets with the availability
+   check and the routing summary citing `model-selection.md`; in the
+   `codex-build.sh` bullet add exits 5, 6 and 7; keep the container bullet
+   unchanged; replace the "Usage visibility" bullet's Claude sentence with
+   how Claude usage is read now (status line JSON, as fresh as the last
+   refresh in any session). In "Open questions",
    replace "Quota-aware failover" with what remains: tuning the thresholds
    from work reports, and narrowing exit 6 once a real expired-plan error
    is seen.
@@ -407,6 +409,13 @@ Model basis: J1 F1 R1 C0 K0 P1 V2 S0 = 6 -> middle; override 3 (V = 2) ->
 middle+.
 
 ## Notes
+- 2026-11-21: rebased onto origin/main (upstream PR #1 had added
+  `CODEX_BUILD_SANDBOX` validation and the hook-trust flag to
+  `codex-build.sh`, without exit 5): kept upstream's script plus our exit 5
+  check and widened its usage range; 02.4 now keeps upstream's container
+  bullet. Plan start is now 6a000a1. Pull requests: the user asked
+  (2026-11-21) to push and open them and see CI pass; this repository has
+  no pull request CI.
 - 2026-11-21: plan review round 2: "Upgrade to Plus" is exit 6; exit 5
   wins over 6/7; failed builds restore from a pre-dispatch `git status`
   snapshot; lapsed sign-in uses logout and login, a second lapse turns
