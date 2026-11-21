@@ -3,7 +3,7 @@
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md); Codex
 builders in [models-codex.md](models-codex.md).
-Status: in progress (stages done: none)
+Status: built fe9a71b (ai-coding-sandbox)
 Before: phase 02 makes the plugin read `AI_CODEX` and Claude's saved
 status line JSON. In the ai-coding sandbox, each user sets the status
 line capture by hand (phase 01 stage 01.2), and a Claude session always
@@ -113,9 +113,9 @@ user (its "Changes to the security boundary").
 
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
-| 03.1 | `AI_CODEX=off` skips Codex's setup in Claude sessions | middle | first, parallel with 03.2 | planned |
-| 03.2 | The sandbox sets the status line capture when there is none | top | first, parallel with 03.1 | planned |
-| 03.3 | README and session guide describe both | middle | after 03.1 and 03.2 | planned |
+| 03.1 | `AI_CODEX=off` skips Codex's setup in Claude sessions | middle | first, parallel with 03.2 | done |
+| 03.2 | The sandbox sets the status line capture when there is none | top | first, parallel with 03.1 | done |
+| 03.3 | README and session guide describe both | middle | after 03.1 and 03.2 | done |
 
 ## 03.1 Skip Codex's setup when off
 
@@ -254,6 +254,13 @@ rules, plugin docs.
 Model basis: J1 F0 R1 C0 K0 P1 V1 S0 = 4 -> middle.
 
 ## Notes
+- 2026-11-21: 03.2: the orchestrator added, before accepting, a guard so a
+  `statusLine` that is not an object keeps the settings update working
+  (bypass mode still set), with a test case.
+- 2026-11-21: phase review (opus high): ready, 0 blocking, no fixes.
+- 2026-11-21: sandbox PR bryanwieg/ai-coding-sandbox#15: CI passed (check
+  12m11s, session 5m16s), including `AI_CODEX=off skips Codex setup in a
+  Claude session` and `Claude settings checks passed.`
 - Sandbox start: ffb401a (branch `ai-codex-statusline`); work report counts
   `ffb401a..HEAD` in ai-coding-sandbox.
 - 2026-11-21: Codex off this session (sign-in token expired, `codex-build.sh`
