@@ -3,7 +3,7 @@
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md); Codex
 builders in [models-codex.md](models-codex.md).
-Status: planned
+Status: built eea540b
 Before: phase 01 built `scripts/claude-usage.py` (exit 0 on pace, 1 ahead
 of pace, 2 nearly out, 3 no data, 4 bad arguments) and the status line
 capture. Routing sends only narrow stages (F = 0, R = 0) to Codex, and
@@ -41,9 +41,10 @@ Codex is **off** for the rest of the session when any of these holds, and
   or delete it when `HEAD` lacks it. A path in the snapshot whose hash or
   `absent` state now differs: stop and ask the user instead of restoring
   it.
-- **After a failed build:** exit 3 and the user signs in again
-  (`codex-usage.py` no longer exits 4): rerun the stage on Codex as the
-  next attempt. Otherwise (exit 3 skipped or repeated, 5, 6, 7) the stage
+- **After a failed build:** exit 3 and the user says they signed in
+  again: rerun the stage on Codex as the next attempt (`codex login
+  status` cannot confirm it: it still says logged in when the token has
+  expired). Otherwise (exit 3 skipped or repeated, 5, 6, 7) the stage
   is built by the routing rule as if Codex had no room.
 - **Exit 7, Codex out of quota during a build**, is not "off": it is "no
   room" for this dispatch (see the routing rule).
@@ -170,8 +171,8 @@ pushes it again at the end.
 | 02.1 | `codex-usage.py` reports Codex off or signed out, with tests | middle | first, parallel with 02.2 | done |
 | 02.2 | `codex-build.sh` reports out of quota (7) or unusable Codex (6) | top | first, parallel with 02.1 | done |
 | 02.5 | `codex-build.sh` exit 3 also matches an expired token | small | after 02.2 | done |
-| 02.3 | Skills check availability and route by usage | middle+ | after 02.1 and 02.2 | planned |
-| 02.4 | README, routing doc and version describe it | middle+ | after 02.3 | planned |
+| 02.3 | Skills check availability and route by usage | middle+ | after 02.1 and 02.2 | done |
+| 02.4 | README, routing doc and version describe it | middle+ | after 02.3 | done |
 
 ## 02.1 codex-usage.py: availability
 
@@ -456,6 +457,13 @@ Model basis: J1 F1 R1 C0 K0 P1 V2 S0 = 6 -> middle; override 3 (V = 2) ->
 middle+.
 
 ## Notes
+- 2026-11-21: Codex off for this phase in practice: its sign-in token had
+  expired (see 02.1 below); every stage was built in Claude.
+- 2026-11-21: phase review (opus high): ready, 0 blocking; fixed: SKILL.md
+  says Codex dispatches run alone and snapshot first; a re-sign-in is the
+  user's word, since `codex login status` still says logged in with an
+  expired token (contract above updated); routing doc's plan-time bullet;
+  `codex exec` gets `< /dev/null` so it cannot wait on stdin.
 - 2026-11-21: building: `/tmp` is `noexec` in this sandbox, so tests that
   run a stub from `tmp_path` need `--basetemp` on an exec-capable path
   (`/cache/...`) here; stubs for script checks go in `/cache/qf2-stubs`
