@@ -167,8 +167,9 @@ pushes it again at the end.
 
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
-| 02.1 | `codex-usage.py` reports Codex off or signed out, with tests | middle | first, parallel with 02.2 | planned |
-| 02.2 | `codex-build.sh` reports out of quota (7) or unusable Codex (6) | top | first, parallel with 02.1 | planned |
+| 02.1 | `codex-usage.py` reports Codex off or signed out, with tests | middle | first, parallel with 02.2 | done |
+| 02.2 | `codex-build.sh` reports out of quota (7) or unusable Codex (6) | top | first, parallel with 02.1 | done |
+| 02.5 | `codex-build.sh` exit 3 also matches an expired token | small | after 02.2 | done |
 | 02.3 | Skills check availability and route by usage | middle+ | after 02.1 and 02.2 | planned |
 | 02.4 | README, routing doc and version describe it | middle+ | after 02.3 | planned |
 
@@ -290,6 +291,35 @@ another tool's output; no tests cover the script). Raised to top, by
 written reason: the same script's exit 5 match was wrong on its first
 build (Phase 01 Notes, 7728ad2), and a wrong exit 6 silently turns Codex
 off. Built in the session: Codex would judge its own failure detection.
+
+## 02.5 codex-build.sh: expired token is exit 3
+
+Goal: a Codex run whose sign-in token has expired exits 3 (sign-in
+lapsed), not 1 or 6.
+
+Context: `plugins/phased-delivery/scripts/codex-build.sh`, the exit 3
+`grep` of `stderr.txt` (`could not be refreshed\|Please log out and sign
+in again\|Not logged in`). Seen 2026-11-21 (first dispatch of 02.1):
+`stderr.txt` had `401 Unauthorized: Your authentication token has
+expired. Please try refreshing it.` and `auth error code: token_expired`,
+while `codex login status` still printed `Logged in using ChatGPT`.
+
+Contracts: add `authentication token has expired` to the exit 3 pattern;
+nothing else changes.
+
+Files: `plugins/phased-delivery/scripts/codex-build.sh`
+
+Work: extend the pattern.
+
+External inputs: Codex's stderr (fixed-string match).
+
+Done when: `sh -n` and `shellcheck -S warning` pass; with a stub `codex`
+whose stderr is the line above, the script exits 3.
+
+Out of scope: the other exits.
+
+Model basis: J0 F0 R0 C0 K0 P0 V0 S0 = 0 -> small. Built directly by the
+orchestrator (one pattern).
 
 ## 02.3 Skill routing rules
 
@@ -426,6 +456,19 @@ Model basis: J1 F1 R1 C0 K0 P1 V2 S0 = 6 -> middle; override 3 (V = 2) ->
 middle+.
 
 ## Notes
+- 2026-11-21: building: `/tmp` is `noexec` in this sandbox, so tests that
+  run a stub from `tmp_path` need `--basetemp` on an exec-capable path
+  (`/cache/...`) here; stubs for script checks go in `/cache/qf2-stubs`
+  and are removed by literal path (user asked for no ambiguous `rm -rf`).
+- 2026-11-21: 02.1's Codex dispatch failed: token expired (401
+  `token_expired`) though `codex login status` said logged in; the run
+  ended in `turn.failed` "model is not supported". `codex-build.sh`
+  exited 1. Rebuilt in the session; added 02.5. The user was told to run
+  `codex logout && codex login --device-auth` to use Codex again.
+- 2026-11-21: 02.2's builder ran the real `codex` once by accident (its
+  stub in noexec `/tmp` could not run); it waited on stdin and was
+  stopped, no changes. The orchestrator ran the stub cases from
+  `/cache`; all passed.
 - 2026-11-21: plan review round 4: level-2 exit 3 only when skipped or
   repeated; one snapshot rule covering staged, renamed and deleted paths;
   phase 02 push point. Round 4's findings were local and are fixed; no
