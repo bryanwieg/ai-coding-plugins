@@ -3,7 +3,7 @@
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md); Codex
 builders in [models-codex.md](models-codex.md).
-Status: planned
+Status: in progress (stages done: none)
 Before: phase 02 makes the plugin read `AI_CODEX` and Claude's saved
 status line JSON. In the ai-coding sandbox, each user sets the status
 line capture by hand (phase 01 stage 01.2), and a Claude session always
@@ -104,10 +104,10 @@ user (its "Changes to the security boundary").
 - Verified: `shellcheck sandbox/image/sandbox-start` already reports
   SC2015 (info) on `origin/main`; the repository has no `.shellcheckrc` and
   CI runs no ShellCheck, so checks use `shellcheck -S warning`.
-- Open: the local checkout is on `lifecycle-broker` (upstream gone) and
-  local `main` differs from `origin/main`; the phase branches from
-  `origin/main` (`git fetch` first). If that lacks the files or sections
-  above, revise this phase first.
+- Verified (2026-11-21): branch `ai-codex-statusline` created from
+  `origin/main` (ffb401a); `sandbox-start`'s loop, `20-settings`'s `jq`
+  line, both README sections, the session guide section and the
+  `test-plugin-sync.sh` workflow line are there.
 
 ## Stages
 
@@ -254,6 +254,10 @@ rules, plugin docs.
 Model basis: J1 F0 R1 C0 K0 P1 V1 S0 = 4 -> middle.
 
 ## Notes
+- Sandbox start: ffb401a (branch `ai-codex-statusline`); work report counts
+  `ffb401a..HEAD` in ai-coding-sandbox.
+- 2026-11-21: Codex off this session (sign-in token expired, `codex-build.sh`
+  exit 3 pattern per 02.5); stages built in Claude.
 - 2026-11-21: plan review round 4: push order ends with CI green before
   the work report; phase 03 uses the branch's phase 02 rules and scripts.
 - 2026-11-21: plan review round 3: ponytail fallback to its marketplace
