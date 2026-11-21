@@ -33,7 +33,11 @@ their local checks. The user asked (2026-11-21) for the work to end with
 pull requests up and CI passing: after the phase review, push the branch
 and open a pull request, set the status to `built <commit> (CI pending)`,
 and record the CI result in Notes; a CI failure is fixed with a
-`Fixes-Stage` commit and pushed again. No Dockerfile, Compose, proxy
+`Fixes-Stage` commit and pushed again. The plugin repository's
+branch `quota-failover` is pushed and its pull request opened after
+phase 02's review, and pushed again after this phase's status and
+work-report commits; that repository has no pull request CI, so "CI
+passing" applies to the sandbox pull request only. No Dockerfile, Compose, proxy
 or session-rules change is planned; one needed means stop and ask the
 user (its "Changes to the security boundary").
 
@@ -46,12 +50,16 @@ user (its "Changes to the security boundary").
 - Status line capture, the `statusLine` the sandbox writes:
 
   ```sh
-  d="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; t="$d/claude-usage.json.$$"; find "$d" -maxdepth 1 -name 'claude-usage.json.*' -mmin +1 -delete 2>/dev/null; cat > "$t"; if [ -f "$d/ponytail-statusline.sh" ]; then bash "$d/ponytail-statusline.sh" < "$t"; fi; if grep -q '"rate_limits"' "$t"; then mv "$t" "$d/claude-usage.json"; else rm -f "$t"; fi
+  d="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; t="$d/claude-usage.json.$$"; find "$d" -maxdepth 1 -name 'claude-usage.json.*' -mmin +1 -delete 2>/dev/null; cat > "$t"; p="$d/ponytail-statusline.sh"; [ -f "$p" ] || p="$d/plugins/marketplaces/ponytail/hooks/ponytail-statusline.sh"; if [ -f "$p" ]; then bash "$p" < "$t"; fi; if grep -q '"rate_limits"' "$t"; then mv "$t" "$d/claude-usage.json"; else rm -f "$t"; fi
   ```
 
   It is phase 01's command (01-claude-usage.md, 01.2 Contracts) with the
-  ponytail call run only when its script exists, since not every user
-  has ponytail. As JSON: `{"type": "command", "command": "<the line>"}`.
+  ponytail call run only when a script exists, since not every user has
+  ponytail: the user-folder copy, else ponytail's marketplace clone.
+  The fallback is needed because ponytail's session hook copies its
+  script into the folder only when it nudges (no `statusLine` at all) or
+  a copy already exists; with this `statusLine` set before the first
+  start, a new user never gets the copy. As JSON: `{"type": "command", "command": "<the line>"}`.
 
 ## Assumptions
 - Verified: `sandbox/image/sandbox-start` runs
@@ -66,6 +74,13 @@ user (its "Changes to the security boundary").
   `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json` at each start with
   one `jq -s '(.[0] // {}) | ...'` through a temporary file and `mv`,
   keeping other keys, and warns instead of failing when `jq` fails.
+- Verified (2026-11-21): ponytail ships with the sandbox
+  (`sandbox/claude/plugins.txt`, `ponytail@ponytail`); its hook
+  (`hooks/ponytail-activate.js`, the `nudge` and `fs.existsSync(scriptPath)`
+  lines) copies `ponytail-statusline.sh` into the config folder only when
+  nudging or when a copy exists; the script is also at
+  `~/.claude/plugins/marketplaces/ponytail/hooks/ponytail-statusline.sh`
+  (unversioned path).
 - Verified: the user's current `statusLine.command` is exactly phase
   01's command (`jq .statusLine ~/.claude/settings.json`, 2026-11-21).
 - Verified: `sandbox/tests/test-session-agent-launch.sh` (the
@@ -177,7 +192,9 @@ Work:
    with `sh -c`, in a temp `CLAUDE_CONFIG_DIR`: input with `rate_limits`
    -> `claude-usage.json` written, no `claude-usage.json.*` left; input
    without -> file unchanged; with a stub `ponytail-statusline.sh` that
-   prints `pt` -> `pt` printed; without it -> nothing printed, exit 0.
+   prints `pt` -> `pt` printed; with only a stub at
+   `plugins/marketplaces/ponytail/hooks/ponytail-statusline.sh` -> its
+   output printed; with neither -> nothing printed, exit 0.
 
 External inputs: the existing `settings.json` (user-owned; `jq` already
 fails on invalid JSON and the script warns, unchanged).
@@ -232,6 +249,8 @@ rules, plugin docs.
 Model basis: J1 F0 R1 C0 K0 P1 V1 S0 = 4 -> middle.
 
 ## Notes
+- 2026-11-21: plan review round 3: ponytail fallback to its marketplace
+  clone; plugin repository push points.
 - 2026-11-21: plan review round 2: push and PR on the user's request;
   CI-pending status; Codex builds use the sandbox checkout as REPO.
 - 2026-11-21: plan review: built from the plan's session (a sandbox-repo

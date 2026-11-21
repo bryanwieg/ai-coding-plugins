@@ -28,12 +28,20 @@ Codex is **off** for the rest of the session when any of these holds, and
 | Codex's sandbox cannot start here | `codex-build.sh` exit 5 | off; tell the user about `CODEX_BUILD_SANDBOX` |
 | sign-in lapsed during a build | `codex-build.sh` exit 3 | ask the user: sign in again (`! codex logout && codex login --device-auth`, the command the script prints) or skip; a second exit 3 in the session turns it off |
 
+- **A Codex dispatch runs alone:** no other stage is built in the same
+  checkout while it runs; stages marked parallel run one after another
+  when one of them goes to Codex.
 - **A failed Codex build** (exit 3, 5, 6 or 7) leaves no accepted work.
-  Before each Codex dispatch, save `git status --porcelain` of the
-  repository. On failure, before anything else, restore to `HEAD` every
-  tracked path that changed since that snapshot and delete every untracked
-  path that is new in it. If such a path already had edits in the
-  snapshot, stop and ask the user instead of restoring it. Then the stage
+  Before each Codex dispatch, snapshot the checkout passed as REPO:
+  `git status --porcelain --untracked-files=all`, plus `git hash-object`
+  of every path it lists. On failure, before anything else: restore to
+  `HEAD` every tracked path that is clean in the snapshot and changed now;
+  delete every untracked path not in the snapshot; for a path listed in
+  the snapshot whose hash now differs, stop and ask the user instead of
+  restoring it.
+- **After a failed build:** exit 3 and the user signs in again
+  (`codex-usage.py` no longer exits 4): rerun the stage on Codex as the
+  next attempt. Otherwise (exit 3 skipped or repeated, 5, 6, 7) the stage
   is built by the routing rule as if Codex had no room.
 - **Exit 7, Codex out of quota during a build**, is not "off": it is "no
   room" for this dispatch (see the routing rule).
@@ -409,6 +417,9 @@ Model basis: J1 F1 R1 C0 K0 P1 V2 S0 = 6 -> middle; override 3 (V = 2) ->
 middle+.
 
 ## Notes
+- 2026-11-21: plan review round 3: Codex dispatches run alone; failed
+  builds restore from a status-and-hash snapshot of REPO; a re-sign-in
+  reruns the stage on Codex.
 - 2026-11-21: rebased onto origin/main (upstream PR #1 had added
   `CODEX_BUILD_SANDBOX` validation and the hook-trust flag to
   `codex-build.sh`, without exit 5): kept upstream's script plus our exit 5

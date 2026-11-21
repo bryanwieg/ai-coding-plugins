@@ -49,7 +49,8 @@ how fast Claude's plan is being used (approved by the user, 2026-11-20):
   (`ponytail-activate.js`) treats a `statusLine.command` containing a quoted
   `ponytail-statusline.sh` path as set up, so it will not nudge again; it
   checks that path only when it is absolute, so a `$d/...` form is left
-  alone, and it refreshes the copy every session.
+  alone, and it refreshes the copy every session once a copy exists (it
+  first copies it only when nudging; corrected 2026-11-21, see phase 03).
 - Verified: `~/.claude/ponytail-statusline.sh` starts `#!/usr/bin/env bash`
   and ponytail's own setup runs it with `bash`; it does not read stdin and
   may exit at once, so piping into it can kill a `tee` (reproduced by the
