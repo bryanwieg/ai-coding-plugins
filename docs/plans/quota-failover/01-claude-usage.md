@@ -22,6 +22,10 @@ how fast Claude's plan is being used (approved by the user, 2026-11-20):
 - Claude nearly out: Codex takes every build stage and the phase review.
 - Claude nearly out and Codex has no room: finish the current stage, commit,
   stop and report both tools' usage.
+- Codex off (`AI_CODEX=off`, not installed, sign-in skipped, or unusable):
+  left out of routing for the session (added 2026-11-21, phase 02).
+- The ai-coding sandbox sets the status line capture and honors
+  `AI_CODEX` (added 2026-11-21, phase 03).
 
 ## Assumptions
 - Verified: the status line command receives JSON on stdin with
