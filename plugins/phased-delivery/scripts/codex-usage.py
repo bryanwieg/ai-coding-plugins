@@ -11,12 +11,17 @@ Prints one line, then exits 0 when both limits are below the maximums
 (defaults: 80% of the short window, 90% of the weekly one), 1 when either is
 at or above, 2 when no usage data is found. A window that has reset since
 the last Codex request counts as 0% used.
+
+Before reading usage it exits 3 when Codex is off (AI_CODEX=off) or not
+installed, and 4 when `codex login status` says it is not signed in.
 """
 
 import datetime
 import glob
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 
@@ -65,6 +70,15 @@ def main(argv):
         raise SystemExit(__doc__)
     for flag, value in zip(args[::2], args[1::2]):
         limits[flag] = float(value)
+    if os.environ.get("AI_CODEX") == "off":
+        print("Codex is off (AI_CODEX=off)")
+        return 3
+    if shutil.which("codex") is None:
+        print("Codex is not installed")
+        return 3
+    if subprocess.run(["codex", "login", "status"], capture_output=True).returncode != 0:
+        print("Codex is not signed in; run: codex login --device-auth")
+        return 4
     found = latest_limits()
     if not found or not found.get("primary"):
         print("no Codex usage data found; run any Codex request first")
