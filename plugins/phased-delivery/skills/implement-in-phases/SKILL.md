@@ -67,7 +67,9 @@ refreshing `models-codex.md`; when Codex is off, skip the rest of this
 paragraph and record why in the Notes. While Codex is on, refresh
 `models-codex.md` the same way, then before each dispatch run
 `scripts/claude-usage.py` and `scripts/codex-usage.py` and route the stage
-by the routing table there, following its rules for failed Codex builds.
+by the routing table there. A Codex dispatch runs alone (stages marked
+parallel run one after another when one goes to Codex) and starts with the
+snapshot of REPO; follow the rules there for failed Codex builds.
 For a Codex build, write stage-builder.md and its filled-in inputs to a
 prompt file outside the repository and run `scripts/codex-build.sh <repo> <prompt> <model> <effort>
 <outdir>`, with the model and effort `models-codex.md` gives for the tier.

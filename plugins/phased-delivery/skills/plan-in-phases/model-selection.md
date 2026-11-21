@@ -218,9 +218,10 @@ Codex is **off** for the rest of the session when any of these holds, and
   or delete it when `HEAD` lacks it. A path in the snapshot whose hash or
   `absent` state now differs: stop and ask the user instead of restoring
   it.
-- **After a failed build:** exit 3 and the user signs in again
-  (`codex-usage.py` no longer exits 4): rerun the stage on Codex as the
-  next attempt. Otherwise (exit 3 skipped or repeated, 5, 6, 7) the stage
+- **After a failed build:** exit 3 and the user says they signed in
+  again: rerun the stage on Codex as the next attempt (`codex login
+  status` cannot confirm it: it still says logged in when the token has
+  expired). Otherwise (exit 3 skipped or repeated, 5, 6, 7) the stage
   is built by the routing rule as if Codex had no room.
 - **Exit 7, Codex out of quota during a build**, is not "off": it is "no
   room" for this dispatch (see the routing rule).
