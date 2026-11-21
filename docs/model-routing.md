@@ -84,7 +84,7 @@ Observed strengths (from use and the evals below):
 How it works now (`model-selection.md`, "Builders in another tool"):
 
 - Planning also writes `models-available-codex.json` and `models-codex.md`
-  when Codex is installed and signed in.
+  when Codex is on (installed, signed in, not `AI_CODEX=off`).
 - Availability: before each phase, `scripts/codex-usage.py` reports Codex
   off (`AI_CODEX=off`, or `codex` not installed) or not signed in (the user
   signs in or skips). Off lasts the session and also follows a build that
