@@ -14,7 +14,7 @@ without guessing, you have not read enough: read the code, then score.
 
 | Measure | 0 | 1 | 2 |
 | --- | --- | --- | --- |
-| **J: Judgment left** | Work names every change; the agent only writes it out | The agent chooses local details no other code sees: private helper names, loop structure, extra test cases | The agent chooses an approach, algorithm or data structure, or anything other code will see |
+| **J: Judgment left** | Work names every change; the agent only writes it out | The agent chooses local details no other code sees: private helper names, loop structure | The agent chooses an approach, algorithm or data structure, or anything other code will see |
 | **F: Files changed** (tests included) | 1–2 | 3–5 | 6 or more (also consider splitting the stage) |
 | **R: Files to read** to change it safely (callers, callees, contracts, tests) | 3 or fewer | 4–10 | More than 10, spread across more than one component, or a data set too large to read whole |
 | **C: Contracts** | Uses only settled contracts, unchanged | Implements a signature or format the plan already defines | Defines or changes a contract another stage or component uses |

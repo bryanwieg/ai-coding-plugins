@@ -51,6 +51,13 @@ or building the wrong thing. Do not report wording or style.
   recommend reworking that phase, even if much of the plan changes. That is
   what this review is for; do not suggest patching around it in a later
   phase.
+- **Tests:** the plan states the change's outcomes, and each has an
+  outcome test that runs the real entry point, written in one stage and
+  made to pass in one stage, all passing by the last phase. Report an
+  outcome only covered by small targeted tests, a unit test without a
+  reason a run-through cannot cover it, tests duplicating what an outcome
+  test already proves, and tests likely to be slow or flaky against the
+  budget in plan-in-phases' Plan the tests.
 - **Order:** order and parallel marks match the dependencies.
 - **Simplicity and rules:** no stage checks internal data, adds unrequested
   tooling or dependencies, or breaks a project rule or limit.

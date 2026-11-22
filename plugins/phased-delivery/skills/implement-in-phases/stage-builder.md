@@ -40,6 +40,10 @@ the code works inside the brief is yours.
   value a new name, produce new values instead of modifying existing ones,
   and keep side effects visible. This is a coding style only; releases,
   artifacts, branches and procedures follow their own requirements.
+- Write the tests the brief's Tests line names, and remove the
+  expected-fail marks it says to. Add no others: if the goal seems to need
+  another test, stop and report. Keep tests deterministic and within the
+  phase file's Outcome tests budget.
 - Follow the project's rules for testing, size limits and what may be run.
   Writing code gives no permission to run it.
 - Do not commit; the orchestrator commits each stage.

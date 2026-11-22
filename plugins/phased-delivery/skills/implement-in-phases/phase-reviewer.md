@@ -33,10 +33,14 @@ assumptions about the codebase: open the files.
    elsewhere is not simpler.
 5. **Done:** each stage's "Done when" is met, and the phase's "After" holds.
    Say which you confirmed by running something and which only by reading.
-6. **Assumptions:** the phase's assumptions still hold in the built code. A
+6. **Tests:** the tests each brief names exist, check what a user would
+   observe, and pass; the outcome tests the phase file says pass from this
+   phase have no expected-fail mark left. Report tests the briefs do not
+   name, and tests that are flaky or over the phase's budget.
+7. **Assumptions:** the phase's assumptions still hold in the built code. A
    wrong assumption that affects later phases or earlier architecture must be
    reported, with which phase it affects.
-7. **Rules:** project rules and limits are kept.
+8. **Rules:** project rules and limits are kept.
 
 ## Report
 
