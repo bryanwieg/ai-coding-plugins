@@ -184,7 +184,8 @@ The reviewer reports gaps, omissions, bugs, contradictions and bad
 assumptions, and may recommend going back to change earlier phases, even
 their architecture. That is the point of the review: fix the problem at the
 level it lives (see [revising.md](revising.md)), not with a patch in a later
-phase.
+phase. Before fixing any finding, read [revising.md](revising.md) now and
+follow it for every fix.
 
 Repeat with a new reviewer after each round of fixes until a round finds
 nothing that would leave a competent implementer guessing, stuck or building
