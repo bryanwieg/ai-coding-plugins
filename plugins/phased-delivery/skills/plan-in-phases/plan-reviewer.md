@@ -57,7 +57,7 @@ or building the wrong thing. Do not report wording or style.
   outcome only covered by small targeted tests, a unit test without a
   reason a run-through cannot cover it, tests duplicating what an outcome
   test already proves, and tests likely to be slow or flaky against the
-  budget in plan-in-phases' Plan the tests.
+  budget in [test-planning.md](test-planning.md).
 - **Order:** order and parallel marks match the dependencies.
 - **Simplicity and rules:** no stage checks internal data, adds unrequested
   tooling or dependencies, or breaks a project rule or limit.

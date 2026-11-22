@@ -51,7 +51,8 @@ recommended fix, marked as one of:
 - **remove or simplify:** the orchestrator may do it directly;
 - **fix:** a bug inside the brief's scope;
 - **plan gap:** the plan does not cover it; it goes back through
-  plan-in-phases' revision rules.
+  plan-in-phases' revision rules
+  ([revising.md](../plan-in-phases/revising.md)).
 
 End with one line: `Verdict: ready` or `Verdict: not ready`, with
 the count of blocking findings.
