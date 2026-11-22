@@ -87,15 +87,48 @@ misreport their own actions, so the implementer checks `small` work itself.
 
 ### Building with Codex from Claude Code
 
-When `codex` is installed and signed in, narrow stages (1–2 files changed,
-at most 3 to read) are built with `codex exec` through
-`scripts/codex-build.sh`, on your Codex plan instead of your Claude quota.
-Refactors and stages that must make sense of large data stay in Claude.
+Stages can be built with `codex exec` through `scripts/codex-build.sh`, on
+your Codex plan instead of your Claude quota. Codex is used only when it is
+installed, signed in and not turned off with `AI_CODEX=off`; this is checked
+at the start of each phase. If Codex is not signed in, you are asked to sign
+in or skip; skipping turns Codex off for the rest of the session. A build
+that cannot run (Codex's sandbox cannot start, a subscription or account
+problem, or a sign-in that lapses twice) also turns it off for the session.
+Codex also loads your installed Codex plugins, which can change how it
+builds.
+
+While Codex is on, how much goes there depends on both tools' usage, checked
+before every stage and before the phase review:
+
+- Claude on pace (or no usage data): narrow stages only (1–2 files changed,
+  at most 3 to read).
+- Claude ahead of pace: also stages one step wider or deeper.
+- Claude nearly out: every build stage and the phase review.
+
+Until Claude is nearly out, refactors and stages that must make sense of
+large data stay in Claude. `scripts/claude-usage.py` reads Claude's level;
 `scripts/codex-usage.py` reads Codex's remaining limits from its local
-session logs (as of the last Codex request) and stops routing there near
-the limit. If Codex's sign-in lapses, the build script says so and the stage
-is built in Claude. Codex also loads your installed Codex plugins, which can
-change how it builds.
+session logs (as of the last Codex request). When Codex has no room, stages
+are built in Claude; when both are nearly out, the phase stops after the
+stage in progress and reports both tools' usage and reset times, so you can
+resume later.
+
+Setup: Claude's usage is read from the status line's JSON, so the status
+line must save it. In `~/.claude/settings.json`, set `statusLine` to
+`{"type": "command", "command": ...}` with this command (as a JSON string,
+quotes escaped):
+
+```sh
+d="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; t="$d/claude-usage.json.$$"; find "$d" -maxdepth 1 -name 'claude-usage.json.*' -mmin +1 -delete 2>/dev/null; cat > "$t"; bash "$d/ponytail-statusline.sh" < "$t"; if grep -q '"rate_limits"' "$t"; then mv "$t" "$d/claude-usage.json"; else rm -f "$t"; fi
+```
+
+`bash "$d/ponytail-statusline.sh" < "$t"` stands for your own status line
+command, which then reads `< "$t"`; drop it if you have none. ai-coding
+sandbox images with `AI_CODEX` support set this up themselves. The usage
+data needs a Claude Pro, Max or Ultra plan; without it, routing stays
+narrow-only. Set `CODEX_BUILD_SANDBOX=danger-full-access` only when Claude
+Code itself runs in a sandbox container where Codex's own sandbox cannot
+start (the ai-coding sandbox already sets it).
 
 ### Tracking which model did what
 

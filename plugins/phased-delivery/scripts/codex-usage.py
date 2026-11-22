@@ -9,14 +9,21 @@ Codex request, not live.
 
 Prints one line, then exits 0 when both limits are below the maximums
 (defaults: 80% of the short window, 90% of the weekly one), 1 when either is
-at or above, 2 when no usage data is found.
+at or above, 2 when no usage data is found. A window that has reset since
+the last Codex request counts as 0% used.
+
+Before reading usage it exits 3 when Codex is off (AI_CODEX=off) or not
+installed, and 4 when `codex login status` says it is not signed in.
 """
 
 import datetime
 import glob
 import json
 import os
+import shutil
+import subprocess
 import sys
+import time
 
 
 def latest_limits():
@@ -63,16 +70,36 @@ def main(argv):
         raise SystemExit(__doc__)
     for flag, value in zip(args[::2], args[1::2]):
         limits[flag] = float(value)
+    if os.environ.get("AI_CODEX") == "off":
+        print("Codex is off (AI_CODEX=off)")
+        return 3
+    if shutil.which("codex") is None:
+        print("Codex is not installed")
+        return 3
+    if subprocess.run(["codex", "login", "status"], capture_output=True).returncode != 0:
+        print("Codex is not signed in; run: codex login --device-auth")
+        return 4
     found = latest_limits()
     if not found or not found.get("primary"):
         print("no Codex usage data found; run any Codex request first")
         return 2
     primary, weekly = found["primary"], found.get("secondary")
-    parts = [describe(f"{primary['window_minutes'] // 60}h window", primary)]
-    over = primary["used_percent"] >= limits["--max-window"]
-    if weekly:
-        parts.append(describe("weekly", weekly))
-        over = over or weekly["used_percent"] >= limits["--max-weekly"]
+    now = time.time()
+    parts = []
+    over = False
+    for name, window, maximum in (
+        (f"{primary['window_minutes'] // 60}h window", primary, limits["--max-window"]),
+        ("weekly", weekly, limits["--max-weekly"]),
+    ):
+        if not window:
+            continue
+        used = window["used_percent"]
+        if window["resets_at"] <= now:
+            parts.append(f"{name} reset since last Codex request")
+            used = 0
+        else:
+            parts.append(describe(name, window))
+        over = over or used >= maximum
     print("; ".join(parts) + ("; over the maximum" if over else "; room left"))
     return 1 if over else 0
 

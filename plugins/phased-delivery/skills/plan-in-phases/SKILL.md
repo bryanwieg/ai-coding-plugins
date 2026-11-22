@@ -51,6 +51,13 @@ your case while they do not. The user makes the final call. Record the
 concern, the reasoning and the outcome in the affected phase's Notes. Do not
 raise concerns about taste or style.
 
+Leave the grill with the change's purpose written as a few observable
+outcomes: what a user can do or see afterwards that they could not before,
+and what no longer goes wrong ("running X on Y writes Z", "a lapsed plan no
+longer hangs the build"). Each outcome must be checkable by running the
+program. One that cannot be turned into a test means the goal is not yet
+understood: keep asking. These outcomes drive the tests (see Plan the tests).
+
 Stop when no question or concern is left whose answer would change the plan.
 A small change may need only a few questions; ask none just to fill the step.
 
@@ -118,8 +125,8 @@ A small plan is lighter in structure only:
   follow the skeleton-to-cutover progression.
 - It adds a `Size` section listing the files, the users searched for and
   found, and each criterion above with its evidence.
-- Reading the code, the Assumptions section, complete stage briefs and the
-  plan review are never skipped. The review uses a fresh subagent, who also
+- Reading the code, the Assumptions section, the Outcome tests section,
+  complete stage briefs and the plan review are never skipped. The review uses a fresh subagent, who also
   re-measures the size: re-counts the files, re-searches the users and
   rechecks each criterion. A small plan often needs only one review round.
 
@@ -161,7 +168,8 @@ Assumptions and Notes in the phase file layout).
 - Assumptions to check: where things belong, that the wiring point exists
   and works as believed, that inactive code really has no effect.
 - Done when: the files exist and are wired, the project builds and its
-  existing tests pass, and behavior is unchanged.
+  existing tests pass, behavior is unchanged, and the test harness can drive
+  the real entry point the outcome tests will use.
 
 **Roles and interfaces.**
 - Settle every contract here: signatures, inputs and outputs, data formats,
@@ -173,19 +181,23 @@ Assumptions and Notes in the phase file layout).
   return, how data really looks (sample it where possible), that the
   responsibility split covers every requirement once.
 - Done when: the whole flow traces end to end through mock bodies returning
-  fixed or pass-through data, and the contracts are written in the code
-  itself, not only in the plan.
+  fixed or pass-through data, the contracts are written in the code
+  itself, not only in the plan, and every outcome test is written and runs
+  through the mocks, marked expected-fail where the mocks cannot produce the
+  outcome yet.
 
 **Internals.**
 - Settle, per stage, one behavior behind a fixed contract: the algorithm or
-  approach, the existing code it reuses, edge cases it handles, and the tests
-  that prove it.
+  approach, the existing code it reuses, edge cases it handles, which
+  outcome tests it makes pass, and any other test it needs under Plan the
+  tests.
 - Read: the contract and mock it replaces, the code it calls, existing
   helpers that already do part of the job, and the tests nearby.
 - Assumptions to check: that the contract is sufficient for the real logic,
   that existing helpers behave as their names suggest, performance or data
   size limits that matter.
-- Done when: the mock is replaced, the behavior's tests pass, and the
+- Done when: the mock is replaced, the outcome tests it names have their
+  expected-fail marks removed and pass, its other tests pass, and the
   contract is unchanged. If the real logic needs a different contract, that
   is a revision of the interfaces phase, not a local change.
 
@@ -201,8 +213,54 @@ Assumptions and Notes in the phase file layout).
   written by older versions is handled, that nothing outside the repository
   depends on what is removed.
 - Done when: the new path is the only path, the old one is gone or
-  deliberately kept with a reason, the full test suite passes, and the
-  documentation matches.
+  deliberately kept with a reason, every outcome test passes with no
+  expected-fail mark left, the full test suite passes within its time
+  budget, and the documentation matches.
+
+## Plan the tests
+
+Tests prove the change does what it was for, not that its pieces run. Small
+targeted tests can each pass while the whole fails; a run-through of the
+real program catches that. Derive the tests from the outcomes settled in the
+grill (see Grill the spec and design), and plan fewer, larger tests.
+
+- **Outcome tests come first.** Each outcome gets at least one test that
+  drives the real entry point (command, API, hook, UI) through the real
+  components and checks what a user would observe: output, files written,
+  exit status, state left behind. Cover the outcome's main failure paths
+  too. Every outcome has a test; the plan is done when they all pass.
+- **Integration tests** only for a contract or trust boundary the outcome
+  tests do not exercise. Use real components; substitute only what lies
+  outside the repository (network, paid or remote services), with a local
+  stand-in.
+- **Unit tests are the exception.** Plan one only where a run-through
+  cannot reach the cases cheaply: a parser with many input shapes, money,
+  a security check, a state machine, a tricky algorithm. Each states why in
+  one line. No unit tests for wiring, pass-throughs, accessors, mocks, or
+  anything an outcome test already covers.
+- **Make failures easy to place.** A failing run-through should show where
+  it broke: assert on the intermediate results a user could observe (files,
+  logged steps, exit codes) rather than adding unit tests to locate faults.
+- **Deterministic.** No real clocks, randomness, sleeps or outside services
+  in a test's result; poll with a timeout instead of sleeping. A flaky
+  run-through is worse than none.
+- **Runtime is a design constraint.** Unless the project sets its own, the
+  budget is about a minute for the tests one stage runs and a few minutes
+  for the whole suite. Design tests to fit: small realistic data, temporary
+  directories, expensive setup done once and shared, tests independent so
+  they can run in parallel. A test that is slow by nature (real network,
+  large data) is marked as such and runs at phase end and cutover only.
+- **Write outcome tests early.** The interfaces phase writes them against
+  the contracts, marked expected-fail with the framework's strict marker
+  (one that fails when the test unexpectedly passes, such as pytest's
+  `xfail(strict=True)`). Each internals stage removes the marks of the
+  tests it makes pass. Without such a marker, write each outcome test in
+  the stage that makes it pass.
+
+Each phase file's Outcome tests section lists the outcomes it writes tests
+for or makes pass; across the plan, every outcome is written once and made
+to pass once. Each stage brief's Tests line names the exact tests that stage
+writes or turns on. The project's own testing rules take precedence.
 
 ## Write every phase file
 
@@ -244,6 +302,13 @@ After: what exists when it ends (what the user will inspect)
 - Open: <assumption>, why it cannot be checked yet, how and when to check it,
   and what changes if it is wrong
 
+## Outcome tests
+Budget: <the project's, or ~1 min per stage, a few minutes for the suite>
+
+| Outcome | Test | Written in | Passes from |
+| --- | --- | --- | --- |
+| <what a user can observe> | <test path::name> | NN.n | NN.n |
+
 ## Stages
 
 | Stage | Goal | Tier | Order | Status |
@@ -284,6 +349,9 @@ Contracts:       interfaces, formats and names it must provide or use, exactly
 Files:           exact paths it may create or change; nothing else
 Work:            the concrete changes, in order
 External inputs: trust boundaries it may check; "none" means no checks
+Tests:           the exact tests it writes or turns on, each with its kind
+                 (outcome, integration, unit) and what it proves; a unit
+                 test also says why a run-through cannot cover it
 Done when:       observable properties of the changed files
 Out of scope:    nearby things it must not change
 Model basis:     scores per model-selection.md, e.g.
