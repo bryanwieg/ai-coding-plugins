@@ -86,8 +86,11 @@ heading is not a name others use unless something links to it.
   the part adds something to an existing thing (an option to a command, a
   section to a file format, a field to a response), list both the new name
   and the existing thing's name (`--min-small` and `select-models.py`):
-  whoever uses the existing thing now meets the addition. Empty for new and
-  internal parts.
+  whoever uses the existing thing now meets the addition. This holds only
+  when users must handle the addition: a format they parse, options they
+  pass, a response they read. A new step or behavior inside a command,
+  skill or function that its callers use the same way as before is an
+  `internal` part. Empty for new and internal parts.
 - `existing_data`: data parts only: true when data written before this
   change must still be read or converted.
 
