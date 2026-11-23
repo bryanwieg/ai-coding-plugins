@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: in progress (stages done: all; review pending)
+Status: built 1432de0
 Before: codex-usage.py runs `codex login status` every time it is called, at the start of every phase. Codex found off stays off only until the session ends; the next session checks again from scratch.
 After: Codex availability is checked at most once a day. Once Codex is found off (not installed, not signed in, or a build showing it unusable), the result is cached for the day: codex-usage.py answers from the cache without running codex, and every session that day starts by telling the agent Codex is off and must not be considered. `codex-usage.py --recheck` checks again after the user fixes it.
 
@@ -161,3 +161,4 @@ Model basis: J1 F1 R1 C0 K0 P1 V2 S0 = 6 -> middle+ (override: middle with a mea
 - Revised before building, 2026-11-23: 03.2 moved the availability text in model-selection.md (now lines 304-350, the routing note at 365); README.md:151 and docs/model-routing.md:124-127 also describe the per-session check and are in 04.3's files. Run tests with `--basetemp=/cache/...` (see 01's Notes); test_codex_usage.py's stub codex needs it.
 - 2026-11-23, 04.1: bad arguments now exit 2 (argparse); no caller passes any. The 5-second timeout (exit 5) was checked by hand with a sleeping stub, not by a test.
 - 2026-11-23, 04.2: the off line reads `Codex is off today, so do not consider Codex this session: ... Cause: <codex-usage.py's line>`, since the script's own line already starts with "Codex is off today" when cached. The exit 5 and no-python3 paths are checked by reading only.
+- Phase review 2026-11-23 (opus high): ready, 3 should-fix, all fixed: an unwritable config folder crashed codex-usage.py with exit 1 (now uncached); exit 5 timeout now has a test; the docs say what a timed-out check before a phase means.
