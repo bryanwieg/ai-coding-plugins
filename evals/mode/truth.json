@@ -95,7 +95,8 @@
      ],
      "lines": "under 30",
      "changes": [
-      "CODEX_BUILD_SANDBOX"
+      "CODEX_BUILD_SANDBOX",
+      "codex-build.sh"
      ]
     }
    ],
@@ -104,15 +105,19 @@
   },
   "summary": {
    "mode": "direct",
-   "total": 2,
+   "total": 3.0,
    "parts": [
     {
      "title": "sandbox variable",
      "weight": 2,
      "size": 1,
-     "reach": 1,
-     "score": 2,
-     "reach_files": []
+     "reach": 1.5,
+     "score": 3.0,
+     "reach_files": [
+      "README.md",
+      "plugins/phased-delivery/skills/implement-in-phases/SKILL.md",
+      "plugins/phased-delivery/skills/plan-in-phases/model-selection.md"
+     ]
     }
    ],
    "reasons": []
@@ -458,7 +463,8 @@
      ],
      "lines": "under 30",
      "changes": [
-      "Outcome tests"
+      "Outcome tests",
+      "phase file"
      ]
     }
    ],
@@ -466,8 +472,8 @@
    "open_questions": []
   },
   "summary": {
-   "mode": "direct",
-   "total": 4,
+   "mode": "quick",
+   "total": 6,
    "parts": [
     {
      "title": "planning text",
@@ -481,9 +487,18 @@
      "title": "phase file gains Outcome tests",
      "weight": 2,
      "size": 1,
-     "reach": 1,
-     "score": 2,
-     "reach_files": []
+     "reach": 2,
+     "score": 4,
+     "reach_files": [
+      "README.md",
+      "evals/README.md",
+      "evals/collect.sh",
+      "evals/lib/make-repo.sh",
+      "evals/tasks/t4-rename/reference/plugins/phased-delivery/skills/implement-in-phases/SKILL.md",
+      "plugins/phased-delivery/hooks/session-start.sh",
+      "plugins/phased-delivery/skills/implement-in-phases/SKILL.md",
+      "plugins/phased-delivery/skills/plan-in-phases/SKILL.md"
+     ]
     }
    ],
    "reasons": []
@@ -644,7 +659,8 @@
      ],
      "lines": "30-150",
      "changes": [
-      "phase-file-template.md"
+      "phase-file-template.md",
+      "plan-in-phases"
      ]
     },
     {
@@ -670,8 +686,8 @@
    "open_questions": []
   },
   "summary": {
-   "mode": "quick",
-   "total": 14.5,
+   "mode": "full",
+   "total": 26.5,
    "parts": [
     {
      "title": "check script, schemas, guides",
@@ -685,9 +701,20 @@
      "title": "planner writes JSON, script renders",
      "weight": 3,
      "size": 2,
-     "reach": 1,
-     "score": 6,
-     "reach_files": []
+     "reach": 3,
+     "score": 18,
+     "reach_files": [
+      "docs/model-routing.md",
+      "evals/tasks/p2-multistep/reference/plugins/phased-delivery/skills/plan-in-phases/model-selection.md",
+      "evals/tasks/t4-rename/reference/plugins/phased-delivery/skills/implement-in-phases/SKILL.md",
+      "evals/tasks/t4-rename/reference/plugins/phased-delivery/skills/implement-in-phases/phase-review.md",
+      "evals/tasks/t5-keywords/reference/plugins/phased-delivery/hooks/prompt-reminder.sh",
+      "plugins/phased-delivery/hooks/hooks.json",
+      "plugins/phased-delivery/hooks/prompt-reminder.sh",
+      "plugins/phased-delivery/hooks/session-start.sh",
+      "plugins/phased-delivery/skills/implement-in-phases/SKILL.md",
+      "plugins/phased-delivery/skills/implement-in-phases/phase-reviewer.md"
+     ]
     },
     {
      "title": "closed review types",
@@ -881,7 +908,8 @@
      ],
      "lines": "under 30",
      "changes": [
-      "--min-small"
+      "--min-small",
+      "select-models.py"
      ]
     }
    ],
@@ -890,15 +918,24 @@
   },
   "summary": {
    "mode": "direct",
-   "total": 2,
+   "total": 4,
    "parts": [
     {
      "title": "min-small option",
      "weight": 2,
      "size": 1,
-     "reach": 1,
-     "score": 2,
-     "reach_files": []
+     "reach": 2,
+     "score": 4,
+     "reach_files": [
+      ".github/workflows/model-report.yml",
+      "README.md",
+      "plugins/phased-delivery/model-report.md",
+      "plugins/phased-delivery/scripts/fetch-model-report.py",
+      "plugins/phased-delivery/skills/implement-in-phases/SKILL.md",
+      "plugins/phased-delivery/skills/plan-in-phases/SKILL.md",
+      "plugins/phased-delivery/skills/plan-in-phases/model-selection.md",
+      "plugins/phased-delivery/skills/plan-in-phases/plan-reviewer.md"
+     ]
     }
    ],
    "reasons": []
@@ -921,7 +958,8 @@
      ],
      "lines": "under 30",
      "changes": [
-      "Report row"
+      "Report row",
+      "models.md"
      ]
     }
    ],
@@ -930,15 +968,23 @@
   },
   "summary": {
    "mode": "direct",
-   "total": 2,
+   "total": 4,
    "parts": [
     {
      "title": "speed column",
      "weight": 2,
      "size": 1,
-     "reach": 1,
-     "score": 2,
-     "reach_files": []
+     "reach": 2,
+     "score": 4,
+     "reach_files": [
+      "README.md",
+      "plugins/phased-delivery/skills/implement-in-phases/SKILL.md",
+      "plugins/phased-delivery/skills/implement-in-phases/phase-reviewer.md",
+      "plugins/phased-delivery/skills/implement-in-phases/stage-builder.md",
+      "plugins/phased-delivery/skills/plan-in-phases/SKILL.md",
+      "plugins/phased-delivery/skills/plan-in-phases/model-selection.md",
+      "plugins/phased-delivery/skills/plan-in-phases/plan-reviewer.md"
+     ]
     }
    ],
    "reasons": []

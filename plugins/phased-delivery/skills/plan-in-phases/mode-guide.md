@@ -80,9 +80,12 @@ they test.
   see that this part adds, changes or changes the meaning of:
   the whole identifier, key, option or route as written in the code
   (`check_rate`, `auth_file`, `/api/login`). The script searches for them;
-  a short or common word matches everywhere, so give the exact name. List
-  names the part adds as well (a new option, a new key): nothing uses them
-  yet, so they add no reach. Empty for new and internal parts.
+  a short or common word matches everywhere, so give the exact name. When
+  the part adds something to an existing thing (an option to a command, a
+  section to a file format, a field to a response), list both the new name
+  and the existing thing's name (`--min-small` and `select-models.py`):
+  whoever uses the existing thing now meets the addition. Empty for new and
+  internal parts.
 - `existing_data`: data parts only: true when data written before this
   change must still be read or converted.
 
