@@ -96,9 +96,11 @@ How it works now:
   input price, since `--max-budget-usd` is the hard stop it offers. A build
   stopped at its cap retries with `route --down 1`; one that fails its
   checks with `route --up 1`. Premium pairs (output price of $30 or more
-  per million tokens; among current models, Fable and GPT-6.x Astra) share $10 per phase;
-  past that, builds leave them out, since one step down from a premium pair
-  is often still premium. Reviews count against it but never drop a step.
+  per million tokens; among current models, Fable and GPT-6.x Astra) built
+  by `claude-build.sh` share $10 per phase; past that, Claude builds leave
+  them out, since one step down from a premium pair is often still premium.
+  Reviews count against it but never drop a step. Codex runs use their own
+  quota and neither add to nor read the budget.
 - **Headless Claude builds:** `scripts/claude-build.sh` runs a stage with
   `claude -p` at route's model, effort and `cap_usd`, the phased-delivery
   plugin off (its hooks would pull the builder away from its brief), in

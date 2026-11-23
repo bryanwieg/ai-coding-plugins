@@ -178,9 +178,11 @@ python3 scripts/select-models.py route <plan>/models-available.json --scores J1F
 written without spaces. It prints one JSON line: `model`, `effort`, `tier`,
 `premium`, `score`, `cap_tokens`, `cap_usd` and `why` (the rules that
 shaped the pick). Exit codes: 0 printed; 2 bad input (fix it from the
-message); 3 profiles missing; 4 no selectable pair. On 3 or 4, or without
+message); 3 profiles missing; 4 no selectable pair. On 3, or without
 Python, dispatch the tier's pair from `models.md` (or the fallback) as an
-in-session subagent with no cap, and say so in the phase's Notes.
+in-session subagent with no cap, and say so in the phase's Notes. On 4,
+stop and report to the user: falling back would get around the premium
+budget and the cap.
 
 What `route` does, in this order:
 
@@ -220,8 +222,11 @@ at the top of the script.
   `--premium-spent`. Once X reaches $10, builds get no premium pair for
   the rest of the phase.
 - **Reviews** use `route --review`: always `top`, their cost counted
-  against the premium budget, never a step down. A review stopped at its
+  against the premium budget when built by `claude-build.sh`, never a step
+  down. A review stopped at its
   cap is reported to the user, not retried lower.
+- **Codex runs** add nothing to the premium spend and their `route` calls
+  pass no `--premium-spent`: Codex runs on its own quota.
 - **Codex builds** have no cap: `codex exec` has no budget option, and
   Codex runs on its own quota (see "Builders in another tool").
 
@@ -408,15 +413,18 @@ the session cannot continue does sparing its quota outweigh that.
 - If `claude-build.sh` stops a build at its cap (exit 8), retry it with
   `route --down 1`, and one step further on each further stop (`--down 2`,
   and so on). Record each stopped attempt as an Earlier-Attempt. When
-  `why` says it moved 0 frontier pairs, the stage is too big for its cap:
-  revise the plan.
+  `why` says it moved fewer pairs than asked, or `route` prints a pair
+  already tried for this stage, the stage is too big for its cap: revise
+  the plan.
 - If a builder fails its "Done when", stops because the stage was harder
   than its scores showed, or produces work the review rejects for reasoning
   errors, rerun it with `route --up 1` instead of retrying the same pair
   (one step further on each further failure), and note which measure was
   under-scored. Where the model is inherited, `route` moves only its
-  thinking level. `--down` and `--up` cannot be combined: pass the net
-  count. When `why` says it moved 0 frontier pairs, the brief or the plan
-  is the problem: go back to planning.
+  thinking level. When `why` says it moved fewer pairs than asked, or
+  `route` prints a pair already tried for this stage, the brief or the
+  plan is the problem: go back to planning. A stage that has both hit its
+  cap and failed its checks also goes back to planning; never net `--down`
+  against `--up`, which would re-dispatch a pair already tried.
 - If a builder stops because the brief is wrong, a higher tier is not the
   fix; revise the plan.

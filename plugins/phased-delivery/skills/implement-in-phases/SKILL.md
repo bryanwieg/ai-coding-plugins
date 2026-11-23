@@ -73,13 +73,19 @@ Accept it exactly as a subagent's work. The limits:
 
 - **Exit 8, budget reached:** retry with `route --down 1`, one step
   further on each further stop; each stopped attempt is an Earlier-Attempt.
+  Never re-dispatch a pair already tried for the stage; when `route` would,
+  revise the plan (model-selection.md, "Adjust while working").
+- **Any other non-zero exit** (2: bad arguments or permissions setting;
+  otherwise claude's own status, such as a sign-in or service failure):
+  report stderr's last line to the user and stop; do not step up.
 - **Fails its "Done when" or is harder than its scores:** rerun with
   `route --up 1` (one step further on each further failure). When it stops
   because the brief is wrong, revise the plan instead.
 - **Premium spend:** after each `claude-build.sh` run of a pair route
-  printed with `"premium": true`, and of every review, add its `Cost:` (its
-  `cap_usd` when unknown) to the `Premium spend` line. From $10, builds get
-  no premium pair.
+  printed with `"premium": true`, and of every review it runs, add its
+  `Cost:` (its `cap_usd` when unknown) to the `Premium spend` line. From
+  $10, builds get no premium pair. Codex runs add nothing and their
+  `route` calls pass no `--premium-spent`.
 - `CLAUDE_BUILD_PERMISSIONS` unset gives the builder `acceptEdits`: file
   edits, and commands the project's allow rules permit. A session already
   in a sandbox container may set it to `bypassPermissions`.
