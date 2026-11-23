@@ -7,7 +7,8 @@ import sys
 
 PLUGIN = Path(__file__).resolve().parents[1]
 SCRIPT = PLUGIN / "scripts" / "select-models.py"
-REPORT = json.loads((PLUGIN / "model-report.json").read_text())
+# A frozen copy: the weekly refresh replaces model-report.json.
+REPORT = json.loads((PLUGIN / "tests" / "fixtures" / "model-report-2026-11-21.json").read_text())
 
 
 def profiles(tmp_path, report):
@@ -50,6 +51,11 @@ def test_refresh_only_on_model_or_price_change(tmp_path):
         code, text = profiles(tmp_path, changed)
         assert code == 0 and text != built
         assert profiles(tmp_path, REPORT)[0] == 0  # back to the committed report
+
+    # a report the code cannot handle must not read as "unchanged" (exit 1)
+    bad = copy.deepcopy(REPORT)
+    bad["rows"][0]["effort"] = 5
+    assert profiles(tmp_path, bad)[0] == 2
 
 
 def test_derived_properties(tmp_path):

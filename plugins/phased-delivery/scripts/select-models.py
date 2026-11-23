@@ -363,7 +363,14 @@ def profiles_main(args):
     if len(args) != 2:
         print(__doc__, file=sys.stderr)
         return 2
-    report_path, out_dir = args
+    try:
+        return build_profiles(*args)
+    except Exception as error:  # any failure must exit 2: the workflow reads 1 as "unchanged"
+        print(f"bad report or output: {error!r}", file=sys.stderr)
+        return 2
+
+
+def build_profiles(report_path, out_dir):
     try:
         report = load_profile_report(report_path)
     except ValueError as error:
@@ -374,8 +381,8 @@ def profiles_main(args):
     try:
         with open(path) as source:
             old_fingerprint = json.load(source).get("fingerprint")
-    except (OSError, ValueError, AttributeError):
-        old_fingerprint = None  # absent or unreadable: rebuild it
+    except FileNotFoundError:
+        old_fingerprint = None
     if old_fingerprint == new_fingerprint:
         print(f"{new_fingerprint} unchanged")
         return 1
