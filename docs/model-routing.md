@@ -184,6 +184,38 @@ How it works now (`model-selection.md`, "Builders in another tool"):
 | GPT-6.1 Terra, low (Codex) | 1 eval (multi-step probe) | Passed, kept the step order, saw the planned failure before fixing it, accurate report; grade 10; 1.5k output tokens. |
 | GPT-6.2 Sol, medium (Codex) | 1 real phase (`stage-stats` failed column) | Passed its checks first try, accurate report, 195k tokens (1.8k output). Opus review found one real bug (non-portable awk) the planned check missed. First try, not clean. |
 
+### Routing calibration, 2026-11-23
+
+15 headless runs of the builder evals through `claude-build.sh`, each at
+the pair `route` picks and one step down, $0.57 in all. The eval briefs
+are all scored mechanical, so this tested the small tier and one
+re-scored stage (p2 with S2), not the J2/C2, risk or speed rules.
+
+| Task | Pair | Check | Cost | Tokens |
+| --- | --- | --- | --- | --- |
+| t1-t5 (5 tasks) | Haiku high (route) | 5/5 pass | $0.006-0.018 | 105k-332k |
+| t1-t5 (5 tasks) | Haiku medium (`--down 1`) | 5/5 pass | $0.006-0.014 | 106k-366k |
+| p1-stop | Haiku high | stopped correctly, no changes | $0.007 | 118k |
+| p1-stop | Haiku medium | did not stop: built the column with the wrong helper | $0.012 | 261k |
+| p2-multistep, as S2 | Opus medium (route) | pass, step order kept | $0.215 | 128k |
+| p2-multistep, as S2 | Opus low (`--down 1`) | pass, step order kept | $0.198 | 126k |
+| p2-multistep | Haiku high (old small pick) | pass, step order kept | $0.012 | 249k |
+
+- **Caps hold with room.** The dearest Haiku stage cost $0.018 against
+  the $0.25 floor; Opus stages $0.21 against $1.60. Tokens run past
+  `cap_tokens` (a small stage used up to 366k, mostly cache reads), so
+  `cap_tokens` is nominal: the dollar cap is what stops a build.
+- **One step down is not free.** Haiku medium passed every hidden check
+  but failed the stop probe Haiku high passed, so dropping a step after a
+  cap costs judgment, not only score. One run each.
+- **Thinking level barely moved Opus cost here:** low and medium spent
+  the same tokens on p2.
+- **Haiku high kept the p2 step order** this time (earlier subagent runs
+  skipped it), at a seventeenth of Opus medium's cost. One run is not
+  enough to relax "small only for mechanical stages".
+- Not tested: the 2-point/1.5x cutoffs (no low-gain pair was a route
+  pick), J2/C2, risk and speed rules, and Sonnet (off the frontier).
+
 Side observations:
 
 - `codex exec` loads the user's installed Codex plugins and skills, which
@@ -193,11 +225,12 @@ Side observations:
 
 ## Open questions and next steps
 
-- **Calibrate routing (paid run, ask first):** the 2-point and 1.5x
-  low-gain cutoffs, the 1.5x preference window, the routing table and the
-  stage caps are unmeasured. At the input price alone a `small` stage's
-  cap on Haiku was $0.01, below one headless run (about $0.02 estimated),
-  so every cap is at least `MIN_CAP_USD` ($0.25).
+- **Calibrate routing further (paid run, ask first):** the first run
+  (above) covered the small tier and the caps. The 2-point and 1.5x
+  low-gain cutoffs, the 1.5x preference window and the J2/C2, risk and
+  speed rules need eval tasks scored to trigger them. Every cap is at
+  least `MIN_CAP_USD` ($0.25); at the input price alone a `small` stage
+  on Haiku would get $0.01.
 - **Headless build checks: done 2026-11-23** (two Haiku-high runs on a
   one-function stage, $0.006 together). On a subscription,
   `total_cost_usd` is reported and `--max-budget-usd` stops the run: a
