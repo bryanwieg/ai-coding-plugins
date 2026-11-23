@@ -1,6 +1,6 @@
 ---
 name: plan-in-phases
-description: "Turn an approved specification and design into a complete phased implementation plan: one self-contained NN-name.md file per phase, each split into stage briefs a fresh agent can build without further decisions. Planning only; writes no code. Use whenever the user asks to plan, break down, phase, stage or sequence a feature, migration, rewrite or other multi-step change (\"plan this\", \"break this into phases\", \"write the implementation plan\", \"how should we build this in stages\"), or to review, fix or rework an existing phased plan or revise a phase after implementation finds gaps. Use proactively, without being asked, before writing code for any change that touches several files, a shared contract or the architecture; it measures from the code whether a small plan is enough, so do not skip it because a change seems small. Not for one-file edits that change no contract, and not for building the plan; that is implement-in-phases."
+description: "Turn an approved specification and design into a complete phased implementation plan: one self-contained NN-name.md file per phase, each split into stage briefs a fresh agent can build without deciding anything other stages, code or the user see. Planning only; writes no code. Use whenever the user asks to plan, break down, phase, stage or sequence a feature, migration, rewrite or other multi-step change (\"plan this\", \"break this into phases\", \"write the implementation plan\", \"how should we build this in stages\"), or to review, fix or rework an existing phased plan or revise a phase after implementation finds gaps. Use proactively, without being asked, before writing code for any change that touches several files, a shared contract or the architecture; it measures from the code whether a small plan is enough, so do not skip it because a change seems small. Not for one-file edits that change no contract, and not for building the plan; that is implement-in-phases."
 ---
 
 # Plan in phases
@@ -46,7 +46,8 @@ for a decision.
   rest on a contract defined earlier in this plan. Say which one.
 - Write down what you verified: in each stage's Context, cite the files and
   symbols you read, so the implementer and the reviewer can see the decision
-  rests on real code.
+  rests on real code. Cite the lines with words they show (see
+  [phase-guide.md](phase-guide.md)); the script checks them.
 
 ## Size the plan from the code
 
@@ -145,11 +146,39 @@ Before each step, for each phase, read the current code that phase touches
 At each step, define all related parts and their contracts before going deeper
 into one of them, including callers and consumers in other phases.
 
-### Phase file layout and stage brief
+### Write the plan as JSON and let the script check and render it
 
-Before writing any phase file, read
-[phase-file-template.md](phase-file-template.md) and use its phase file layout
-and stage brief exactly.
+Steps 2 to 4 are written as JSON in a `.plan/` folder inside the plan
+directory, and `scripts/plan-check.py` (in this plugin, two directories above
+this skill's directory) checks them and renders the phase files. The JSON is
+a planning tool only: once the plan is reported, the rendered `NN-name.md`
+files are the plan.
+
+1. Steps 2 and 3: read [plan-guide.md](plan-guide.md) and write
+   `.plan/plan.json` following it: the outcomes from the grill, the
+   decisions that span phases, the contract registry, the outcome tests,
+   and every phase with its stages, files, contracts and order. Run
+   `python3 scripts/plan-check.py <plan dir> --outline --repo <repo>
+   --spec <spec> --design <design>` and fix every error it reports before
+   going on; judge each warning.
+2. Step 4: read [phase-guide.md](phase-guide.md) and write
+   `.plan/NN.json` for every phase following it. Run the script without
+   `--outline`; it checks each phase against the guide and `plan.json`,
+   checks every spec and design quote and every code citation, and renders
+   each clean phase to `NN-name.md` in the layout of
+   [phase-file-template.md](phase-file-template.md). Fix every error and
+   rerun until it reports none.
+3. Change the plan by editing the JSON and rerunning the script, never the
+   rendered files, until the plan is reported. Then delete `.plan/`.
+
+The script decides what can be checked without judgment: that each
+contract is listed by its provider and every user, the build order, that
+files exist or are created first, outcome coverage, tiers from the scores,
+quotes and citations, and the no-code and length rules. Do not re-check
+those by hand; spend the reading on what needs judgment. If Python is not
+available, write the phase files directly in the layout of
+[phase-file-template.md](phase-file-template.md), follow the two guides for
+each field, and check each item above by reading.
 
 ## Plan for simple code
 
@@ -173,27 +202,30 @@ and stage brief exactly.
 
 ## Review the written plan
 
-When all files are written, review the plan, not any implementation. Use a
-fresh reviewing subagent each round, since it reads the files as an
-implementer will, without the planning session's context. Give it
-[plan-reviewer.md](plan-reviewer.md) unchanged, with its inputs filled in;
-that file holds the full checklist and report format. Use the `top`
-candidate from the plan's `models.md`.
+When all files are written and the script reports no errors, review the
+plan, not any implementation. Use a fresh reviewing subagent each round,
+since it reads the files as an implementer will, without the planning
+session's context. Give it [plan-reviewer.md](plan-reviewer.md) unchanged,
+with its inputs filled in; that file holds what counts as a finding, where
+to look and the report format. Use the `top` candidate from the plan's
+`models.md`.
 
-The reviewer reports gaps, omissions, bugs, contradictions and bad
-assumptions, and may recommend going back to change earlier phases, even
+The reviewer reports only the finding types plan-reviewer.md lists, each
+with evidence, and may recommend going back to change earlier phases, even
 their architecture. That is the point of the review: fix the problem at the
 level it lives (see [revising.md](revising.md)), not with a patch in a later
 phase. Before fixing any finding, read [revising.md](revising.md) now and
 follow it for every fix.
 
-Repeat with a new reviewer after each round of fixes until a round finds
-nothing that would leave a competent implementer guessing, stuck or building
-the wrong thing. The plan does not have to be perfect; that is impossible.
-It has to be enough that a competent agent can take over each stage, know
-what to do and why, and not lose the spec's goals. Do not keep reviewing for
-wording or style once that bar is met. If rounds keep finding new problems in
-the same area, the design there is likely unsettled: stop and ask the user.
+Fix findings in the JSON and rerun the script. Repeat with a new reviewer
+after each round of fixes until a round reports no findings; a later round
+checks the previous findings and reviews only the phases that changed and
+what depends on them. The plan does not have to be perfect; that is
+impossible. It has to be enough that a competent agent can take over each
+stage, know what to do and why, and not lose the spec's goals. If rounds
+keep finding new problems in the same area, the design there is likely
+unsettled: stop and ask the user. Why the review works this way is in
+[structured-planning-notes.md](structured-planning-notes.md).
 
 Then report the plan to the user, including any open assumptions.
 

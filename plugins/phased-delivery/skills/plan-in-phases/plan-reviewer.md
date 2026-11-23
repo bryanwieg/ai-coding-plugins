@@ -20,8 +20,19 @@ plan as the implementer will, with only the files and the repository.
 
 The goal is a plan that a competent agent can build stage by stage, knowing
 what to do and why, without losing the specification's goals. It does not
-need to be perfect. Report what would leave an implementer guessing, stuck
-or building the wrong thing. Do not report wording or style.
+need to be perfect. Report only the finding types listed under "What counts
+as a finding", each with evidence; anything else is not a finding, however
+true. Do not report wording or style.
+
+`scripts/plan-check.py` has already checked what needs no judgment: each
+contract is listed by its provider and every user, providers are built
+before users, edited files exist or are created first, parallel stages
+share no file, every outcome has a test written before it must pass, tiers
+follow the scores, spec and design quotes appear in the documents, cited
+code lines exist and show what they claim, and no brief holds code. Do not
+re-check those. Implementation revises each phase against the code before
+building it and reviews every diff, so a slip inside one stage is caught
+there.
 
 ## How to review
 
@@ -31,9 +42,13 @@ or building the wrong thing. Do not report wording or style.
    brief takes from existing code, open that code and check it. Do not trust
    the plan's claims, its cited files or your own memory of the codebase.
 3. For later rounds, first confirm each earlier finding is actually fixed,
-   then review the whole plan again; fixes often break something nearby.
+   then review the phases that changed and what depends on them; fixes
+   often break something nearby.
 
-## What to check
+## Where to look
+
+These are the places problems hide. A problem you find here is reported
+only if it is one of the finding types below.
 
 - **Coverage:** every requirement and design decision is placed in exactly
   one stage, and the specification's goals stay visible in the stages that
@@ -76,22 +91,49 @@ or building the wrong thing. Do not report wording or style.
   applied, and the stage table agrees. Report any measure scored too low.
 - **Bugs:** logic in the briefs that would produce wrong behavior.
 
+## What counts as a finding
+
+| Type | Report it when | Not this |
+| --- | --- | --- |
+| `approach-fails` | the planned approach cannot meet a spec goal or success item, shown from the spec and the code | an approach you would have chosen differently |
+| `simpler-approach` | a much simpler way meets the same requirements with existing code or tools, named concretely | a small simplification inside one stage |
+| `trust-boundary` | data from outside the code's control enters unchecked, or a security design (auth, secrets, permissions) has a flaw an attacker could use | a missing check on data this code produced |
+| `requirement-uncovered` | a spec requirement, design decision or success item no stage builds or tests | a test case missing inside a stage |
+| `departure-unrecorded` | the plan departs from the approved spec or design without recording it as a decision with the user's answer | a recorded departure you disagree with (say so after the findings) |
+| `contract-conflict` | two phases describe a shared interface, format, route or key differently in a way the script cannot see (same name, different meaning), or a brief leaves something other stages or code see undecided | a naming detail inside one stage; anything only the stage's own code sees |
+| `contradicts-code` | a contract or assumption is false about existing code, so a phase cannot work as planned; cite the line | a detail a builder will notice when opening the file |
+| `outcome-untestable` | an outcome test cannot be written or made to pass at its planned stages, or does not go through the real entry point | a test you would structure differently |
+| `order-wrong` | a stage depends on work a later stage builds, or a phase leaves the repository incoherent | a parallel mark that could be added |
+| `size-wrong` | the plan claims to be small and a size criterion fails on re-measuring | |
+| `model-table` | `models.md` is not the selector's output for `models-available.json`, or the fallback was misapplied | |
+| `score-too-low` | a `Model basis` measure is scored lower than the code and model-selection.md support | a score you would put one higher by taste |
+| `over-specified` | a brief dictates code: function bodies, expressions, statement order, private helpers | precise interfaces, routes, formats or rules |
+
+Examples (from an unrelated feature, login rate limiting):
+- Valid `requirement-uncovered`: spec §3 "limits apply per address and per
+  user name"; no stage limits by user name (02.1 behaviour covers address
+  only).
+- Not a finding: "02.1 should say which data structure holds the counts"
+  (internal; the builder's choice).
+
 ## Report
 
 List findings, most serious first. For each:
 
-- **Severity:** `blocking` (an implementer would guess, get stuck or build
-  the wrong thing) or `should fix` (a real problem a competent implementer
-  would likely get past).
+- **Type:** one of the types above.
 - **Where:** phase file and stage.
 - **Problem:** what is wrong or missing.
-- **Evidence:** the file, symbol or plan text that shows it.
+- **Evidence:** the spec or design section with the words quoted, or
+  `path:line` in the code, and the plan text that says otherwise.
 - **Fix at:** the highest level it should be fixed (which phase and which
   contract or decision), and the recommended change.
 
-End with one line: `Verdict: ready` if there are no blocking findings, or
-`Verdict: not ready` with the count of blocking findings. If the same area
-keeps failing across rounds, say so: the design there may be unsettled and
-need the user.
+Then, briefly, anything you noticed that is not a finding type, such as a
+recorded departure you disagree with.
+
+End with one line: `Verdict: ready` if there are no findings, or
+`Verdict: not ready` with the count of findings. If the same area keeps
+failing across rounds, say so: the design there may be unsettled and need
+the user.
 
 Do not edit any files.

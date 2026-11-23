@@ -54,22 +54,30 @@ holds independent responsibilities.
 ```
 Goal:            one sentence: what is true when done
 Context:         what earlier phases and stages built that this uses, the
-                 existing code it relies on (files and symbols read while
-                 planning), and the design decisions that apply (link
-                 spec/design sections; quote the few lines that matter)
-Contracts:       interfaces, formats and names it must provide or use, exactly
-Files:           exact paths it may create or change; nothing else
-Work:            the concrete changes, in order
+                 existing code it relies on (files and lines read while
+                 planning), and the spec and design words that apply, quoted
+Contracts:       every interface, format or name it provides to or uses from
+                 something outside the stage, exactly, with who is on the
+                 other side
+Files:           exact paths it may create, change or delete, each with what
+                 it holds afterwards; nothing else
+Behaviour:       what other code, tests or the user can observe, as given /
+                 when / then rules, edge cases included
 External inputs: trust boundaries it may check; "none" means no checks
-Tests:           the exact tests it writes or turns on, each with its kind
-                 (outcome, integration, unit) and what it proves; a unit
-                 test also says why a run-through cannot cover it
+Tests:           the outcome tests it writes or turns on, then any other
+                 tests it writes, keeps passing or deletes, each with its
+                 kind (outcome, integration, unit) and what it proves; a
+                 unit test also says why a run-through cannot cover it
 Done when:       observable properties of the changed files
 Out of scope:    nearby things it must not change
 Model basis:     scores per model-selection.md, e.g.
                  J1 F1 R1 C1 K0 P0 V1 S0 = 5 -> middle
 ```
 
-Write decisions, not instructions to decide: "Decide how X works" is unfinished
-planning. Exact code bodies need not be in the brief, but everything an agent
-would otherwise have to invent about structure or contracts must be.
+`scripts/plan-check.py` renders this layout from the plan's JSON (see
+[plan-guide.md](plan-guide.md) and [phase-guide.md](phase-guide.md), which
+say what goes in each field). Write decisions, not instructions to decide:
+"Decide how X works" is unfinished planning when X is seen outside the
+stage. The brief settles everything another stage, existing code or the
+user sees; how the code works inside the stage is the builder's, and the
+brief holds no code and no statement-level steps.

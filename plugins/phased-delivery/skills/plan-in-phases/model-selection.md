@@ -14,14 +14,14 @@ without guessing, you have not read enough: read the code, then score.
 
 | Measure | 0 | 1 | 2 |
 | --- | --- | --- | --- |
-| **J: Judgment left** | Work names every change; the agent only writes it out | The agent chooses local details no other code sees: private helper names, loop structure | The agent chooses an approach, algorithm or data structure, or anything other code will see |
+| **J: Judgment left** | The brief names a near-identical example and every change follows it; the agent only writes it out | The agent chooses local details no other code sees: private helper names, loop structure | The agent chooses an approach, algorithm or data structure, or anything other code will see |
 | **F: Files changed** (tests included) | 1–2 | 3–5 | 6 or more (also consider splitting the stage) |
 | **R: Files to read** to change it safely (callers, callees, contracts, tests) | 3 or fewer | 4–10 | More than 10, spread across more than one component, or a data set too large to read whole |
 | **C: Contracts** | Uses only settled contracts, unchanged | Implements a signature or format the plan already defines | Defines or changes a contract another stage or component uses |
 | **K: Risk items** (count from the list below) | None | One | Two or more |
 | **P: Pattern to follow** | A near-identical example exists; the brief names the file | Similar code exists but needs adapting | Nothing comparable in the repository |
 | **V: Verification** of "Done when" | Fully by running tests, a build or the program | Partly by running, partly by reading | Only by reading code |
-| **S: Sequencing** of the Work steps | Independent edits; no step depends on another's result | Ordered steps, but none depends on what a run shows | A step depends on what a run shows (run, look at the result, then act) |
+| **S: Sequencing** of the changes | Independent edits; no step depends on another's result | Ordered steps, but none depends on what a run shows | A step depends on what a run shows (run, look at the result, then act) |
 
 Risk items for K: a trust boundary; security, authentication, permissions or
 secrets; concurrency, async ordering or shared mutable state; persisted data,
