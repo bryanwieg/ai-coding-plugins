@@ -2,12 +2,23 @@
 """Estimate how much planning a change needs: direct, quick or full.
 
 Usage:
+  plan-mode.py sketch SKETCH.json [--repo DIR]
   plan-mode.py locate TERMS.json [--repo DIR]
   plan-mode.py score FORM.json [--repo DIR]
   plan-mode.py rescore PLAN_DIR [--repo DIR]
 
-A quick estimate with hard limits, in two calls (see
-skills/plan-in-phases/mode-guide.md). The agent does no searching itself:
+A quick estimate with hard limits, in stages that stop as soon as the mode
+is certain (see skills/plan-in-phases/mode-guide.md). The agent does no
+searching itself:
+
+0. The agent writes a sketch (the form below, with no files opened) from
+   the request alone: paths only where it already knows them, lines
+   "unsure" where it cannot tell. `sketch` searches for the users of each
+   changed name and prints the lowest and highest score the change could
+   have (an unknown line count spans every size; a part without paths may
+   have reach from 1 up to what the search found). When both ends give the
+   same mode, that is the mode and the estimate stops; otherwise the agent
+   continues with 1 and 2.
 
 1. The agent lists up to 5 terms from the request (TERMS.json, see
    mode.schema.json "terms"); `locate` searches the repository for each and
@@ -53,6 +64,7 @@ _spec.loader.exec_module(plan_check)
 
 WEIGHT = {"new": 0.5, "internal": 1, "interface": 2, "architecture": 3, "data": 3}
 SIZE = {"under 30": 1, "30-150": 2, "over 150": 5}
+UNSURE = "unsure"  # sketch only: a line count the request does not show
 REACHES = {"interface", "architecture", "data"}
 DIRECT_MAX, QUICK_MAX = 4, 15
 MODES = ["direct", "quick", "full"]
@@ -140,12 +152,14 @@ def locate(terms, repo, skip=None):
     return out
 
 
-def check_form(form, repo):
+def check_form(form, repo, sketch=False):
     out = []
 
     def add(where, kind, msg, level="error"):
         out.append({"where": where, "kind": kind, "msg": msg, "level": level})
 
+    if sketch and form["opened"]:
+        add("/opened", "limit", "a sketch is written before opening any file")
     if len(form["opened"]) > MAX_OPENED:
         add("/opened", "limit", f"{len(form['opened'])} files opened; the estimate reads at most {MAX_OPENED}")
     for f in form["opened"]:
@@ -154,6 +168,10 @@ def check_form(form, repo):
     created = set()
     for i, p in enumerate(form["parts"]):
         w = f"/parts/{i}"
+        if not sketch and not p["files"]:
+            add(w, "files", "every part lists its files once they are located")
+        if not sketch and p["lines"] == UNSURE:
+            add(w, "lines", "pick a bucket; unsure is for the sketch only")
         for f in p["files"]:
             exists = os.path.exists(os.path.join(repo, f["path"])) or f["path"] in created
             if f["action"] == "create" and exists:
@@ -191,6 +209,34 @@ def with_reach(form, repo, skip=None):
         p["reach"], p["reach_files"] = sorted(users), len(users)
         parts.append(p)
     return parts
+
+
+def mode_of(total):
+    return MODES[0 if total <= DIRECT_MAX else 1 if total <= QUICK_MAX else 2]
+
+
+def bounds(form, parts):
+    """The lowest and highest total a sketch allows, and the mode if both give the same."""
+    lo = hi = len(form["open_questions"])
+    rows, reasons = [], []
+    for p in parts:
+        w = WEIGHT[p["kind"]]
+        s_lo, s_hi = (1, 5) if p["lines"] == UNSURE else (SIZE[p["lines"]],) * 2
+        r_hi = reach(p["reach_files"]) if p["kind"] in REACHES else 1
+        r_lo = r_hi if p["files"] else 1  # without its paths, its own files may be among the users found
+        lo, hi = lo + w * s_lo * r_lo, hi + w * s_hi * r_hi
+        rows.append({"title": p["title"], "low": w * s_lo * r_lo, "high": w * s_hi * r_hi,
+                     "reach_files": p["reach"][:MAX_FILES_PER_TERM]})
+    mode = mode_of(lo) if mode_of(lo) == mode_of(hi) else None
+    if any(p["kind"] == "data" and p.get("existing_data") for p in parts):
+        mode = "full"
+        reasons.append("changes data already written -> full")
+    elif form["unresolved"] and mode != "full":
+        mode = None
+        reasons.append("unresolved parts: locate and read before deciding")
+    if mode is None and not reasons:
+        reasons.append(f"{mode_of(lo)} to {mode_of(hi)}: locate and read before deciding")
+    return {"mode": mode, "low": lo, "high": hi, "parts": rows, "reasons": reasons}
 
 
 def plan_parts(plan):
@@ -255,7 +301,7 @@ def main(argv):
             repo, i = argv[i + 1], i + 2
         else:
             args, i = args + [argv[i]], i + 1
-    if len(args) != 2 or args[0] not in ("locate", "score", "rescore"):
+    if len(args) != 2 or args[0] not in ("sketch", "locate", "score", "rescore"):
         print(__doc__, file=sys.stderr)
         return 2
     cmd, path = args
@@ -286,12 +332,14 @@ def main(argv):
         print(json.dumps({"summary": {"located": [] if problems else locate(data, repo, os.path.abspath(path))}}))
         return 1 if problems else 0
     if not problems:
-        problems = check_form(data, repo)
+        problems = check_form(data, repo, cmd == "sketch")
     for p in problems:
         print(json.dumps(p))
     errors = any(p["level"] == "error" for p in problems)
     summary = {"mode": None, "total": None, "parts": [], "reasons": []}
-    if not errors:
+    if not errors and cmd == "sketch":
+        summary = bounds(data, with_reach(data, repo, os.path.abspath(path)))
+    elif not errors:
         parts = with_reach(data, repo, os.path.abspath(path))
         mode, total, rows, reasons = score(parts, data["open_questions"], data["unresolved"])
         for r, p in zip(rows, parts):

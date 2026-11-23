@@ -17,10 +17,10 @@
       "properties": {
         "title": {"type": "string"},
         "kind": {"enum": ["new", "internal", "interface", "architecture", "data"]},
-        "files": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false,
+        "files": {"type": "array", "items": {"type": "object", "additionalProperties": false,
           "required": ["path", "action"],
           "properties": {"path": {"type": "string"}, "action": {"enum": ["create", "edit", "delete"]}}}},
-        "lines": {"enum": ["under 30", "30-150", "over 150"]},
+        "lines": {"enum": ["under 30", "30-150", "over 150", "unsure"]},
         "changes": {"type": "array", "items": {"type": "string"}},
         "existing_data": {"type": "boolean"}}}
   }

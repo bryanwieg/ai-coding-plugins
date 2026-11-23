@@ -140,3 +140,49 @@ def test_rescore_structure_forces_full(tmp_path):
 def test_rescore_without_plan(tmp_path):
     p = subprocess.run([sys.executable, SCRIPT, "rescore", str(tmp_path / "nope")], capture_output=True, text=True)
     assert p.returncode == 2
+
+
+def sketch(**part):
+    f = form(**part)
+    f["opened"] = []
+    return f
+
+
+def test_sketch_decides_direct_without_reading(tmp_path):
+    code, rows, s = call(tmp_path, "sketch", sketch(kind="internal", changes=[], files=[]))
+    assert code == 0 and s["mode"] == "direct" and (s["low"], s["high"]) == (1, 1)
+
+
+def test_sketch_without_paths_spans_reach(tmp_path):
+    s = call(tmp_path, "sketch", sketch(files=[], lines="30-150"))[2]
+    # check_rate is in 3 files (its own among them): reach 1 to 1.5, 2x2 -> 4 to 6
+    assert s["mode"] is None and (s["low"], s["high"]) == (4, 6)
+
+
+def test_sketch_with_paths_uses_found_reach(tmp_path):
+    s = call(tmp_path, "sketch", sketch())[2]
+    assert s["mode"] == "direct" and (s["low"], s["high"]) == (3, 3)
+
+
+def test_sketch_unsure_lines_span_sizes(tmp_path):
+    s = call(tmp_path, "sketch", sketch(kind="internal", changes=[], lines="unsure"))[2]
+    assert s["mode"] is None and (s["low"], s["high"]) == (1, 5)
+    s = call(tmp_path, "sketch", sketch(kind="architecture", changes=["check_rate"], lines="unsure"))[2]
+    assert s["mode"] is None and (s["low"], s["high"]) == (4.5, 22.5)
+
+
+def test_sketch_unresolved_is_undecided_unless_full(tmp_path):
+    f = sketch(kind="internal", changes=[])
+    f["unresolved"] = ["where sessions live"]
+    assert call(tmp_path, "sketch", f)[2]["mode"] is None
+    f["parts"][0].update(kind="data", existing_data=True, changes=["check_rate"])
+    assert call(tmp_path, "sketch", f)[2]["mode"] == "full"
+
+
+def test_sketch_rules(tmp_path):
+    f = sketch()
+    f["opened"] = ["docs.md"]
+    assert call(tmp_path, "sketch", f)[0] == 1
+    assert call(tmp_path, "sketch", sketch(files=[{"path": "app/nope.py", "action": "edit"}]))[0] == 1
+    code, rows, _ = call(tmp_path, "score", form(files=[], lines="unsure"))
+    assert code == 1 and {"files", "lines"} <= {r["kind"] for r in rows}

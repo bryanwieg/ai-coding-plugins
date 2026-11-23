@@ -11,7 +11,9 @@ keeps its TERMS.json, FORM.json, the score output and the stream. Opus,
 medium effort, plugins off, no Grep/Glob/Agent/web tools, a $1 cap and a
 5-minute timeout per case. `compare` prints, per case, the estimate's mode
 against the truth's, the files it opened, the shell commands it ran other
-than plan-mode.py that search (the guide forbids it), and the cost.
+than plan-mode.py that search (the guide forbids it), the cost, and the
+stage that decided: `sketch` when the sketch's range settled the mode,
+`form` when the estimate went on to read files.
 """
 
 import json
@@ -32,9 +34,9 @@ PROMPT = """Estimate how much planning this request needs. Do not plan it and do
 Request: {request}
 
 Follow {guide} exactly: it is the whole procedure. The script is {script}; run it with
-`python3 {script} locate|score FILE --repo .` from the repository (the current directory).
-Write TERMS.json and FORM.json in {out}, not in the repository. Finish with the mode the
-score step printed."""
+`python3 {script} sketch|locate|score FILE --repo .` from the repository (the current directory).
+Write SKETCH.json, TERMS.json and FORM.json in {out}, not in the repository. Finish with the mode the
+script printed."""
 
 
 def run(case):
@@ -95,15 +97,30 @@ def compare():
             continue
         reads, shell, cost = calls(d)
         total += cost or 0
-        p = subprocess.run([sys.executable, SCRIPT, "score", os.path.join(d, "FORM.json"), "--repo",
-                            os.path.join(d, "repo")], capture_output=True, text=True)
+        stage = "form" if os.path.exists(os.path.join(d, "FORM.json")) else "sketch"
+        p = subprocess.run([sys.executable, SCRIPT, "score" if stage == "form" else "sketch",
+                            os.path.join(d, stage.upper() + ".json"), "--repo", os.path.join(d, "repo")],
+                           capture_output=True, text=True)
         try:
             s = json.loads(p.stdout.splitlines()[-1])["summary"]
         except (IndexError, ValueError):
             s = {"mode": None, "total": None, "parts": []}
+        if stage == "sketch":
+            s["total"] = f"{s.get('low')}-{s.get('high')}"
+            for x in s["parts"]:
+                x.update(weight="", size="", reach=f"{x['low']}-{x['high']}")
         t = truth[case["id"]]["summary"]
         hits += s["mode"] == t["mode"]
-        print(f"{case['id']:20} est {str(s['mode']):7}{str(s['total']):>6}  truth {t['mode']:7}{t['total']:>6}"
+        sk = os.path.join(d, "SKETCH.json")
+        if stage == "form" and os.path.exists(sk):  # what the sketch alone said, before it went on
+            q = subprocess.run([sys.executable, SCRIPT, "sketch", sk, "--repo", os.path.join(d, "repo")],
+                               capture_output=True, text=True)
+            try:
+                b = json.loads(q.stdout.splitlines()[-1])["summary"]
+                stage = f"form (sketch {b.get('low')}-{b.get('high')})"
+            except (IndexError, ValueError):
+                stage = "form (sketch invalid)"
+        print(f"{case['id']:20} {stage:24} est {str(s['mode']):7}{str(s['total']):>10}  truth {t['mode']:7}{t['total']:>6}"
               f"  read {len(reads)}  searches {len(shell)}  ${cost or 0:.2f}"
               + "".join(f"\n{'':22}{x['title']}: {x['weight']}x{x['size']}x{x['reach']}" for x in s["parts"])
               + "".join(f"\n{'':22}SEARCH {c}" for c in shell))

@@ -77,8 +77,11 @@ descriptions. Both scripts use only the Python standard library.
 plan-in-phases starts with a quick estimate that decides how much planning a
 change gets: **direct** (no plan; the change is made in context), **quick**
 (one phase file checked by the script, no review subagent) or **full**. The
-agent lists up to 5 terms from the request, `plugins/phased-delivery/scripts/plan-mode.py`
-finds the files that mention them, the agent reads at most 5 and fills a
+agent first sketches the parts from the request alone; `plugins/phased-delivery/scripts/plan-mode.py`
+searches for the users of what changes and prints the lowest and highest
+score the sketch allows, and when both give the same mode the estimate
+stops there, before any file is read. Otherwise the agent lists up to 5
+terms, the script finds the files that mention them, the agent reads at most 5 and fills a
 form, and the script searches for the users of what changes and scores
 kind × size × reach per part. A quick plan is re-scored from its `plan.json`
 and can move up to full or down to direct. `evals/mode/` holds the

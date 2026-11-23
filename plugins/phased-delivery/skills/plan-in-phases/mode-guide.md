@@ -2,7 +2,8 @@
 
 Before planning, estimate how much planning the change needs. This is an
 estimate with hard limits, not the start of a plan: you do no searching of
-your own, open at most 5 files, and stop. `scripts/plan-mode.py` does the
+your own, open at most 5 files, and stop as soon as the script says the mode
+is certain. Most small changes stop at the sketch, before any file is read. `scripts/plan-mode.py` does the
 searches, checks the form and picks the mode; follow it. Examples use an
 unrelated web app to show form, not content.
 
@@ -14,6 +15,16 @@ unrelated web app to show form, not content.
 
 ## The steps
 
+0. **Sketch, without tools.** Write `SKETCH.json`: the form below, from
+   the request and what this conversation already shows, with `opened`
+   empty. Give a part's `files` only where you already know the path;
+   otherwise leave them empty. Set `lines` to `unsure` when you cannot
+   tell the size. Name `changes` as for the form. Run
+   `plan-mode.py sketch SKETCH.json --repo .`. It searches for the users
+   of each changed name and prints the lowest and highest score the
+   change could have. If it prints a mode, that is the mode: stop here.
+   If the mode is `null`, the range crosses a limit; continue with step 1,
+   keeping what the sketch got right.
 1. **Terms, without tools.** Write `TERMS.json` (mode.schema.json `terms`):
    the request and up to 5 terms from it, the names of things it
    mentions or needs: commands, options, settings, routes, functions,
@@ -33,7 +44,10 @@ unrelated web app to show form, not content.
    and follow the mode it prints.
 
 How the script scores each part: `kind` weight × `lines` size × reach,
-summed, plus one per open question. Reach counts the files outside the
+summed, plus one per open question. The sketch takes the lowest and
+highest of each: `unsure` lines span 1 to 5, and a part without paths
+spans reach 1 to what the search found, since its own files may be among
+them. Reach counts the files outside the
 part that contain the part's `changes` names; the script finds them. Direct
 up to 4, quick up to 15, full above. A data part that changes existing
 data is always full; anything unresolved makes it at least quick.
@@ -52,6 +66,9 @@ The request in one sentence, as the user gave it.
 
 ### opened
 The files you read in step 3, at most 5.
+
+In a sketch, `unresolved` holds a part you cannot even name a kind for
+yet; it sends the estimate on to step 1.
 
 ### parts
 Split the change into pieces that differ in kind: usually one to five.

@@ -23,10 +23,12 @@ tool or external system). Give options and a recommendation.
 ## Estimate how much planning the change needs
 
 Before grilling or reading further, make the quick estimate in
-[mode-guide.md](mode-guide.md): list the terms, run
-`scripts/plan-mode.py locate`, read at most 5 of the files it lists, write
-the form and run `scripts/plan-mode.py score`. It has hard limits so that
-it stays an estimate; do not read more to improve it. Follow the mode it
+[mode-guide.md](mode-guide.md): sketch the change from the request and run
+`scripts/plan-mode.py sketch`, which stops when the mode is already certain;
+otherwise list the terms, run `scripts/plan-mode.py locate`, read at most 5
+of the files it lists, write the form and run `scripts/plan-mode.py score`.
+It has hard limits so that it stays an estimate; do not read more to
+improve it. Follow the mode it
 prints, unless the user asked for a particular one:
 
 - **direct:** do not plan. Leave this skill and make the change in context:
