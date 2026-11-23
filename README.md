@@ -94,7 +94,7 @@ that, builds use none. Reviews always run on `top`, and their cost counts
 against that budget. The builder may edit files and runs only the commands
 your project's permission rules allow; set
 `CLAUDE_BUILD_PERMISSIONS=bypassPermissions` only when Claude Code already
-runs in a sandbox container. Every cap is at least $0.25, since a cheap
+runs in a sandbox container (the ai-coding sandbox image sets it). Every cap is at least $0.25, since a cheap
 model's cap at its input price alone would round to a cent. The caps and
 cutoffs are not yet calibrated.
 

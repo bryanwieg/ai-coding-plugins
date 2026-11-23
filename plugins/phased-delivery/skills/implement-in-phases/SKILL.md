@@ -88,7 +88,8 @@ Accept it exactly as a subagent's work. The limits:
   `route` calls pass no `--premium-spent`.
 - `CLAUDE_BUILD_PERMISSIONS` unset gives the builder `acceptEdits`: file
   edits, and commands the project's allow rules permit. A session already
-  in a sandbox container may set it to `bypassPermissions`.
+  in a sandbox container may set it to `bypassPermissions` (the ai-coding
+  sandbox sets it already).
 
 When the plan has `models-codex.md` and the session is not Codex, take
 Codex availability from the daily check in "Builders in another tool" in

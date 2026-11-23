@@ -252,7 +252,8 @@ Never commits.
 `CLAUDE_BUILD_PERMISSIONS` sets the permission mode. Unset:
 `acceptEdits`, so file edits work and commands follow the project's own
 allow rules (a command they do not allow cannot run). `bypassPermissions`:
-only for a session already in a sandbox container. Any other value exits 2.
+only for a session already in a sandbox container (the ai-coding sandbox
+sets it already). Any other value exits 2.
 
 ## Record the score
 

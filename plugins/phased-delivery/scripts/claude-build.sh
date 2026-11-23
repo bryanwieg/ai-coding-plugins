@@ -9,7 +9,8 @@
 #
 # CLAUDE_BUILD_PERMISSIONS sets the permission mode (default acceptEdits:
 # file edits work and commands follow the project's allow rules). A session
-# already in a sandbox container sets it to bypassPermissions.
+# already in a sandbox container sets it to bypassPermissions (the ai-coding
+# sandbox image does).
 # Prints "Tokens: N" (input, output, cache read and cache creation, from
 # modelUsage, else usage) and
 # "Cost: X.XX" (USD), or unknown, for the stage commit.
