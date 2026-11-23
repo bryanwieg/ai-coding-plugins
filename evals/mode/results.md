@@ -183,3 +183,9 @@ modes matching truth: 17; cost $2.51
 ```
 
 Both misses err upward, by one mode. codex-off: lines guessed 30-150 for 14 (every run). structured-planning: listed the skill's name 'plan-in-phases' as the thing added to (reach 10+), despite the rule that the container counts only when its users must handle the addition; it has scored 15.5, 24.5, 13.5 and 21.5 across runs. No change is reached by the estimate making a quick or full change direct.
+
+## 2026-11-23, end-to-end runs (plain requests, plugin from this branch)
+
+- direct (t1 --min-small at ff8ce98, $0.26): change made directly, no plan files; the skill was never started, so the estimate did not run (the agent judged it single-step itself).
+- quick (exit codes at d16d571, $1.11): invalid test, the base already held the quota-failover plan with this change as stage 02.2; the agent built the stage without implement-in-phases and marked it done. Codex was not hidden and the real CLI ran once by accident (failed on a trust check).
+- full (Fava auth s2, Codex hidden, $6.94 + $0.83 grade, 21 min): the skill started on its own from 'Plan how to build...', estimate full at 48.5, 3 phases, 4 closed-type review rounds; blind grade 27/30 (s1 on PR #5's skill: 26/30, $6.61; a3 on the old skill: 27/30, $15).
