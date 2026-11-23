@@ -54,9 +54,14 @@ How it works now:
   overrides. See `skills/plan-in-phases/model-selection.md`.
 - **Candidates are model + thinking level pairs.** The same model can be
   strong at one level and poor at another.
-- **Data:** `model-report.json`, refreshed daily from Artificial Analysis
-  by a GitHub workflow. Score = Intelligence Index; cost = benchmark run
-  cost (counts the tokens a thinking level spends, not just price).
+- **Data:** `model-profiles.json`, one entry per model and thinking level
+  built from the Artificial Analysis report by a weekly GitHub workflow,
+  rebuilt only when the model list or a price changes (a fingerprint of
+  both; score changes alone are ignored). The selector uses it at any age;
+  `models.md` records the fingerprint and `select-models.py check` says
+  whether it is current, so the selector reruns only after a change.
+  Score = Intelligence Index; cost = benchmark run cost (counts the tokens
+  a thinking level spends, not just price).
 - **Selection:** each tier takes the cheapest candidate within a share of
   the best score (`FLOORS`: top 0.97, middle 0.85, small 0.50); within 3
   points the cheaper one wins (`TIE_POINTS`). Thinking-level ceilings
@@ -68,6 +73,38 @@ How it works now:
   this account.
 - **`small` is mechanical only:** no judgment, contracts, risk or
   sequencing, a named example to copy, and every check a command.
+- **Per-stage routing:** tiers stay in plans as a summary; at dispatch
+  `select-models.py route` picks one pair from the stage's eight scores.
+  The rules (table in `model-selection.md`, "Route each stage"):
+  - only pairs on the score/cost frontier; a pair beaten on both is never
+    chosen;
+  - a thinking step gaining under 2 points for more than 1.5 times the run
+    cost is left out (`LOW_GAIN_POINTS`, `LOW_GAIN_COST_RATIO`): on the
+    current data that drops, among others, Fable 5.2 xhigh, Opus 5.5 max
+    and Haiku 5.5 max;
+  - mechanical stages (J, P, V all 0) above `small` run at `medium` or
+    below; `small` stages keep Haiku's higher levels, since capping them
+    would move them to Sonnet medium at 5.6 times the cost;
+  - long or wide stages (S2, R2, F2) run at `high` or below and take the
+    fastest pair within 3 points and 1.5 times the cost;
+  - design and contract stages (J2, C2) take a larger model at lower
+    thinking within 1.5 times the cost (`PREFER_COST_RATIO`);
+  - risk (K of 1 or more) moves one frontier pair up;
+  - reviews (`--review`) run on `top` and ignore the stage's scores.
+- **Limits:** a token cap per stage (150k `small`, 400k `middle` and
+  `middle+`, 1M `top`) passed to `claude -p` as a dollar cap at the pair's
+  input price, since `--max-budget-usd` is the hard stop it offers. A build
+  stopped at its cap retries with `route --down 1`; one that fails its
+  checks with `route --up 1`. Premium pairs (output price of $30 or more
+  per million tokens; among current models, Fable and GPT-6.x Astra) share $10 per phase;
+  past that, builds leave them out, since one step down from a premium pair
+  is often still premium. Reviews count against it but never drop a step.
+- **Headless Claude builds:** `scripts/claude-build.sh` runs a stage with
+  `claude -p` at route's model, effort and `cap_usd`, the phased-delivery
+  plugin off (its hooks would pull the builder away from its brief), in
+  `acceptEdits` mode so commands follow the project's allow rules
+  (`CLAUDE_BUILD_PERMISSIONS=bypassPermissions` in sandbox containers). It
+  prints tokens and cost and exits 8 when the budget stopped the run.
 
 ## Part 2: routing between Codex and Claude
 
@@ -119,7 +156,7 @@ How it works now (`model-selection.md`, "Builders in another tool"):
 ## Part 3: reports
 
 - **Per-stage commits** with trailers: `Stage`, `Plan`, `Tier`, `Tool`,
-  `Model`, `Effort`, `Attempt`, `Tokens`, `Tool-Calls`,
+  `Model`, `Effort`, `Attempt`, `Tokens`, `Cost`, `Tool-Calls`,
   `Earlier-Attempt` (one per failed try), `Fixes-Stage` (on later fixes),
   `Phase` (phase status commits).
 - **`scripts/stage-stats.sh <range>`** turns them into a Markdown report
@@ -149,6 +186,16 @@ Side observations:
 - Fixes made directly by the orchestrator have unknown token counts.
 
 ## Open questions and next steps
+
+- **Calibrate routing (paid run, ask first):** the 2-point and 1.5x
+  low-gain cutoffs, the 1.5x preference window, the routing table and the
+  stage caps are unmeasured. Known limit: on the current profiles a `small`
+  stage's cap is $0.01 (150k tokens at Haiku's input price), likely below
+  one headless run; a minimum cap is the likely fix.
+- **Headless build checks (paid run, ask first):** whether
+  `--max-budget-usd` stops subscription runs and reports `total_cost_usd`,
+  and whether an `acceptEdits` builder can edit and run the project's
+  allowed commands.
 
 - **More Codex evidence:** a few more probe runs and real phases before
   widening what goes to Codex; does a deeper stage (R = 1) work there?

@@ -1,9 +1,9 @@
 # Choosing a model and effort
 
 Used by plan-in-phases, which scores every stage and records a tier and
-effort, and by implement-in-phases, which re-scores each stage and maps its
-tier to a model through the plan's `models.md` when it dispatches a
-subagent. Score from the brief and the code as read now, not
+effort, and by implement-in-phases, which re-scores each stage and routes
+it to a model and thinking level with `select-models.py route` when it
+dispatches a builder. Score from the brief and the code as read now, not
 from how small the task looks, from memory or from habit.
 
 ## Score the task
@@ -32,7 +32,8 @@ touched code with no tests covering it.
 
 Add the scores (0–16), then apply the overrides in order. Plans record the
 tier, not a model name, so a plan written in one tool can be built in
-another.
+another. Tiers stay in plans as a summary: at dispatch, `route` picks the
+stage's pair from its eight scores (see "Route each stage").
 
 | Total | Tier |
 | --- | --- |
@@ -64,9 +65,19 @@ at another, so candidates are compared as pairs, never as models alone.
 
 The mapping is computed by code, not judged by reading tables:
 `scripts/select-models.py` in this plugin (two directories above this
-skill's directory) reads the plugin's `model-report.json`, refreshed daily
-from Artificial Analysis, and writes the plan's `models.md`. Every phase
-file links to `models.md`. Never write or edit it by hand.
+skill's directory) reads the plugin's `model-profiles.json` and writes the
+plan's `models.md`, the per-tier summary; its `route` subcommand picks each
+stage's pair at dispatch. Every phase file links to `models.md`. Never
+write or edit it by hand.
+
+The profiles hold one entry per model and thinking level, from the
+Artificial Analysis data: scores, benchmark run cost, prices, speed, a
+premium or standard price class (premium: output price of $30 or more per
+million tokens) and the points gained and cost multiplied by each step up
+in thinking level. A weekly workflow rebuilds them only when the model list
+or a price changes; a change to scores alone is ignored. The selector uses
+them at any age and writes their fingerprint into `models.md` as a
+`Profiles:` line.
 
 ### 1. List what the running tool offers
 
@@ -128,7 +139,7 @@ rerun the script.
 
 - **Exit 0:** done. Read the Matches and Excluded lists; if a model you
   expected is excluded for a name mismatch, add its `match` and rerun.
-- **Exit 3, report missing or older than 7 days:** fall back by hand and say
+- **Exit 3, profiles missing:** fall back by hand and say
   so in `models.md`: rank models by the tool's own descriptions (fastest and
   cheapest to `small`, general-purpose to `middle`, most capable to `top`)
   and use effort low, medium and high for the three tiers, never above the
@@ -137,15 +148,106 @@ rerun the script.
   what the script printed; if nothing is selectable, use the fallback.
 - **No Python available:** use the fallback.
 
-Before each phase, the implementer refreshes `models-available.json` from the
-tool and reruns the selector. If the result changed, it records the change in
-the phase's Notes. A plan built in a different tool from the one it was
-planned in is redone the same way; briefs record tiers, so nothing else
-changes.
+At the start of each phase, the implementer runs
+
+```
+python3 scripts/select-models.py check <plan>/models.md
+```
+
+Exit 0: `models.md` is current, reuse it. Exit 1: its Profiles line differs
+or is missing; refresh `models-available.json` from the tool, rerun the
+selector and record the change in the phase's Notes. Do the same when a
+dispatch fails because a model is unavailable. Exit 3: profiles missing,
+use the fallback. A plan built in a different tool from the one it was
+planned in is redone the same way; briefs record tiers and scores, so
+nothing else changes.
 
 When subagents must inherit the model, still set the candidate's effort
 where the tool allows it, and say in the phase report which tier each stage
 called for.
+
+## Route each stage
+
+Before every stage build and the phase review, the implementer runs
+
+```
+python3 scripts/select-models.py route <plan>/models-available.json --scores J1F1R1C1K0P0V1S0 [--down N | --up N] [--premium-spent USD] [--review]
+```
+
+`--scores` is the stage's `Model basis` scores, re-scored at dispatch,
+written without spaces. It prints one JSON line: `model`, `effort`, `tier`,
+`premium`, `score`, `cap_tokens`, `cap_usd` and `why` (the rules that
+shaped the pick). Exit codes: 0 printed; 2 bad input (fix it from the
+message); 3 profiles missing; 4 no selectable pair. On 3 or 4, or without
+Python, dispatch the tier's pair from `models.md` (or the fallback) as an
+in-session subagent with no cap, and say so in the phase's Notes.
+
+What `route` does, in this order:
+
+| Rule | Pick |
+| --- | --- |
+| Candidates | Offered pairs within the thinking-level ceilings that have a score and a benchmark run cost, minus low-gain thinking steps: a step up gaining under 2 points for more than 1.5 times the run cost of the level below. |
+| Frontier | Only pairs on the score/cost frontier: a pair another beats on both score and cost is never chosen. |
+| Tier | The tier from the scores with the overrides above; `--review` uses `top`. The pick is the cheapest frontier pair meeting the tier's floor, then any cheaper pair within 3 points; `middle+` is the next frontier pair above the `middle` pick. |
+| Premium budget | With `--premium-spent` at or above $10, builds leave premium pairs out. |
+| Mechanical (J, P and V all 0, tier above `small`) | Thinking at `medium` or below. `small` stages keep the small model's higher levels. |
+| Long or wide (S, R or F = 2) | Thinking at `high` or below. |
+| Risk (K of 1 or more) | One frontier pair up. |
+| Design or contract (J = 2 or C = 2) | Among pairs meeting the floor that score at least the pick and cost at most 1.5 times it, the lowest thinking level: a larger model at lower thinking. |
+| Long or wide (S, R or F = 2) | Among pairs meeting the floor within 3 points of the pick (with K of 1 or more, at least the risk step's score) and costing at most 1.5 times it, the fastest. |
+| `--down N`, `--up N` | Move N frontier pairs cheaper or dearer from the pick, stopping at either end. N is 0 or more; not both at once. |
+| `--review` | `top`, ignoring premium spend and the stage's scores (no caps, risk step or preferences). |
+
+The constants (`LOW_GAIN_POINTS`, `LOW_GAIN_COST_RATIO`, `FLOORS`,
+`TIE_POINTS`, `PREMIUM_BUDGET_USD`, `PREFER_COST_RATIO`, `CAP_TOKENS`) are
+at the top of the script.
+
+### Limits
+
+- **Stage caps:** `cap_tokens` is 150000 for `small`, 400000 for `middle`
+  and `middle+`, 1000000 for `top`. `cap_usd` is that many tokens at the
+  pair's input price, rounded to cents; `claude-build.sh` stops the build
+  there. Known limit, until a paid calibration run sets the caps: on the
+  committed profiles a `small` stage's `cap_usd` is $0.01 (150000 tokens at
+  Haiku's input price), likely below what one headless run costs.
+- **Budget stop:** a build that `claude-build.sh` stops at its cap (exit 8)
+  is retried one step down the frontier (see "Adjust while working").
+- **Premium budget, $10 per phase:** the implementer keeps a
+  `Premium spend: $X of $10` line in the phase's Notes. After each
+  `claude-build.sh` run of a pair `route` printed with `"premium": true`,
+  and after every phase review it runs, it adds the run's `Cost:` (its
+  `cap_usd` when the cost is `unknown`) and passes X to `route` as
+  `--premium-spent`. Once X reaches $10, builds get no premium pair for
+  the rest of the phase.
+- **Reviews** use `route --review`: always `top`, their cost counted
+  against the premium budget, never a step down. A review stopped at its
+  cap is reported to the user, not retried lower.
+- **Codex builds** have no cap: `codex exec` has no budget option, and
+  Codex runs on its own quota (see "Builders in another tool").
+
+### claude-build.sh
+
+Claude stages and reviews are built headless, so a runaway is stopped, not
+just counted:
+
+```
+scripts/claude-build.sh REPO PROMPT MODEL EFFORT BUDGET_USD OUTDIR
+```
+
+PROMPT is a file outside REPO holding stage-builder.md (or
+phase-reviewer.md) and its inputs; its text is passed to `claude -p`, which
+works in REPO with the phased-delivery plugin off and
+`--max-budget-usd BUDGET_USD`. MODEL, EFFORT and BUDGET_USD are route's
+`model`, `effort` and `cap_usd`. OUTDIR receives `report.md` (the final
+message), `stream.jsonl` and `stderr.txt`. It prints `Tokens: N` and
+`Cost: X.XX` (each `unknown` when claude reports none). Exit: 0 built; 2
+usage; 8 the budget was reached; other non-zero: claude's exit status.
+Never commits.
+
+`CLAUDE_BUILD_PERMISSIONS` sets the permission mode. Unset:
+`acceptEdits`, so file edits work and commands follow the project's own
+allow rules (a command they do not allow cannot run). `bypassPermissions`:
+only for a session already in a sandbox container. Any other value exits 2.
 
 ## Record the score
 
@@ -176,13 +278,16 @@ R = 2, check whether the stage should be split.
 
 ## Fixed choices
 
-- **Reviews use the `top` candidate**, of `models-codex.md` when the
-  routing rule sends the review to Codex, whatever the tier of the work
-  under review. A review exists to catch what the author missed, including bad
-  assumptions; a weaker reviewer defeats the point.
+- **Reviews run on `top`** through `route --review` (on
+  `models-available-codex.json` when the routing rule sends the review to
+  Codex), whatever the tier of the work under review. A review exists to
+  catch what the author missed, including bad assumptions; a weaker
+  reviewer defeats the point. Its cost counts against the premium budget,
+  but it never drops a step.
 - **Planning and plan revision** use `top`.
-- Never dispatch below the tier the scores give without a written reason in
-  the phase's Notes.
+- Never dispatch a pair below the one `route` prints for the stage's scores
+  without a written reason in the phase's Notes; a `--down` retry after a
+  budget stop is recorded by its Earlier-Attempt trailer.
 
 ## Builders in another tool
 
@@ -268,8 +373,9 @@ the session cannot continue does sparing its quota outweigh that.
 
 - A stage goes to Codex only when `models-codex.md` has a candidate for
   its tier; otherwise it is built in the session.
-- Codex builds use the tier's candidate in `models-codex.md`; a Codex review
-  uses its `top` candidate, through `scripts/codex-build.sh` with
+- Codex builds use the pair `route` prints for
+  `models-available-codex.json`, with no cap; a Codex review uses
+  `route --review` on it, through `scripts/codex-build.sh` with
   phase-reviewer.md as the prompt file.
 - **Stop and report:** finish and commit the stage in progress, update the
   phase status line and Notes, commit them, and stop. Report the stages
@@ -297,13 +403,20 @@ the session cannot continue does sparing its quota outweigh that.
 ## Adjust while working
 
 - At dispatch, re-score against the brief as revised and the code as it now
-  is. If the tier changes, update `Model basis` and record why in the Notes.
-- If a subagent fails its "Done when", stops because the stage was harder
+  is. If a score changes, update `Model basis` and record why in the Notes;
+  `route` reads the new scores.
+- If `claude-build.sh` stops a build at its cap (exit 8), retry it with
+  `route --down 1`, and one step further on each further stop (`--down 2`,
+  and so on). Record each stopped attempt as an Earlier-Attempt. When
+  `why` says it moved 0 frontier pairs, the stage is too big for its cap:
+  revise the plan.
+- If a builder fails its "Done when", stops because the stage was harder
   than its scores showed, or produces work the review rejects for reasoning
-  errors, rerun it one tier higher instead of retrying the same tier, and
-  note which measure was under-scored. Where the model is inherited, move to
-  the next higher effort the report benchmarked for that model (never above
-  its thinking-level ceiling), or build the stage directly. If `top` also
-  fails, the brief or the plan is the problem: go back to planning.
-- If a subagent stops because the brief is wrong, a higher tier is not the
+  errors, rerun it with `route --up 1` instead of retrying the same pair
+  (one step further on each further failure), and note which measure was
+  under-scored. Where the model is inherited, `route` moves only its
+  thinking level. `--down` and `--up` cannot be combined: pass the net
+  count. When `why` says it moved 0 frontier pairs, the brief or the plan
+  is the problem: go back to planning.
+- If a builder stops because the brief is wrong, a higher tier is not the
   fix; revise the plan.

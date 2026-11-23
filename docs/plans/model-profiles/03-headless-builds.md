@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: in progress (stages done: 03.1)
+Status: in progress (stages done: all; review pending)
 Before: Claude stages are built by in-session subagents with no hard stop, and the skills map a stage to its tier's single pair from models.md, refreshed before every phase.
 After: Claude stages and reviews are built headless by `claude-build.sh`, each stopped at its dollar cap. implement-in-phases routes every dispatch through `select-models.py route`, reruns the selector only when `check` says models.md is out of date, drops one step after a capped-out build, tracks premium spend per phase, and keeps reviews on top. The docs describe the weekly, change-only refresh.
 
@@ -24,7 +24,7 @@ Budget: python3 -m pytest -q plugins/phased-delivery/tests runs in under a minut
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
 | 03.1 | `claude-build.sh` builds one stage with `claude -p` at a given model, effort and dollar cap, and reports tokens, cost and a budget stop the way codex-build.sh reports its results. | top | first | done |
-| 03.2 | The skills, README and routing notes use profiles, `check`, `route` and claude-build.sh, with the limits, and describe the weekly change-only refresh. | top | after 03.1 | planned |
+| 03.2 | The skills, README and routing notes use profiles, `check`, `route` and claude-build.sh, with the limits, and describe the weekly change-only refresh. | top | after 03.1 | done |
 
 ## 03.1 claude-build.sh
 
@@ -142,3 +142,4 @@ Model basis: J1 F2 R2 C1 K0 P1 V2 S0 = 9 -> top
 - claude-build.sh runs with `--permission-mode acceptEdits` by default, so file edits work and commands follow the project's allow rules; CLAUDE_BUILD_PERMISSIONS=bypassPermissions replaces it. The prompt is passed as the text of `-p`. Reason: claude -p refuses any tool needing approval, and many projects allow no edits; passing the prompt text avoids reading a file outside the repository.
 - Revised before building, 2026-11-23: phase 02 added that `route --review` ignores the stage's scores and that --down/--up must be 0 or more; 03.2's docs say so. The small-tier `cap_usd` is $0.01 on the committed profiles (see 02's Notes): 03.2's docs name it as a known limit for the calibration run. The paid checks in the Assumptions stay open: the user asked to approve paid runs, so they go to the PR's test plan. Run tests with `--basetemp=/cache/...` (see 01's Notes).
 - 2026-11-23, 03.1: the `--settings` value `{"enabledPlugins":{"phased-delivery@ai-coding-plugins":false}}` is the same key and plugin id the mode evals used to run with plugins off; an unreadable PROMPT exits 2.
+- 2026-11-23, 03.2: the docs settle five points the brief left open: route exit 3 or 4 falls back to models.md in session with no cap; `Cost: unknown` counts the run's cap_usd as spent; a review stopped at its cap is reported, not retried lower; `moved 0 frontier pairs` means revise the plan; --down and --up are netted.

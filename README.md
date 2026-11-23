@@ -54,23 +54,48 @@ phased plans only with the implement-in-phases skill.
 ### Models
 
 The skills never name models. Each plan records tiers (`small`, `middle`,
-`top`). The planner lists the models and thinking levels the running tool
-offers in the plan's `models-available.json`, and
-`plugins/phased-delivery/scripts/select-models.py` turns that into the plan's
-`models.md`; the implementer reruns it before each phase. The script, not the
-agent, does the matching and the math: only benchmarked thinking levels count,
-Codex models never run above `max` thinking and Claude models never above
-`high` (Haiku up to `xhigh`), and each tier gets the cheapest model and
-thinking level that scores close enough to the best available.
+`top`) and each stage's eight scores. The planner lists the models and
+thinking levels the running tool offers in the plan's
+`models-available.json`, and `plugins/phased-delivery/scripts/select-models.py`
+turns that into the plan's `models.md`, the per-tier summary. The script,
+not the agent, does the matching and the math: only benchmarked thinking
+levels count, Codex models never run above `max` thinking and Claude models
+never above `high` (Haiku up to `xhigh`), and each tier gets the cheapest
+model and thinking level that scores close enough to the best available.
 
-The script reads `plugins/phased-delivery/model-report.json`, refreshed daily
-by `.github/workflows/model-report.yml` from the free
-[Artificial Analysis](https://artificialanalysis.ai) API (`model-report.md`
-is the same data for people). The workflow needs the repository secret
-`ARTIFICIAL_ANALYSIS_API_KEY`; run it by hand from the Actions tab to create
-the first report. When the report is missing or more than 7 days old, or
-Python is unavailable, the skills fall back to the tools' own model
-descriptions. Both scripts use only the Python standard library.
+The script reads `plugins/phased-delivery/model-profiles.json`: one entry
+per model and thinking level with its scores, prices, speed, a premium or
+standard price class and what each step up in thinking level gains and
+costs. `.github/workflows/model-report.yml` fetches the free
+[Artificial Analysis](https://artificialanalysis.ai) API once a week
+(`model-report.md` is the same data for people) and rebuilds and commits
+the profiles only when the model list or a price changes; a change to
+scores alone is ignored. The workflow needs the repository secret
+`ARTIFICIAL_ANALYSIS_API_KEY`; run it by hand from the Actions tab to
+create the first profiles. The selector uses the profiles at any age and
+writes their fingerprint into `models.md`; at the start of each phase the
+implementer runs `select-models.py check` and reruns the selector only when
+the profiles changed. When the profiles are missing, or Python is
+unavailable, the skills fall back to the tools' own model descriptions. The
+scripts use only the Python standard library.
+
+At each dispatch, `select-models.py route` picks one model and thinking
+level for the stage from its scores: only pairs on the score/cost frontier,
+no thinking step that gains under 2 points for more than 1.5 times the
+cost, lower thinking for mechanical stages, a larger model at lower
+thinking for design work, faster models for long or wide work and one step
+up for risk. Claude stages and phase reviews are then built headless by
+`plugins/phased-delivery/scripts/claude-build.sh` (`claude -p`), stopped at
+a dollar cap: 150k tokens for `small`, 400k for `middle`, 1M for `top`, at
+the pair's input price. A stage stopped at its cap is retried one step down
+the frontier; one that fails its checks, one step up. Premium models
+(output price of $30 or more per million tokens) get $10 per phase; past
+that, builds use none. Reviews always run on `top`, and their cost counts
+against that budget. The builder may edit files and runs only the commands
+your project's permission rules allow; set
+`CLAUDE_BUILD_PERMISSIONS=bypassPermissions` only when Claude Code already
+runs in a sandbox container. The caps and cutoffs are not yet calibrated:
+a `small` stage's cap is currently $0.01, likely too low for one run.
 
 ### Planning mode
 
@@ -165,7 +190,7 @@ start (the ai-coding sandbox already sets it).
 ### Tracking which model did what
 
 implement-in-phases commits each stage on its own, with trailers for the
-stage, plan, tier, model, effort, attempt and token count, and gives later
+stage, plan, tier, model, effort, attempt, token count and cost, and gives later
 fixes to a stage their own commits marked `Fixes-Stage:`. When the plan is
 done, it writes `work-report.md` in the plan directory: per model and
 effort, the stages built, how many were right first time ("clean": accepted
