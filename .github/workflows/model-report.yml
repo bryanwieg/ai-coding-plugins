@@ -1,14 +1,13 @@
 name: Model report
 
-# Refresh plugins/phased-delivery/model-report.json (read by
-# scripts/select-models.py) and model-report.md (for people) from Artificial
-# Analysis once a day. Commits when the data changed, or every 3 days as a
-# heartbeat so the Checked date shows the job is alive (the selector treats a
-# report older than 7 days as stale).
+# Fetch the Artificial Analysis report once a week and rebuild
+# plugins/phased-delivery/model-profiles.json (read by scripts/select-models.py).
+# Commits model-report.json, model-report.md (for people) and the profiles only
+# when the model list or a price changed, as the profiles fingerprint shows.
 
 on:
   schedule:
-    - cron: "17 6 * * *"
+    - cron: "17 6 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -34,28 +33,24 @@ jobs:
           mkdir -p "$RUNNER_TEMP/report"
           python3 -I "$DIR/scripts/fetch-model-report.py" "$RUNNER_TEMP/report"
 
-      - name: Decide whether to commit
-        id: decide
+      - name: Rebuild profiles
+        id: profiles
         run: |
-          strip() { grep -v '"checked":' "$1" 2>/dev/null || true; }
-          old="$DIR/model-report.json"
-          new="$RUNNER_TEMP/report/model-report.json"
-          if [ ! -f "$old" ] || [ "$(strip "$old")" != "$(strip "$new")" ]; then
-            echo "commit=data changed" >> "$GITHUB_OUTPUT"
-          else
-            last=$(git log -1 --format=%ct -- "$old")
-            age_days=$(( ( $(date +%s) - ${last:-0} ) / 86400 ))
-            if [ "$age_days" -ge 3 ]; then
-              echo "commit=heartbeat" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-          cp "$RUNNER_TEMP/report/model-report.json" "$RUNNER_TEMP/report/model-report.md" "$DIR/"
+          rc=0
+          python3 -I "$DIR/scripts/select-models.py" profiles "$RUNNER_TEMP/report/model-report.json" "$DIR" || rc=$?
+          # 0 changed (profiles written), 1 unchanged, anything else is an error
+          case $rc in
+            0) echo "changed=true" >> "$GITHUB_OUTPUT"
+               cp "$RUNNER_TEMP/report/model-report.json" "$RUNNER_TEMP/report/model-report.md" "$DIR/" ;;
+            1) ;;
+            *) exit "$rc" ;;
+          esac
 
       - name: Commit
-        if: steps.decide.outputs.commit != ''
+        if: steps.profiles.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$DIR/model-report.json" "$DIR/model-report.md"
-          git commit -m "model-report: refresh (${{ steps.decide.outputs.commit }})"
+          git add "$DIR/model-report.json" "$DIR/model-report.md" "$DIR/model-profiles.json"
+          git commit -m "model-report: refresh (models or prices changed)"
           git push
