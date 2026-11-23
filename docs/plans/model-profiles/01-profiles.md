@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: planned
+Status: in progress (stages done: 01.1)
 Before: The selector reads `model-report.json`, refuses it when older than 7 days, and is rerun before every phase. A workflow fetches the Artificial Analysis data daily and commits it when anything changed, or every 3 days as a heartbeat.
 After: `model-profiles.json` sits in the plugin with one entry per model and thinking level, its derived properties and a fingerprint of the model list and prices. The selector reads it at any age, writes the fingerprint into models.md, and `select-models.py check models.md` says whether models.md is still current. The workflow runs weekly and commits only when the fingerprint changes.
 
@@ -24,7 +24,7 @@ Budget: python3 -m pytest -q plugins/phased-delivery/tests runs in under a minut
 
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
-| 01.1 | `select-models.py profiles REPORT OUT_DIR` builds model-profiles.json with derived properties and a fingerprint, and writes it only when the fingerprint changed. | top | first | planned |
+| 01.1 | `select-models.py profiles REPORT OUT_DIR` builds model-profiles.json with derived properties and a fingerprint, and writes it only when the fingerprint changed. | top | first | done |
 | 01.2 | The selector reads model-profiles.json at any age, records its fingerprint in models.md, and `select-models.py check` tells whether models.md is current. | top | after 01.1 | planned |
 | 01.3 | The model-report workflow runs weekly and commits the report and profiles only when `select-models.py profiles` says the fingerprint changed. | middle | after 01.1 | planned |
 
@@ -168,6 +168,9 @@ Out of scope:
 Model basis: J1 F1 R0 C0 K1 P1 V1 S0 = 5 -> middle
 
 ## Notes
+- Plan start: b0c58e2
+- 2026-11-23: in this sandbox /tmp is noexec, so tests that put stub commands in pytest's tmp_path fail; run the suite as `python3 -m pytest -q -p no:cacheprovider --basetemp=/cache/pytest-model-profiles plugins/phased-delivery/tests` (92 pass at plan start).
+- 2026-11-23: models-available.json and models.md re-checked before the first dispatch: unchanged.
 - Grill 2026-11-23: the user chose re-ranking on model and price changes only, data from Artificial Analysis fields only, and dropping a step on limits.
 - Review round 1, 2026-11-23: K raised on 01.1 and 01.2 (persisted format, retired age check, select-models.py had no tests) and 01.3 (retired heartbeat path); fingerprint gains whether a run cost exists.
 - `model-profiles.json` replaces `model-report.json` as the selector's input. The report stays as the raw fetched data and `model-report.md` for people. Reason: The profiles hold every field the selector reads plus the derived properties, so one cached file decides routing.

@@ -4,6 +4,7 @@
 Usage:
   select-models.py AVAILABLE.json [--report model-report.json]
                    [--out models.md] [--json models.json] [--today YYYY-MM-DD]
+  select-models.py profiles REPORT OUT_DIR
 
 AVAILABLE.json is written by the planning agent from what the running tool
 offers now:
@@ -24,9 +25,15 @@ offers now:
 
 Exit codes: 0 written; 2 bad input; 3 report missing or stale (use the
 fallback in model-selection.md); 4 no selectable candidate.
+
+`profiles` builds OUT_DIR/model-profiles.json from a model-report.json and
+writes it only when the fingerprint of the model list and prices changed.
+It prints the fingerprint and "changed" or "unchanged". Exit codes: 0
+written; 1 unchanged, nothing written; 2 bad or unreadable report.
 """
 
 import datetime
+import hashlib
 import json
 import math
 import os
@@ -52,6 +59,14 @@ CEILINGS = [
     ("anthropic", None, "high"),      # other Claude: xhigh and max cost far more
 ]
 DEFAULT_EFFORT = "default"  # report row without a thinking-level suffix
+# A pair is premium when its output price is at least this many dollars per
+# million tokens.
+PREMIUM_PRICE_OUT = 30
+# A step up in thinking level is low gain when it adds fewer intelligence
+# points than this for more than this multiple of the run cost.
+LOW_GAIN_POINTS = 2
+LOW_GAIN_COST_RATIO = 1.5
+PROFILES_FILE = "model-profiles.json"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_REPORT = os.path.join(HERE, "..", "model-report.json")
@@ -270,7 +285,109 @@ def render(available, report, metric, cost_field, best, tiers, scored, excluded,
     return "\n".join(lines) + "\n"
 
 
+def fingerprint(rows):
+    """sha256 over the model list and prices; score and run-cost values are left out."""
+    keys = sorted(json.dumps([r["creator"], r["model"], normalize_effort(r.get("effort")),
+                              r.get("intelligence_index") is not None,
+                              r.get("benchmark_run_cost_usd") is not None,
+                              r.get("price_in_per_1m_usd"), r.get("price_out_per_1m_usd")])
+                  for r in rows)
+    return hashlib.sha256("\n".join(keys).encode()).hexdigest()
+
+
+def step_from_lower(pair, lower):
+    """(gain, cost ratio) from the next lower level, or (None, None)."""
+    if lower is None or None in (pair["intelligence"], pair["run_cost_usd"],
+                                 lower["intelligence"], lower["run_cost_usd"]) \
+            or not lower["run_cost_usd"]:
+        return None, None
+    return (round(pair["intelligence"] - lower["intelligence"], 2),
+            round(pair["run_cost_usd"] / lower["run_cost_usd"], 3))
+
+
+def build_pairs(rows):
+    base_pairs = [{
+        "creator": r["creator"], "model": r["model"],
+        "effort": normalize_effort(r.get("effort")), "name": r["name"],
+        "released": r.get("released"),
+        "intelligence": r.get("intelligence_index"),
+        "engineering": r.get("engineering_index"),
+        "run_cost_usd": r.get("benchmark_run_cost_usd"),
+        "price_in": r.get("price_in_per_1m_usd"),
+        "price_out": r.get("price_out_per_1m_usd"),
+        "speed": r.get("output_tokens_per_second"),
+    } for r in rows]
+    ordered = {}
+    for p in base_pairs:
+        if p["effort"] in EFFORT_ORDER:
+            ordered.setdefault((p["creator"], p["model"]), []).append(p)
+
+    def lower_of(pair):
+        below = [p for p in ordered.get((pair["creator"], pair["model"]), [])
+                 if EFFORT_ORDER.index(p["effort"]) < EFFORT_ORDER.index(pair["effort"])]
+        return max(below, key=lambda p: EFFORT_ORDER.index(p["effort"]), default=None)
+
+    pairs = []
+    for p in base_pairs:
+        gain, ratio = step_from_lower(p, lower_of(p)) if p["effort"] in EFFORT_ORDER else (None, None)
+        pairs.append({**p,
+                      "premium": p["price_out"] is not None and p["price_out"] >= PREMIUM_PRICE_OUT,
+                      "gain_from_lower": gain, "cost_ratio_from_lower": ratio,
+                      "low_gain": gain is not None and gain < LOW_GAIN_POINTS
+                      and ratio > LOW_GAIN_COST_RATIO})
+    return pairs
+
+
+def load_profile_report(path):
+    """The report, or raise ValueError saying what is wrong."""
+    try:
+        with open(path) as source:
+            report = json.load(source)
+    except OSError as error:
+        raise ValueError(f"cannot read {path}: {error}")
+    if not isinstance(report, dict) or not isinstance(report.get("rows"), list):
+        raise ValueError("needs a 'rows' list")
+    for key in ("checked", "attribution"):
+        if key not in report:
+            raise ValueError(f"needs '{key}'")
+    for index, row in enumerate(report["rows"]):
+        if not isinstance(row, dict) or not all(row.get(k) for k in ("creator", "model", "name")):
+            raise ValueError(f"row {index} needs creator, model and name")
+    return report
+
+
+def profiles_main(args):
+    if len(args) != 2:
+        print(__doc__, file=sys.stderr)
+        return 2
+    report_path, out_dir = args
+    try:
+        report = load_profile_report(report_path)
+    except ValueError as error:
+        print(f"bad report: {error}", file=sys.stderr)
+        return 2
+    new_fingerprint = fingerprint(report["rows"])
+    path = os.path.join(out_dir, PROFILES_FILE)
+    try:
+        with open(path) as source:
+            old_fingerprint = json.load(source).get("fingerprint")
+    except (OSError, ValueError, AttributeError):
+        old_fingerprint = None  # absent or unreadable: rebuild it
+    if old_fingerprint == new_fingerprint:
+        print(f"{new_fingerprint} unchanged")
+        return 1
+    profiles = {"fingerprint": new_fingerprint, "source_checked": report["checked"],
+                "attribution": report["attribution"], "pairs": build_pairs(report["rows"])}
+    with open(path, "w") as out:
+        json.dump(profiles, out, indent=2)
+        out.write("\n")
+    print(f"{new_fingerprint} changed")
+    return 0
+
+
 def main(argv):
+    if argv[1:2] == ["profiles"]:
+        return profiles_main(argv[2:])
     options = parse_args(argv)
     today = (datetime.date.fromisoformat(options["today"]) if options["today"]
              else datetime.datetime.now(datetime.timezone.utc).date())
