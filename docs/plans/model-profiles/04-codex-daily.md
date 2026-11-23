@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: in progress (stages done: 04.1, 04.2)
+Status: in progress (stages done: all; review pending)
 Before: codex-usage.py runs `codex login status` every time it is called, at the start of every phase. Codex found off stays off only until the session ends; the next session checks again from scratch.
 After: Codex availability is checked at most once a day. Once Codex is found off (not installed, not signed in, or a build showing it unusable), the result is cached for the day: codex-usage.py answers from the cache without running codex, and every session that day starts by telling the agent Codex is off and must not be considered. `codex-usage.py --recheck` checks again after the user fixes it.
 
@@ -26,7 +26,7 @@ Budget: python3 -m pytest -q plugins/phased-delivery/tests runs in under a minut
 | --- | --- | --- | --- | --- |
 | 04.1 | codex-usage.py caches an off result for the day and answers from it without running codex, with `--recheck` and `--record-off CAUSE`. | top | first | done |
 | 04.2 | The SessionStart hook checks Codex at most once a day through codex-usage.py and, when Codex is off, tells the agent not to consider it for the session. | middle | after 04.1 | done |
-| 04.3 | The skills check Codex through the daily cache, record off with `--record-off`, and leave Codex out entirely while it is off. | middle+ | after 04.1 | planned |
+| 04.3 | The skills check Codex through the daily cache, record off with `--record-off`, and leave Codex out entirely while it is off. | middle+ | after 04.1 | done |
 
 ## 04.1 daily Codex cache
 

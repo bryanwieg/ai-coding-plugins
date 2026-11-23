@@ -303,17 +303,23 @@ when it is narrow. How much goes to Codex depends on both tools' usage.
 
 ### Codex availability
 
-Codex is **off** for the rest of the session when any of these holds, and
-**on** otherwise:
+Codex is **off** for the rest of the day when any of these holds, and
+**on** otherwise. `codex-usage.py` caches the answer for the local day in
+`codex-availability.json` (beside `claude-usage.json`), so it runs `codex`
+at most once a day; while the cache says off it exits 3 at once with
+`Codex is off today: <cause>`. Off never prompts the user; after fixing
+the cause, the user runs `codex-usage.py --recheck`.
 
 | Cause | Detected by | Action |
 | --- | --- | --- |
-| `AI_CODEX=off` in the environment | `codex-usage.py` exit 3 | off, no prompt |
-| `codex` not installed | `codex-usage.py` exit 3 | off, no prompt |
-| not signed in | `codex-usage.py` exit 4 | ask the user: sign in (`! codex login --device-auth`), then check again; or skip, which turns it off |
-| Codex cannot be used (expired subscription, account error) | `codex-build.sh` exit 6 | off |
-| Codex's sandbox cannot start here | `codex-build.sh` exit 5 | off; tell the user to set `CODEX_BUILD_SANDBOX=danger-full-access` only if the session already runs in a sandbox container (the ai-coding sandbox sets it already) |
-| sign-in lapsed during a build | `codex-build.sh` exit 3 | ask the user: sign in again (`! codex logout && codex login --device-auth`, the command the script prints) or skip; a second exit 3 in the session turns it off |
+| `AI_CODEX=off` in the environment | `codex-usage.py` exit 3 | off while it is set (read every time, never cached); unset `AI_CODEX` to use Codex |
+| `codex` not installed | `codex-usage.py` exit 3 | off for the day (cached) |
+| found off earlier today | `codex-usage.py` exit 3 (`Codex is off today: ...`) | off for the day |
+| not signed in | `codex-usage.py` exit 4 | off for the day (cached), no prompt; tell the user to sign in (`! codex login --device-auth`) and run `codex-usage.py --recheck` |
+| availability check timed out | `codex-usage.py` exit 5 | off for this check only, never room; nothing is cached and the next check runs again |
+| Codex cannot be used (expired subscription, account error) | `codex-build.sh` exit 6 | off for the day: run `codex-usage.py --record-off "<cause>"` |
+| Codex's sandbox cannot start here | `codex-build.sh` exit 5 | off for the day: run `codex-usage.py --record-off "<cause>"`; tell the user to set `CODEX_BUILD_SANDBOX=danger-full-access` only if the session already runs in a sandbox container (the ai-coding sandbox sets it already) |
+| sign-in lapsed during a build | `codex-build.sh` exit 3 | off for the day, no prompt: run `codex-usage.py --record-off "sign-in lapsed; run codex logout && codex login --device-auth"`; tell the user to sign in again and run `codex-usage.py --recheck` |
 
 - **A Codex dispatch runs alone:** no other stage is built in the same
   checkout while it runs; stages marked parallel run one after another
@@ -328,23 +334,24 @@ Codex is **off** for the rest of the session when any of these holds, and
   or delete it when `HEAD` lacks it. A path in the snapshot whose hash or
   `absent` state now differs: stop and ask the user instead of restoring
   it.
-- **After a failed build:** exit 3 and the user says they signed in
-  again: rerun the stage on Codex as the next attempt (`codex login
-  status` cannot confirm it: it still says logged in when the token has
-  expired). Otherwise (exit 3 skipped or repeated, 5, 6, 7) the stage
-  is built by the routing rule as if Codex had no room.
+- **After a failed build** (exit 3, 5, 6 or 7), the stage is built by the
+  routing rule as if Codex had no room; exits 3, 5 and 6 also record
+  Codex off for the day as in the table.
 - **Exit 7, Codex out of quota during a build**, is not "off": it is "no
   room" for this dispatch (see the routing rule).
-- **When:** at the start of each phase, before refreshing
-  `models-available-codex.json` and `models-codex.md`, and whenever a
-  dispatch result above turns it off. Only when the plan has
-  `models-codex.md` and the session is not Codex.
+- **When:** a session told at start that Codex is off today (exit 3 or
+  4) treats it as off without checking again. Otherwise run
+  `codex-usage.py` before a phase's first dispatch, ahead of refreshing
+  `models-available-codex.json` and `models-codex.md`; it answers from
+  the daily cache. Only when the plan has `models-codex.md` and the
+  session is not Codex.
 - **Off means not loaded:** no refresh of the Codex model files, no usage
-  scripts, no routing table; the phase runs as it would without Codex.
-  Record `Codex off this session: <cause and the script's line>` in the
-  phase's Notes and in the phase report.
-- **Session scope:** off lasts until the session ends; a new session (or a
-  resume in one) checks again. The Notes line is history, not a switch.
+  scripts, no routing table, nothing routed to Codex; the phase runs as it
+  would without Codex. Record `Codex off today: <cause and the script's
+  line>` in the phase's Notes and in the phase report.
+- **Day scope:** off lasts the local day, in every session, until
+  `codex-usage.py --recheck` finds Codex usable; the next day checks
+  again. The Notes line is history, not a switch.
 - **No quota is not "off":** it stays the per-dispatch "no room" in the
   routing rule (from `codex-usage.py` exit 1 or `codex-build.sh` exit 7),
   because Codex's windows reset within hours.
@@ -362,7 +369,7 @@ Codex is **off** for the rest of the session when any of these holds, and
 Only while Codex is on. Checked before **every** stage dispatch and before
 the phase review. Run `scripts/claude-usage.py` (Claude level) and
 `scripts/codex-usage.py` (exit 0 or 2 means room; exit 1 means no room;
-exit 3 or 4 is handled by the availability table first). No usage data
+exit 3, 4 or 5 is handled by the availability table first). No usage data
 (exit 2: Codex has not run yet) counts as room, since a build that does
 hit the limit reports exit 7.
 
@@ -388,8 +395,8 @@ the session cannot continue does sparing its quota outweigh that.
   When the stop comes at the check before the phase review, set
   `Status: in progress (stages done: all; review pending)`; resuming
   starts with the review, after checking availability and the rule again.
-- At level 2, Codex turning off or failing a build (exit 3 that is
-  skipped or repeated, 5, 6 or 7) means "Codex has no room": the failed
+- At level 2, Codex turning off or failing a build (exit 3, 5, 6 or 7)
+  means "Codex has no room": the failed
   stage is not rebuilt in the session; restore it as above, leave it
   `planned`, stop and report, with the cause.
 - **Session-only stages** (those that must write outside the repository,

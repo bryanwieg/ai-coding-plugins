@@ -90,11 +90,12 @@ Accept it exactly as a subagent's work. The limits:
   edits, and commands the project's allow rules permit. A session already
   in a sandbox container may set it to `bypassPermissions`.
 
-When the plan has `models-codex.md` and the session is not Codex, first
-check Codex availability by "Builders in another tool" in
-model-selection.md, before the phase's first dispatch and ahead of
-refreshing `models-codex.md`; when Codex is off, skip the rest of this
-paragraph and record why in the Notes. While Codex is on, refresh
+When the plan has `models-codex.md` and the session is not Codex, take
+Codex availability from the daily check in "Builders in another tool" in
+model-selection.md: off when the session was told at start that Codex is
+off today, otherwise what `scripts/codex-usage.py` answers from its daily
+cache before the phase's first dispatch. When Codex is off, skip the rest
+of this paragraph and record why in the Notes. While Codex is on, refresh
 `models-codex.md` the same way, then before each dispatch run
 `scripts/claude-usage.py` and `scripts/codex-usage.py` and route the stage
 by the routing table there. A Codex dispatch runs alone (stages marked

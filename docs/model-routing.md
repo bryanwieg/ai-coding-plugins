@@ -124,10 +124,14 @@ How it works now (`model-selection.md`, "Builders in another tool"):
 
 - Planning also writes `models-available-codex.json` and `models-codex.md`
   when Codex is on (installed, signed in, not `AI_CODEX=off`).
-- Availability: before each phase, `scripts/codex-usage.py` reports Codex
-  off (`AI_CODEX=off`, or `codex` not installed) or not signed in (the user
-  signs in or skips). Off lasts the session and also follows a build that
-  cannot run; the phase then runs as it would without Codex.
+- Availability: `scripts/codex-usage.py` checks at most once a day and
+  caches the answer for the local day in `codex-availability.json`; the
+  SessionStart hook tells every session that day when Codex is off. Off
+  (`codex` not installed or not signed in, or recorded with `--record-off`
+  after a build that cannot run) lasts the day with no prompt, until
+  `codex-usage.py --recheck` finds Codex usable; `AI_CODEX=off` is read
+  every time and never cached. A check that times out (exit 5) is off for
+  that check only. While off, the phase runs as it would without Codex.
 - Routing by usage: before every stage dispatch and the phase review,
   `scripts/claude-usage.py` gives Claude's level and `codex-usage.py`
   whether Codex has room. Claude on pace (or no data): narrow stages

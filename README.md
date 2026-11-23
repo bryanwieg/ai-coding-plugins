@@ -146,11 +146,14 @@ misreport their own actions, so the implementer checks `small` work itself.
 
 Stages can be built with `codex exec` through `scripts/codex-build.sh`, on
 your Codex plan instead of your Claude quota. Codex is used only when it is
-installed, signed in and not turned off with `AI_CODEX=off`; this is checked
-at the start of each phase. If Codex is not signed in, you are asked to sign
-in or skip; skipping turns Codex off for the rest of the session. A build
-that cannot run (Codex's sandbox cannot start, a subscription or account
-problem, or a sign-in that lapses twice) also turns it off for the session.
+installed, signed in and not turned off with `AI_CODEX=off`. Codex is
+checked at most once a day: `scripts/codex-usage.py` caches the answer in
+`~/.claude/codex-availability.json`, and every session started that day is
+told at once when Codex is off. Off (not installed, not signed in, or a
+build that cannot run: Codex's sandbox cannot start, a subscription or
+account problem, or a lapsed sign-in) lasts the rest of the day, with no
+prompt. After fixing it (for example `codex login --device-auth`), run
+`scripts/codex-usage.py --recheck` to use Codex again the same day.
 Codex also loads your installed Codex plugins, which can change how it
 builds.
 
