@@ -2,8 +2,9 @@
 """Map tiers (small, middle, middle+, top) to a model and thinking level.
 
 Usage:
-  select-models.py AVAILABLE.json [--report model-report.json]
-                   [--out models.md] [--json models.json] [--today YYYY-MM-DD]
+  select-models.py AVAILABLE.json [--profiles model-profiles.json]
+                   [--out models.md] [--json models.json] [--today ignored]
+  select-models.py check MODELS_MD [--profiles model-profiles.json]
   select-models.py profiles REPORT OUT_DIR
 
 AVAILABLE.json is written by the planning agent from what the running tool
@@ -23,8 +24,13 @@ offers now:
     ]
   }
 
-Exit codes: 0 written; 2 bad input; 3 report missing or stale (use the
+Profiles default to the plugin's model-profiles.json and are used at any
+age. Exit codes: 0 written; 2 bad input; 3 profiles missing (use the
 fallback in model-selection.md); 4 no selectable candidate.
+
+`check` compares the Profiles line of a models.md with the profiles'
+fingerprint. Exit codes: 0 current; 1 differs or no Profiles line (rerun
+the selector); 3 profiles missing.
 
 `profiles` builds OUT_DIR/model-profiles.json from a model-report.json and
 writes it only when the fingerprint of the model list and prices changed.
@@ -32,7 +38,6 @@ It prints the fingerprint and "changed" or "unchanged". Exit codes: 0
 written; 1 unchanged, nothing written; 2 bad or unreadable report.
 """
 
-import datetime
 import hashlib
 import json
 import math
@@ -46,7 +51,6 @@ FLOORS = {"top": 0.97, "middle": 0.85, "small": 0.50}
 # After a tier picks a candidate, any cheaper candidate scoring within this
 # many index points (the index runs 0-100) of the pick is taken instead.
 TIE_POINTS = 3.0
-MAX_REPORT_AGE_DAYS = 7
 # Thinking levels from least to most.
 EFFORT_ORDER = ["minimal", "low", "medium", "high", "xhigh", "max", "ultra"]
 # Highest thinking level allowed, as (creator, model family word or None,
@@ -69,7 +73,7 @@ LOW_GAIN_COST_RATIO = 1.5
 PROFILES_FILE = "model-profiles.json"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_REPORT = os.path.join(HERE, "..", "model-report.json")
+DEFAULT_PROFILES = os.path.join(HERE, "..", PROFILES_FILE)
 
 
 def normalize(text):
@@ -83,7 +87,7 @@ def normalize_effort(effort):
 def parse_args(argv):
     if len(argv) < 2 or argv[1].startswith("-"):
         raise SystemExit(__doc__)
-    options = {"available": argv[1], "report": DEFAULT_REPORT, "out": None,
+    options = {"available": argv[1], "profiles": DEFAULT_PROFILES, "out": None,
                "json": None, "today": None}
     rest = argv[2:]
     if len(rest) % 2:
@@ -96,16 +100,14 @@ def parse_args(argv):
     return options
 
 
-def load_report(path, today):
+def load_profiles(path):
+    """The profiles, or None after saying on stderr that the file is missing."""
     if not os.path.exists(path):
-        return None, f"report not found: {path}"
+        print(f"profiles not found: {path}; use the fallback in model-selection.md",
+              file=sys.stderr)
+        return None
     with open(path) as source:
-        report = json.load(source)
-    checked = datetime.date.fromisoformat(report["checked"])
-    age = (today - checked).days
-    if age > MAX_REPORT_AGE_DAYS:
-        return None, f"report is stale: checked {checked}, {age} days old (limit {MAX_REPORT_AGE_DAYS})"
-    return report, None
+        return json.load(source)
 
 
 def model_locked(available):
@@ -159,9 +161,9 @@ def effort_denial(effort, ceiling):
     return None
 
 
-def build_candidates(available, report):
+def build_candidates(available, profiles):
     rows_by_base = {}
-    for row in report["rows"]:
+    for row in profiles["pairs"]:
         rows_by_base.setdefault(row["model"], []).append(row)
     bases = {name: {"released": max((r["released"] or "") for r in rows)}
              for name, rows in rows_by_base.items()}
@@ -176,7 +178,7 @@ def build_candidates(available, report):
             continue
         ceiling = ceiling_for(rows_by_base[base][0]["creator"], base, codex_tool)
         for row in rows_by_base[base]:
-            effort = normalize_effort(row["effort"])
+            effort = row["effort"]
             label = f"{entry['id']} at {effort}"
             if effort not in offered:
                 excluded.append((entry["id"], effort, "benchmarked but not offered by the tool"))
@@ -185,7 +187,7 @@ def build_candidates(available, report):
             else:
                 candidates.append({"tool_model": entry["id"], "effort": effort,
                                    "label": label, "row": row})
-        benchmarked = {normalize_effort(r["effort"]) for r in rows_by_base[base]}
+        benchmarked = {r["effort"] for r in rows_by_base[base]}
         for effort in sorted(offered - benchmarked - {DEFAULT_EFFORT}):
             reason = effort_denial(effort, ceiling) or "offered but not benchmarked"
             excluded.append((entry["id"], effort, reason))
@@ -197,24 +199,24 @@ def score_and_cost(candidates):
     # reasoning-heavy science and HLE-Diamond. The free tier has no coding
     # index, and its "engineering" index is mostly engineering domain
     # knowledge with only 15% coding, so it is not used for ranking.
-    metric = "intelligence_index"
+    metric = "intelligence"
     unscored = [(c["tool_model"], c["effort"], f"no {metric}")
                 for c in candidates if c["row"][metric] is None]
     with_score = [c for c in candidates if c["row"][metric] is not None]
     # Benchmark run cost counts the tokens each thinking level spends, so it
     # is the only cost that separates levels of one model. Candidates without
     # it are excluded; price per token is used only if no candidate has it.
-    if any(c["row"]["benchmark_run_cost_usd"] is not None for c in with_score):
-        cost_field = "benchmark_run_cost_usd"
+    if any(c["row"]["run_cost_usd"] is not None for c in with_score):
+        cost_field = "run_cost_usd"
         unscored += [(c["tool_model"], c["effort"], "no benchmark run cost")
                      for c in with_score if c["row"][cost_field] is None]
         with_score = [c for c in with_score if c["row"][cost_field] is not None]
     else:
-        cost_field = "price_out_per_1m_usd"
+        cost_field = "price_out"
     scored = []
     for c in with_score:
         cost = c["row"][cost_field]
-        speed = c["row"]["output_tokens_per_second"] or 0
+        speed = c["row"]["speed"] or 0
         scored.append({**c, "score": c["row"][metric],
                        "cost": math.inf if cost is None else cost, "speed": speed})
     return scored, unscored, metric, cost_field
@@ -248,16 +250,17 @@ def money(value):
     return "n/a" if value == math.inf else f"{value:.2f}"
 
 
-def render(available, report, metric, cost_field, best, tiers, scored, excluded, matches):
+def render(available, profiles, metric, cost_field, best, tiers, scored, excluded, matches):
     lines = [
         "# Models",
         "",
         "Generated by `scripts/select-models.py` from `models-available.json` and",
-        "the plugin's `model-report.json`; rerun it rather than editing this file.",
+        "the plugin's `model-profiles.json`; rerun it rather than editing this file.",
         "",
         f"Looked up: {available.get('tool')} {available.get('tool_version', '')}, "
         f"from {available.get('looked_up_from', 'unspecified')}",
-        f"Report: checked {report['checked']}; {report['attribution']}",
+        f"Profiles: {profiles['fingerprint']} (data checked {profiles['source_checked']}); "
+        f"{profiles['attribution']}",
         f"Subagent model choice: {available.get('subagent_model_choice', 'unspecified')}"
         + ("" if available.get("subagent_model_choice") == "allowed" else
            f" (opted in: {'yes' if available.get('opted_in') else 'no'}"
@@ -385,12 +388,28 @@ def profiles_main(args):
     return 0
 
 
+def check_main(args):
+    if len(args) not in (1, 3) or args[1:2] not in ([], ["--profiles"]):
+        print(__doc__, file=sys.stderr)
+        return 2
+    profiles = load_profiles(args[2] if len(args) == 3 else DEFAULT_PROFILES)
+    if profiles is None:
+        return 3
+    with open(args[0]) as source:
+        recorded = re.search(r"^Profiles: (\S+)", source.read(), re.MULTILINE)
+    if recorded and recorded.group(1) == profiles["fingerprint"]:
+        print(f"{args[0]} is current")
+        return 0
+    print(f"{args[0]} does not match profiles {profiles['fingerprint']}; rerun the selector")
+    return 1
+
+
 def main(argv):
     if argv[1:2] == ["profiles"]:
         return profiles_main(argv[2:])
+    if argv[1:2] == ["check"]:
+        return check_main(argv[2:])
     options = parse_args(argv)
-    today = (datetime.date.fromisoformat(options["today"]) if options["today"]
-             else datetime.datetime.now(datetime.timezone.utc).date())
     try:
         with open(options["available"]) as source:
             available = json.load(source)
@@ -399,11 +418,10 @@ def main(argv):
     except (OSError, ValueError) as error:
         print(f"bad available file: {error}", file=sys.stderr)
         return 2
-    report, problem = load_report(options["report"], today)
-    if report is None:
-        print(f"{problem}; use the fallback in model-selection.md", file=sys.stderr)
+    profiles = load_profiles(options["profiles"])
+    if profiles is None:
         return 3
-    candidates, excluded, matches = build_candidates(available, report)
+    candidates, excluded, matches = build_candidates(available, profiles)
     if model_locked(available):
         session = available.get("session_model")
         if not session:
@@ -422,7 +440,7 @@ def main(argv):
             print(f"- {model} at {effort}: {reason}", file=sys.stderr)
         return 4
     best, tiers = assign_tiers(scored)
-    text = render(available, report, metric, cost_field, best, tiers, scored, excluded, matches)
+    text = render(available, profiles, metric, cost_field, best, tiers, scored, excluded, matches)
     if options["out"]:
         with open(options["out"], "w") as out:
             out.write(text)
