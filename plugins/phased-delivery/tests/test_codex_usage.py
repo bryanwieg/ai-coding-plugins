@@ -118,3 +118,19 @@ def test_daily_cache(tmp_path, stub_status, args, code, cause):
     cache.write_text(json.dumps({"date": "2000-01-01", "on": False, "cause": "old"}))
     assert run(tmp_path, 0).returncode == 0
     assert calls.read_text() == "login status\n"
+
+
+def test_check_timeout(tmp_path):
+    """A sign-in check that hangs exits 5 within the hook's time and caches nothing."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    stub = bin_dir / "codex"
+    stub.write_text("#!/bin/sh\nsleep 30\n")
+    stub.chmod(0o755)
+    started = time.monotonic()
+    result = subprocess.run([sys.executable, SCRIPT], capture_output=True, text=True, timeout=20,
+                            env={k: v for k, v in os.environ.items() if k != "AI_CODEX"}
+                            | {"CLAUDE_CONFIG_DIR": str(tmp_path), "CODEX_HOME": str(tmp_path),
+                               "PATH": f"{bin_dir}:/usr/bin:/bin"})
+    assert result.returncode == 5 and time.monotonic() - started < 9
+    assert not (tmp_path / "codex-availability.json").exists()

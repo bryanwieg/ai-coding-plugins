@@ -91,8 +91,11 @@ def read_cache(today):
 
 def write_cache(today, on, cause=None):
     entry = {"date": today, "on": on, **({} if on else {"cause": cause})}
-    with open(cache_path(), "w", encoding="utf-8") as saved:
-        json.dump(entry, saved)
+    try:
+        with open(cache_path(), "w", encoding="utf-8") as saved:
+            json.dump(entry, saved)
+    except OSError:
+        pass  # an unwritable config folder only means the answer is not cached
 
 
 def off_today(cause):
