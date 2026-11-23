@@ -45,29 +45,58 @@ design lacks, goes to the user first.
 
 ### 2. Build the stages
 
-Follow the stage table's order. Hand each stage to a subagent with
+Follow the stage table's order. Hand each stage to a new builder with
 [stage-builder.md](stage-builder.md) unchanged and its inputs filled in; run
 stages marked parallel together. Small or tightly coupled stages may be built
 directly, under the same directions. Delegation keeps each agent's context
 focused on its brief.
 
-Before the phase's first dispatch, refresh the plan's
-`models-available.json` from the running tool and rerun
-`scripts/select-models.py` to regenerate `models.md`, as
-[model-selection.md](../plan-in-phases/model-selection.md) describes; note
-any change in the phase's Notes. Then choose each subagent's tier: start from the
-brief's `Model basis` scores, re-score against the revised brief and the code
-as it now is, record any change in the Notes, and use the model and thinking
-level `models.md` gives for that tier, where the tool lets you choose; never
-above the model's thinking-level ceiling in model-selection.md. When a builder fails or
-finds the stage harder than its tier, rerun it one tier higher; when it stops
-because the brief is wrong, revise the plan instead.
+Before the phase's first dispatch, run `scripts/select-models.py check
+<plan>/models.md`. Only on exit 1, or when a dispatch fails because a model
+is unavailable, refresh the plan's `models-available.json` from the running
+tool, rerun the selector to regenerate `models.md` and note the change in
+the phase's Notes; exit 3 means the fallback, as
+[model-selection.md](../plan-in-phases/model-selection.md) describes.
 
-When the plan has `models-codex.md` and the session is not Codex, first
-check Codex availability by "Builders in another tool" in
-model-selection.md, before the phase's first dispatch and ahead of
-refreshing `models-codex.md`; when Codex is off, skip the rest of this
-paragraph and record why in the Notes. While Codex is on, refresh
+Route every dispatch by "Route each stage" in model-selection.md: start
+from the brief's `Model basis` scores, re-score against the revised brief
+and the code as it now is, record any change in the Notes, and run
+`scripts/select-models.py route <plan>/models-available.json --scores
+<scores> --premium-spent <X>`, with X from the phase's
+`Premium spend: $X of $10` Notes line (0 until the first premium run).
+Build a Claude stage headless: write stage-builder.md and its filled-in
+inputs to a prompt file outside the repository and run
+`scripts/claude-build.sh <repo> <prompt> <model> <effort> <cap_usd>
+<outdir>` with route's `model`, `effort` and `cap_usd`. Read its report
+from `<outdir>/report.md`; it prints `Tokens:` and `Cost:` for the commit.
+Accept it exactly as a subagent's work. The limits:
+
+- **Exit 8, budget reached:** retry with `route --down 1`, one step
+  further on each further stop; each stopped attempt is an Earlier-Attempt.
+  Never re-dispatch a pair already tried for the stage; when `route` would,
+  revise the plan (model-selection.md, "Adjust while working").
+- **Any other non-zero exit** (2: bad arguments or permissions setting;
+  otherwise claude's own status, such as a sign-in or service failure):
+  report stderr's last line to the user and stop; do not step up.
+- **Fails its "Done when" or is harder than its scores:** rerun with
+  `route --up 1` (one step further on each further failure). When it stops
+  because the brief is wrong, revise the plan instead.
+- **Premium spend:** after each `claude-build.sh` run of a pair route
+  printed with `"premium": true`, and of every review it runs, add its
+  `Cost:` (its `cap_usd` when unknown) to the `Premium spend` line. From
+  $10, builds get no premium pair. Codex runs add nothing and their
+  `route` calls pass no `--premium-spent`.
+- `CLAUDE_BUILD_PERMISSIONS` unset gives the builder `acceptEdits`: file
+  edits, and commands the project's allow rules permit. A session already
+  in a sandbox container may set it to `bypassPermissions` (the ai-coding
+  sandbox sets it already).
+
+When the plan has `models-codex.md` and the session is not Codex, take
+Codex availability from the daily check in "Builders in another tool" in
+model-selection.md: off when the session was told at start that Codex is
+off today, otherwise what `scripts/codex-usage.py` answers from its daily
+cache before the phase's first dispatch. When Codex is off, skip the rest
+of this paragraph and record why in the Notes. While Codex is on, refresh
 `models-codex.md` the same way, then before each dispatch run
 `scripts/claude-usage.py` and `scripts/codex-usage.py` and route the stage
 by the routing table there. A Codex dispatch runs alone (stages marked
@@ -75,7 +104,8 @@ parallel run one after another when one goes to Codex) and starts with the
 snapshot of REPO; follow the rules there for failed Codex builds.
 For a Codex build, write stage-builder.md and its filled-in inputs to a
 prompt file outside the repository and run `scripts/codex-build.sh <repo> <prompt> <model> <effort>
-<outdir>`, with the model and effort `models-codex.md` gives for the tier.
+<outdir>`, with the model and effort `route` prints for
+`models-available-codex.json` (Codex builds have no cap).
 Read its report from `<outdir>/report.md`; it prints the token count for
 the commit. Accept it exactly as a subagent's work.
 
@@ -103,17 +133,21 @@ Model: <model as dispatched>
 Effort: <thinking level as dispatched, or "default">
 Attempt: 1
 Tokens: <total tokens for this attempt, or "unknown">
+Cost: <the Cost line claude-build.sh printed, or "unknown">
 Tool-Calls: <count, or "unknown">
 ```
 
 - **Model, Effort** are what was dispatched; "orchestrator" when the stage
   was built directly.
-- **Tokens, Tool-Calls** come from the subagent tool's own usage report
-  (in Claude Code, the subagent's completion notice; for Codex, the line
-  `codex-build.sh` prints), never from the builder's report. Use "unknown" when the tool gives none.
-- **Attempt** counts dispatches of this stage, including reruns at a higher
-  tier; commit only the accepted attempt, and list earlier ones as
-  `Earlier-Attempt: <model> <effort> <tokens> <why it failed>`.
+- **Tokens, Cost, Tool-Calls** come from the tool's own usage report (the
+  lines `claude-build.sh` or `codex-build.sh` prints; for an in-session
+  subagent, its completion notice), never from the builder's report. Use
+  "unknown" when the tool gives none; the build scripts print no tool-call
+  count.
+- **Attempt** counts dispatches of this stage, including `--down` and
+  `--up` reruns; commit only the accepted attempt, and list earlier ones as
+  `Earlier-Attempt: <model> <effort> <tokens> <why it failed>` (for exit 8,
+  "budget reached").
 - A change made later to fix a committed stage, from the phase review or
   later work, gets its own commit with `Fixes-Stage: <stage>`,
   `Model:`, `Effort:` and `Tokens:` of whoever made the fix.
@@ -123,13 +157,15 @@ Tool-Calls: <count, or "unknown">
 
 ### 3. Review the phase
 
-Hand the review to a new subagent that built none of the phase, with
-[phase-reviewer.md](phase-reviewer.md) unchanged and its inputs filled in, on
-the `top` candidate from the plan's `models.md`. While Codex is on, check
-the routing rule first; when it sends the review to Codex, write
-phase-reviewer.md and its inputs to a prompt file outside the repository
-and run `scripts/codex-build.sh` with the `top` candidate of
-`models-codex.md`. It reads the actual diff and code, not
+Hand the review to a new agent that built none of the phase, with
+[phase-reviewer.md](phase-reviewer.md) unchanged and its inputs filled in,
+written to a prompt file outside the repository. Run `route --review` and
+`scripts/claude-build.sh` with its `model`, `effort` and `cap_usd`; add its
+`Cost:` to the phase's premium spend. A review never drops a step: if it
+stops at its cap (exit 8), report that to the user. While Codex is on,
+check the routing rule first; when it sends the review to Codex, run
+`scripts/codex-build.sh` with the pair `route --review` prints for
+`models-available-codex.json`. It reads the actual diff and code, not
 the builders' reports. Then read the diff yourself and decide on each
 finding.
 

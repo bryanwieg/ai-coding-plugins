@@ -78,9 +78,10 @@ only if it is one of the finding types below.
   tooling or dependencies, or breaks a project rule or limit.
 - **Model table:** `models-available.json` reflects what the tool offers
   (check the source it names), and `models.md` is the selector's output for
-  it: rerun `scripts/select-models.py` on it and compare. Read the Matches
-  and Excluded lists for wrong or missing matches. If the selector could not
-  run, check the fallback was used as model-selection.md describes, with no
+  it and current against the profiles: `scripts/select-models.py check
+  <plan>/models.md` exits 0 (exit 1: out of date, the selector must be
+  rerun). Read the Matches and Excluded lists for wrong or missing
+  matches. If the selector could not run, check the fallback was used as model-selection.md describes, with no
   thinking level above its model's ceiling. Briefs and stage tables use tiers, never model
   names or effort levels.
 - **Model choice:** each brief's `Model basis` scores match the code and the
