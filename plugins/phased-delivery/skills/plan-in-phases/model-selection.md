@@ -343,7 +343,9 @@ the cause, the user runs `codex-usage.py --recheck`.
   4) treats it as off without checking again. Otherwise run
   `codex-usage.py` before a phase's first dispatch, ahead of refreshing
   `models-available-codex.json` and `models-codex.md`; it answers from
-  the daily cache. Only when the plan has `models-codex.md` and the
+  the daily cache. When that check times out (exit 5), the phase starts
+  without Codex and its Notes record `Codex check timed out`, not off;
+  exit 5 at a check before a dispatch builds that stage in the session. Only when the plan has `models-codex.md` and the
   session is not Codex.
 - **Off means not loaded:** no refresh of the Codex model files, no usage
   scripts, no routing table, nothing routed to Codex; the phase runs as it
