@@ -36,8 +36,10 @@ adjustment in the phase's Notes. Check each open assumption in the phase's
 Assumptions section against the code now: mark it verified with where it was
 checked, or, if it is wrong, revise the plan through plan-in-phases' revision
 rules ([revising.md](../plan-in-phases/revising.md)) before building. For a
-small plan, also confirm its Size criteria still hold; if not, the plan must
-become a full plan first. Planning-level changes
+quick plan (its `Size` section says so), check that
+the revision keeps it one phase of at most 3 stages and adds no contract
+that existing code, the user or disk uses; if not, the plan must become a
+full plan first. Planning-level changes
 inside the approved design need no approval. A change to the specification or design, or work the
 design lacks, goes to the user first.
 

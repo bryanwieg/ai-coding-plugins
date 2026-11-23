@@ -9,5 +9,5 @@ prompt=$(sed -nE 's/.*"prompt"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*/\1/p'
   sed -e 's/\\[nt]/ /g')
 
 if printf '%s' "$prompt" | grep -qiwE '(plan|plans|planning|phase|phases|phased|stages|break (it|this|that) down|migrat[a-z]*|rewrite|refactor[a-z]*|implement[a-z]*)'; then
-  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"phased-delivery: if this is multi-step work, plan it with the plan-in-phases skill (it sizes the plan from the code); if it builds or continues a phased plan, use the implement-in-phases skill."}}'
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"phased-delivery: if this is multi-step work, start the plan-in-phases skill (its first step is a capped estimate that may send the change straight to direct work); if it builds or continues a phased plan, use the implement-in-phases skill."}}'
 fi

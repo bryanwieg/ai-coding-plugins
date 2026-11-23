@@ -23,7 +23,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 context="The phased-delivery plugin is enabled.
-- Use the plan-in-phases skill to plan any multi-step change (a feature, migration, rewrite, or work touching several files, a shared contract or the architecture) before writing code. It decides from the code whether a small plan is enough; do not skip it because a change seems small or familiar.
+- Before a multi-step change (a feature, migration, rewrite, or work touching several files, a shared contract or the architecture), start the plan-in-phases skill. Its first step is a capped estimate (at most 5 files read) that picks direct work, a quick plan or a full plan; small changes go straight back to direct work.
 - Use the implement-in-phases skill to build any phased plan. Never build phase files without it."
 
 if [ -n "$unfinished" ]; then

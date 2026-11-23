@@ -8,7 +8,7 @@
   },
   "properties": {
     "size": {"type": "object", "additionalProperties": false, "required": ["verdict", "evidence"],
-      "properties": {"verdict": {"enum": ["full", "small"]}, "evidence": {"type": "array", "items": {"type": "string"}}}},
+      "properties": {"verdict": {"enum": ["full", "quick"]}, "evidence": {"type": "array", "items": {"type": "string"}}}},
     "outcomes": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false,
       "required": ["id", "title", "observable", "how_to_check", "sources"],
       "properties": {"id": {"type": "string", "pattern": "^O\\d+$"}, "title": {"type": "string"},
@@ -40,11 +40,12 @@
         "name": {"type": "string"},
         "kind": {"enum": ["skeleton", "interfaces", "internals", "integration", "behaviour"]},
         "stages": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false,
-          "required": ["id", "title", "files", "provides", "uses", "order"],
+          "required": ["id", "title", "files", "lines", "provides", "uses", "order"],
           "properties": {"id": {"type": "string", "pattern": "^\\d\\d\\.\\d+$"}, "title": {"type": "string"},
             "files": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false,
               "required": ["path", "action"],
               "properties": {"path": {"type": "string"}, "action": {"enum": ["create", "edit", "delete"]}}}},
+            "lines": {"enum": ["under 30", "30-150", "over 150"]},
             "provides": {"type": "array", "items": {"type": "string", "pattern": "^C\\d+$"}},
             "uses": {"type": "array", "items": {"type": "string", "pattern": "^C\\d+$"}},
             "order": {"type": "string", "pattern": "^(first|after \\d\\d\\.\\d+|parallel with \\d\\d\\.\\d+)$"}}}}}}}

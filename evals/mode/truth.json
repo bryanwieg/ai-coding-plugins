@@ -638,7 +638,7 @@
     },
     {
      "title": "planner writes JSON, script renders",
-     "kind": "architecture",
+     "kind": "internal",
      "files": [
       {
        "path": "plugins/phased-delivery/skills/plan-in-phases/SKILL.md",
@@ -658,10 +658,7 @@
       }
      ],
      "lines": "30-150",
-     "changes": [
-      "phase-file-template.md",
-      "plan-in-phases"
-     ]
+     "changes": []
     },
     {
      "title": "closed review types",
@@ -686,8 +683,8 @@
    "open_questions": []
   },
   "summary": {
-   "mode": "full",
-   "total": 26.5,
+   "mode": "quick",
+   "total": 10.5,
    "parts": [
     {
      "title": "check script, schemas, guides",
@@ -699,22 +696,11 @@
     },
     {
      "title": "planner writes JSON, script renders",
-     "weight": 3,
+     "weight": 1,
      "size": 2,
-     "reach": 3,
-     "score": 18,
-     "reach_files": [
-      "docs/model-routing.md",
-      "evals/tasks/p2-multistep/reference/plugins/phased-delivery/skills/plan-in-phases/model-selection.md",
-      "evals/tasks/t4-rename/reference/plugins/phased-delivery/skills/implement-in-phases/SKILL.md",
-      "evals/tasks/t4-rename/reference/plugins/phased-delivery/skills/implement-in-phases/phase-review.md",
-      "evals/tasks/t5-keywords/reference/plugins/phased-delivery/hooks/prompt-reminder.sh",
-      "plugins/phased-delivery/hooks/hooks.json",
-      "plugins/phased-delivery/hooks/prompt-reminder.sh",
-      "plugins/phased-delivery/hooks/session-start.sh",
-      "plugins/phased-delivery/skills/implement-in-phases/SKILL.md",
-      "plugins/phased-delivery/skills/implement-in-phases/phase-reviewer.md"
-     ]
+     "reach": 1,
+     "score": 2,
+     "reach_files": []
     },
     {
      "title": "closed review types",

@@ -99,3 +99,44 @@ def test_changes_ignored_for_internal(tmp_path):
 
 def test_existing_data_forces_full(tmp_path):
     assert call(tmp_path, "score", form(kind="data", existing_data=True))[2]["mode"] == "full"
+
+
+def plan(tmp_path, stages, contracts, phases=1):
+    d = repo(tmp_path) / "docs" / "plan" / ".plan"
+    d.mkdir(parents=True, exist_ok=True)
+    ph = [{"phase": f"{i + 1:02}", "stages": stages if i == 0 else stages[:1]} for i in range(phases)]
+    (d / "plan.json").write_text(json.dumps({"contracts": contracts, "phases": ph}))
+    p = subprocess.run([sys.executable, SCRIPT, "rescore", str(d.parent), "--repo", str(tmp_path)],
+                       capture_output=True, text=True)
+    return p.returncode, json.loads(p.stdout)["summary"] if p.stdout else None
+
+
+def st(sid, files, provides=(), lines="30-150"):
+    return {"id": sid, "title": "t", "files": [{"path": f, "action": a} for f, a in files],
+            "lines": lines, "provides": list(provides), "uses": [], "order": "first"}
+
+
+def test_rescore_kinds_and_reach(tmp_path):
+    code, s = plan(tmp_path, [
+        st("01.1", [("app/new.py", "create")]),
+        st("01.2", [("app/ratelimit.py", "edit")]),
+        st("01.3", [("app/views.py", "edit")], ["C2"], "under 30")],
+        [{"id": "C1", "name": "check_rate", "provided_by": "existing:app/ratelimit.py", "used_by": ["01.3"]},
+         {"id": "C2", "name": "login_page", "provided_by": "01.3", "used_by": ["user"]}])
+    assert code == 0
+    assert [p["kind"] for p in s["parts"]] == ["new", "interface", "interface"]
+    assert s["parts"][1]["reach_files"] == ["app/views.py", "docs.md"]
+    assert s["parts"][2]["reach_files"] == ["user"]
+    assert s["mode"] == "quick" and s["total"] == 1 + 6 + 3
+
+
+def test_rescore_structure_forces_full(tmp_path):
+    stages = [st(f"01.{i}", [(f"app/f{i}.py", "create")], lines="under 30") for i in range(1, 5)]
+    assert plan(tmp_path, stages, [])[1]["mode"] == "full"
+    assert plan(tmp_path, stages[:1], [], phases=2)[1]["mode"] == "full"
+    assert plan(tmp_path, stages[:1], [])[1]["mode"] == "direct"
+
+
+def test_rescore_without_plan(tmp_path):
+    p = subprocess.run([sys.executable, SCRIPT, "rescore", str(tmp_path / "nope")], capture_output=True, text=True)
+    assert p.returncode == 2

@@ -4,6 +4,7 @@
 Usage:
   plan-mode.py locate TERMS.json [--repo DIR]
   plan-mode.py score FORM.json [--repo DIR]
+  plan-mode.py rescore PLAN_DIR [--repo DIR]
 
 A quick estimate with hard limits, in two calls (see
 skills/plan-in-phases/mode-guide.md). The agent does no searching itself:
@@ -23,6 +24,15 @@ skills/plan-in-phases/mode-guide.md). The agent does no searching itself:
    direct up to 4, quick up to 15, full above. A part that changes data
    already written is always full; anything the estimate could not find
    (unresolved) makes it at least quick.
+
+`rescore` re-scores a quick plan from PLAN_DIR/.plan/plan.json alone, so the
+planner's own view of the estimate does not decide it: one part per stage,
+with its files and `lines`; a stage providing a contract that existing
+code, the user or disk uses, or editing the file of an existing contract,
+is an interface part; a stage that only creates files is new; others are
+internal. Reach is the contracts' outside users plus a search for their
+names. More than one phase, or more than 3 stages, is full whatever the
+score.
 
 Output: one JSON line per problem, {"where", "kind", "msg", "level"}, then a
 summary line. level "error" must be fixed; "warning" is for the agent to
@@ -183,6 +193,61 @@ def with_reach(form, repo, skip=None):
     return parts
 
 
+def plan_parts(plan):
+    """Parts for rescore: one per stage, kind and names from the contract registry."""
+    contracts = {c["id"]: c for c in plan["contracts"]}
+    stage_ids = {s["id"] for ph in plan["phases"] for s in ph["stages"]}
+    parts = []
+    for ph in plan["phases"]:
+        for st in ph["stages"]:
+            paths = {f["path"] for f in st["files"]}
+            names, outside = [], set()
+            for cid in st["provides"]:
+                c = contracts.get(cid)
+                users = [u for u in (c["used_by"] if c else []) if u not in stage_ids]
+                if users:
+                    names.append(c["name"])
+                    outside |= set(users)
+            for c in plan["contracts"]:
+                src = c["provided_by"]
+                if src.startswith("existing:") and src[len("existing:"):] in paths:
+                    names.append(c["name"])
+                    outside |= {u for u in c["used_by"] if u not in stage_ids}
+            if names:
+                kind = "interface"
+            elif all(f["action"] == "create" for f in st["files"]):
+                kind = "new"
+            else:
+                kind = "internal"
+            parts.append({"title": f"{st['id']} {st['title']}", "kind": kind, "files": st["files"],
+                          "lines": st["lines"], "changes": names, "listed": outside - paths})
+    return parts
+
+
+def rescore(plan_dir, repo):
+    with open(os.path.join(plan_dir, ".plan", "plan.json")) as fh:
+        plan = json.load(fh)
+    parts = plan_parts(plan)
+    corpus = texts(repo)
+    plan_abs = os.path.abspath(plan_dir)
+    for p in parts:
+        own = {f["path"] for f in p["files"]}
+        found = set()
+        for name in p["changes"]:
+            found |= set(mentions(corpus, name, False)) - own
+        found = {f for f in found if not os.path.abspath(os.path.join(repo, f)).startswith(plan_abs + os.sep)}
+        users = found | p.pop("listed")
+        p["reach"], p["reach_files"] = sorted(users), len(users)
+    mode, total, rows, reasons = score(parts, [], [])
+    stages = max(len(ph["stages"]) for ph in plan["phases"])
+    if len(plan["phases"]) > 1 or stages > 3:
+        reasons.append(f"{len(plan['phases'])} phases, up to {stages} stages: more than one phase of 3 stages -> full")
+        mode = "full"
+    for r, p in zip(rows, parts):
+        r["kind"], r["reach_files"] = p["kind"], p["reach"][:MAX_FILES_PER_TERM]
+    return {"mode": mode, "total": total, "parts": rows, "reasons": reasons}
+
+
 def main(argv):
     args, repo, i = [], ".", 0
     while i < len(argv):
@@ -190,10 +255,18 @@ def main(argv):
             repo, i = argv[i + 1], i + 2
         else:
             args, i = args + [argv[i]], i + 1
-    if len(args) != 2 or args[0] not in ("locate", "score"):
+    if len(args) != 2 or args[0] not in ("locate", "score", "rescore"):
         print(__doc__, file=sys.stderr)
         return 2
     cmd, path = args
+    if cmd == "rescore":
+        try:
+            summary = rescore(path, repo)
+        except (OSError, ValueError, KeyError) as e:
+            print(f"cannot read the plan (run plan-check.py --outline first): {e!r}", file=sys.stderr)
+            return 2
+        print(json.dumps({"summary": summary}))
+        return 0
     try:
         with open(path) as fh:
             data = json.load(fh)

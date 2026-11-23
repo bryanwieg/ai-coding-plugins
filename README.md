@@ -69,6 +69,18 @@ the first report. When the report is missing or more than 7 days old, or
 Python is unavailable, the skills fall back to the tools' own model
 descriptions. Both scripts use only the Python standard library.
 
+### Planning mode
+
+plan-in-phases starts with a quick estimate that decides how much planning a
+change gets: **direct** (no plan; the change is made in context), **quick**
+(one phase file checked by the script, no review subagent) or **full**. The
+agent lists up to 5 terms from the request, `plugins/phased-delivery/scripts/plan-mode.py`
+finds the files that mention them, the agent reads at most 5 and fills a
+form, and the script searches for the users of what changes and scores
+kind × size × reach per part. A quick plan is re-scored from its `plan.json`
+and can move up to full or down to direct. `evals/mode/` holds the
+calibration cases and their results.
+
 ### Plan checks
 
 plan-in-phases writes the plan as JSON in a `.plan/` folder while planning:

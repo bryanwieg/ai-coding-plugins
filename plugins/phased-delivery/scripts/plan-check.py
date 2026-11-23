@@ -377,8 +377,8 @@ def render(num, d, plan):
          "without it. Model tiers map to models in [models.md](models.md).",
          "Status: planned", f"Before: {d['before']}", f"After: {d['after']}", "", "## Assumptions"]
     L += bullets(d["assumptions"], lambda a: f"{a['status'].capitalize()}: {a['text']} ({a['evidence']})")
-    if plan["size"]["verdict"] == "small":
-        L += ["", "## Size", "", "Small plan:"] + bullets(plan["size"]["evidence"], str)
+    if plan["size"]["verdict"] == "quick":
+        L += ["", "## Size", "", "Quick plan:"] + bullets(plan["size"]["evidence"], str)
     L += ["", "## Outcome tests", f"Budget: {d['test_budget']}", "",
           "| Outcome | Test | Written in | Passes from |", "| --- | --- | --- | --- |"]
     L += [f"| {outcomes[t['outcome']]['observable'] if t['outcome'] in outcomes else t['outcome']} | "

@@ -76,9 +76,6 @@ only if it is one of the finding types below.
 - **Order:** order and parallel marks match the dependencies.
 - **Simplicity and rules:** no stage checks internal data, adds unrequested
   tooling or dependencies, or breaks a project rule or limit.
-- **Size:** if the plan claims to be small, re-measure it yourself: count the
-  files, search for every user of the changed code and check each size
-  criterion in plan-in-phases. Report any criterion that fails.
 - **Model table:** `models-available.json` reflects what the tool offers
   (check the source it names), and `models.md` is the selector's output for
   it: rerun `scripts/select-models.py` on it and compare. Read the Matches
@@ -104,7 +101,6 @@ only if it is one of the finding types below.
 | `contradicts-code` | a contract or assumption is false about existing code, so a phase cannot work as planned; cite the line | a detail a builder will notice when opening the file |
 | `outcome-untestable` | an outcome test cannot be written or made to pass at its planned stages, or does not go through the real entry point | a test you would structure differently |
 | `order-wrong` | a stage depends on work a later stage builds, or a phase leaves the repository incoherent | a parallel mark that could be added |
-| `size-wrong` | the plan claims to be small and a size criterion fails on re-measuring | |
 | `model-table` | `models.md` is not the selector's output for `models-available.json`, or the fallback was misapplied | |
 | `score-too-low` | a `Model basis` measure is scored lower than the code and model-selection.md support | a score you would put one higher by taste |
 | `over-specified` | a brief dictates code: function bodies, expressions, statement order, private helpers | precise interfaces, routes, formats or rules |

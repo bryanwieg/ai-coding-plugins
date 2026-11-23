@@ -125,8 +125,10 @@ break it?
 
 The mode holds only while the estimate is true.
 - **Quick plan:** when its `plan.json` passes `plan-check.py --outline`,
-  update the form from it (the stages' files, the contracts' kinds and
-  names, anything unresolved now found) and score again. If it says full,
+  run `plan-mode.py rescore <plan dir> --repo .`. It scores the plan
+  itself, not your form: one part per stage from its files and `lines`,
+  the kind and reach from the contract registry, and full whenever the plan
+  needs more than one phase or more than 3 stages. If it says full,
   continue as a full plan. If it says direct, stop planning and make the
   change directly.
 - **Direct work:** when the work finds a user of something it changes that

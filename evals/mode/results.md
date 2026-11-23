@@ -120,3 +120,7 @@ Unresolved is now empty in every rerun; real questions moved to open_questions. 
 ## 2026-11-23, run 3 (4 reruns after the container rule, $0.50): 17 of 19
 
 grill-step now direct (2.0). structured-planning fell to quick (13.5): the workflow change was called interface 30-150 this time, architecture over 150 in run 2 (24.5) and architecture 30-150 in run 1 (15.5). Its estimate swings across the quick/full line between runs; the quick plan's re-score is the net for it. codex-off still guesses lines high.
+
+## 2026-11-23, quick plan re-score test ($0.58)
+
+plan-in-phases with the new wiring on the structured-planning request, forced to quick: estimate quick 10.5; the agent's own re-score of its form repeated it (quick 10.5), so the form re-score is not an independent check. Replaced by plan-mode.py rescore, computed from plan.json: quick 12.5 on the same plan (it found implement-in-phases as a reader of the edited template). The user agreed quick is right for that request as scoped (rendered layout unchanged); the case's truth now labels the workflow change internal (10.5, quick).

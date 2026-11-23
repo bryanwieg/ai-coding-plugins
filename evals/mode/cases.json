@@ -250,7 +250,7 @@
   "id": "structured-planning",
   "base": "28f0398",
   "head": "fee10d5",
-  "expected": "full",
+  "expected": "quick",
   "request": "plan-in-phases writes the plan as JSON checked by a script, which renders the phase files; the plan review uses closed finding types.",
   "parts": [
    {
@@ -269,17 +269,14 @@
    },
    {
     "title": "planner writes JSON, script renders",
-    "kind": "architecture",
+    "kind": "internal",
     "files": [
      "plugins/phased-delivery/skills/plan-in-phases/SKILL.md",
      "plugins/phased-delivery/skills/plan-in-phases/phase-file-template.md",
      "README.md",
      "plugins/phased-delivery/.claude-plugin/plugin.json"
     ],
-    "changes": [
-     "phase-file-template.md",
-     "plan-in-phases"
-    ]
+    "changes": []
    },
    {
     "title": "closed review types",
