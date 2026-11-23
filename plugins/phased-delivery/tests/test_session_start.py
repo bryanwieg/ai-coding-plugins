@@ -1,0 +1,36 @@
+import datetime
+import json
+import os
+from pathlib import Path
+import subprocess
+
+HOOK = Path(__file__).resolve().parents[1] / "hooks" / "session-start.sh"
+
+
+def hook_context(tmp_path):
+    """Run the hook outside any git repository with a stub `codex` that reports signed in."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    stub = bin_dir / "codex"
+    stub.write_text("#!/bin/sh\nexit 0\n")
+    stub.chmod(0o755)
+    base = {k: v for k, v in os.environ.items() if k != "AI_CODEX"}
+    result = subprocess.run(
+        ["sh", str(HOOK)], cwd=tmp_path, capture_output=True, text=True, check=True,
+        env={**base, "CLAUDE_CONFIG_DIR": str(tmp_path), "CODEX_HOME": str(tmp_path),
+             "PATH": f"{bin_dir}{os.pathsep}{base['PATH']}"},
+    )
+    return json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+
+
+def test_codex_off_line(tmp_path):
+    today = datetime.date.today().isoformat()
+    cache = tmp_path / "codex-availability.json"
+    cache.write_text(json.dumps({"date": today, "on": False, "cause": "not signed in"}))
+    off = hook_context(tmp_path)
+    assert "Codex is off today" in off
+    assert "do not consider Codex this session" in off
+    assert "codex-usage.py --recheck" in off
+
+    cache.write_text(json.dumps({"date": today, "on": True}))
+    assert "Codex" not in hook_context(tmp_path)
