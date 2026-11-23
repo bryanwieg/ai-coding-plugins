@@ -531,14 +531,18 @@ def pick_pair(allowed, tier, best, scores, signals, up, down):
     cap = "medium" if mechanical else "high" if long_wide else None
     capped = [c for c in allowed if not effort_denial(c["effort"], cap)]
     if not capped:
-        return None, f"no selectable pair at {cap} thinking or below"
+        return None, f"no selectable pair at {cap} thinking or below", False, []
     front = frontier(capped)
     pick = frontier_pick(front, tier, best)
+    last = len(front) - 1
+    # A step up asked for (middle+, risk or --up) that the frontier's end cut short.
+    short = tier == "middle+" and front.index(frontier_pick(front, "middle", best)) == last
     if cap and pick is not frontier_pick(frontier(allowed), tier, best):
         why.append(f"{'mechanical' if mechanical else 'long or wide'} stage: thinking capped at {cap}")
     meeting = meets_floor(front, tier, best)
     if signals and scores["K"] >= 1:
-        stepped = front[min(front.index(pick) + 1, len(front) - 1)]
+        short = short or front.index(pick) == last
+        stepped = front[min(front.index(pick) + 1, last)]
         if stepped is not pick:
             why.append(f"risk K{scores['K']}: one frontier pair up from {pick['label']}")
         pick = stepped
@@ -565,7 +569,8 @@ def pick_pair(allowed, tier, best, scores, signals, up, down):
     if down or up:
         why.append(f"--{'down' if down else 'up'} {down or up}: moved "
                    f"{abs(moved - index)} frontier pairs from {pick['label']}")
-    return front[moved], why
+    short = short or moved - index < up
+    return front[moved], why, short, front
 
 
 def route_main(args):
@@ -601,15 +606,21 @@ def route_main(args):
     scores = options.scores
     signals = not options.review  # a review runs on top as is: the stage's scores do not shape it
     steps = (options.up, options.down)
-    choice, notes = pick_pair(allowed, tier, best, scores, signals, *steps)
+    choice, notes, _, front = pick_pair(allowed, tier, best, scores, signals, *steps)
     if choice is None:
         print(notes, file=sys.stderr)
         return 4
     standard = [c for c in allowed if not c["row"]["premium"]]
     if tier != "top" and choice["row"]["premium"] and standard:
-        # Below top a premium pair must beat the standard pick on cost and score.
-        other, other_notes = pick_pair(standard, tier, best, scores, signals, *steps)
-        if other is not None and (choice["cost"] > other["cost"] or choice["score"] < other["score"]):
+        # Below top a premium pair must beat the standard pick on cost and score,
+        # unless the standard pairs cannot give a step up the stage asked for:
+        # the next model up at low thinking beats more thinking on a smaller one.
+        other, other_notes, other_short, _ = pick_pair(standard, tier, best, scores, signals, *steps)
+        if other is not None and other_short and choice["score"] > other["score"]:
+            choice = next(c for c in front if c["score"] > other["score"])  # front is cheapest first
+            notes = other_notes + [f"no standard pair above {other['label']} for the step up: "
+                                   f"{choice['label']}, the cheapest pair above it"]
+        elif other is not None and (choice["cost"] > other["cost"] or choice["score"] < other["score"]):
             notes = other_notes + [f"premium {choice['label']} left out below top: "
                                    f"{other['label']} costs less or scores at least as well"]
             choice = other

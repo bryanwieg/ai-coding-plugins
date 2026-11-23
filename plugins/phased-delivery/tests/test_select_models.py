@@ -129,6 +129,11 @@ def test_route_premium_below_top(offered, tmp_path):
     better = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"intelligence": 59}})
     kept = route(offered, "J1F1R0C0K0P2V0S0", "--up", "2", profiles=better)
     assert pair(kept) == ("astra", "high") and kept["premium"]
+    # When the standard pairs run out before the step asked for, the cheapest
+    # pair above the standard pick is taken: --up 5 wants nova medium, past
+    # sol high, the last standard pair, and gets nova low, the next pair up.
+    short = route(offered, "J1F1R0C0K0P2V0S0", "--up", "5")
+    assert pair(short) == ("nova", "low") and "step up" in short["why"]
 
 
 def test_route_speed_gain(offered, tmp_path):
