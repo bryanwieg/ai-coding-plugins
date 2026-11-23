@@ -206,7 +206,9 @@ Side observations:
   tokens (98k of them cache reads) in 6 turns. Under `acceptEdits` the
   builder edited files and ran read-only commands, but `python3 -m pytest`
   was refused: a project must allow its test commands, or set
-  `CLAUDE_BUILD_PERMISSIONS=bypassPermissions` in a sandbox. A budget stop
+  `CLAUDE_BUILD_PERMISSIONS=bypassPermissions` in a sandbox; with the
+  ai-coding sandbox image setting it, a third run ran pytest itself (2
+  passed, no denials, $0.0034). A budget stop
   reports zero `usage`; `claude-build.sh` counts tokens from `modelUsage`.
 
 - **More Codex evidence:** a few more probe runs and real phases before
