@@ -32,7 +32,8 @@ TEXT=$(cat "$PROMPT") || exit 2
   --output-format stream-json --verbose) \
   < /dev/null > "$OUT/stream.jsonl" 2> "$OUT/stderr.txt"
 status=$?
-# Exits 0 with a result event, 8 when it says the budget was reached, 1 without one.
+# Exits 0 for a successful result, 8 when the budget was reached, 9 for another
+# error result, 1 without one.
 python3 - "$OUT/stream.jsonl" "$OUT/report.md" <<'PY'
 import json, sys
 result = None
@@ -52,11 +53,16 @@ text = found.get("result")
 open(sys.argv[2], "w").write(text if isinstance(text, str) else "")
 print(f"Tokens: {tokens}")
 print(f"Cost: {cost:.2f}" if isinstance(cost, (int, float)) else "Cost: unknown")
-sys.exit(1 if result is None else 8 if result.get("subtype") == "error_max_budget_usd" else 0)
+if result is None:
+    sys.exit(1)
+if result.get("subtype") == "error_max_budget_usd":
+    sys.exit(8)
+sys.exit(9 if result.get("is_error") or result.get("subtype") not in (None, "success") else 0)
 PY
 case $? in
   0) exit $status ;;
   8) echo "Budget of \$$BUDGET reached; the build was stopped" >&2; exit 8 ;;
+  9) echo "claude reported an error result; the build did not finish" >&2 ;;
 esac
 grep -v '^[[:space:]]*$' "$OUT/stderr.txt" | tail -n 1 >&2
 [ $status -ne 0 ] || status=1
