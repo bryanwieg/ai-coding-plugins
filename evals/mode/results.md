@@ -116,3 +116,7 @@ modes matching truth: 17; cost $2.48
 ```
 
 Unresolved is now empty in every rerun; real questions moved to open_questions. Misses: grill-step listed the skill's name as the thing added to (reach 10+, score 14); fixed in mode-guide: only additions users must handle count the container. codex-off again guessed 30-150 lines for 14; left alone (errs upward, moves only to quick).
+
+## 2026-11-23, run 3 (4 reruns after the container rule, $0.50): 17 of 19
+
+grill-step now direct (2.0). structured-planning fell to quick (13.5): the workflow change was called interface 30-150 this time, architecture over 150 in run 2 (24.5) and architecture 30-150 in run 1 (15.5). Its estimate swings across the quick/full line between runs; the quick plan's re-score is the net for it. codex-off still guesses lines high.
