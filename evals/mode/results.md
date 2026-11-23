@@ -189,3 +189,65 @@ Both misses err upward, by one mode. codex-off: lines guessed 30-150 for 14 (eve
 - direct (t1 --min-small at ff8ce98, $0.26): change made directly, no plan files; the skill was never started, so the estimate did not run (the agent judged it single-step itself).
 - quick (exit codes at d16d571, $1.11): invalid test, the base already held the quota-failover plan with this change as stage 02.2; the agent built the stage without implement-in-phases and marked it done. Codex was not hidden and the real CLI ran once by accident (failed on a trust check).
 - full (Fava auth s2, Codex hidden, $6.94 + $0.83 grade, 21 min): the skill started on its own from 'Plan how to build...', estimate full at 48.5, 3 phases, 4 closed-type review rounds; blind grade 27/30 (s1 on PR #5's skill: 26/30, $6.61; a3 on the old skill: 27/30, $15).
+
+## 2026-11-23, staged estimate (sketch first), all 19 cases, $2.12
+
+```
+gitignore            sketch                   est direct        1-1  truth direct      1  read 0  searches 0  $0.08
+                      ignore cache directories: xx1-1
+test-exit-codes      sketch                   est direct    0.5-2.5  truth direct    0.5  read 0  searches 0  $0.08
+                      exit-code test with lapsed-plan fixture: xx0.5-2.5
+sandbox-env          sketch                   est direct        2-4  truth direct    3.0  read 0  searches 0  $0.08
+                      sandbox mode from CODEX_BUILD_SANDBOX: xx2-4
+hook-trust           sketch                   est direct        1-1  truth direct      1  read 0  searches 0  $0.08
+                      pass hook-trust bypass in full-access sandbox: xx1-1
+grill-step           form (sketch 2-10)       est direct          3  truth direct      2  read 1  searches 1  $0.13
+                      grill interview step before planning: 1x2x1
+                      planner pushback once on security/architecture: 1x1x1
+                      SEARCH wc -l plugins/phased-delivery/skills/plan-in-phases/SKILL.md && grep -n '^#' plugins/phased-delivery
+grill-collab         form (sketch 1-5)        est direct          1  truth direct      1  read 0  searches 1  $0.12
+                      grill concerns become a discussion: 1x1x1
+                      SEARCH grep -n -i -C3 "grill\|concern" plugins/phased-delivery/skills/plan-in-phases/SKILL.md | head -80
+claude-usage         sketch                   est direct    0.5-2.5  truth direct    1.0  read 0  searches 0  $0.10
+                      claude-usage script with tests: xx0.5-2.5
+codex-reset          sketch                   est direct        1-1  truth direct      1  read 0  searches 0  $0.08
+                      skip windows whose reset time has passed: xx1-1
+codex-off            form (sketch 1-5)        est direct        4.0  truth direct    3.0  read 1  searches 1  $0.13
+                      report Codex off/signed out as its own result: 2x1x1.5
+                      SEARCH wc -l plugins/phased-delivery/scripts/codex-usage.py && sed -n 1,60p plugins/phased-delivery/scripts
+exit-codes           form (sketch 2-20)       est quick           6  truth quick       8  read 3  searches 1  $0.17
+                      codex-build.sh exits 7 on quota, 6 when unusable: 2x1x2
+                      docs and orchestrator fall back on 6 and 7: 1x1x1
+                      SEARCH wc -l plugins/phased-delivery/scripts/codex-build.sh && cat plugins/phased-delivery/scripts/codex-bu
+outcome-tests        form (sketch 5-25)       est quick           7  truth quick       6  read 1  searches 1  $0.17
+                      grill ends with outcomes; outcome tests expected-fail early; unit tests need a reason: 1x2x1
+                      phase file gains Outcome tests section, turned on during implementation: 2x2x1
+                      reviewers check Outcome tests: 1x1x1
+                      SEARCH cd /tmp/mode-runs/outcome-tests/repo/plugins/phased-delivery/skills && for f in plan-in-phases/SKILL
+split-skill          form (sketch 1-5)        est quick           5  truth quick       6  read 1  searches 1  $0.13
+                      move SKILL.md sections into step files: 1x5x1
+                      SEARCH f=plugins/phased-delivery/skills/plan-in-phases/SKILL.md; wc -l $f; grep -n '^#' $f; ls plugins/phas
+structured-planning  form (sketch 4.5-47.5)   est quick         7.5  truth quick    10.5  read 3  searches 0  $0.18
+                      plan schema, check and render script: 0.5x5x1
+                      plan-in-phases writes plan.json, phase files rendered: 2x2x1
+quota-failover       form (sketch 2.0-6.0)    est full         18.0  truth full     39.5  read 3  searches 1  $0.20
+                      Claude plan usage reader: 0.5x2x1
+                      route stages by quota between tools: 3x2x1.5
+                      turn Codex off when out of quota or unusable: 2x2x2
+                      SEARCH head -60 docs/model-routing.md; echo ----; grep -n -i "quota\|codex" plugins/phased-delivery/skills/
+t1-min-small         sketch                   est direct        2-4  truth direct      4  read 0  searches 0  $0.08
+                      --min-small option sets small tier floor: xx2-4
+t3-speed-col         sketch                   est direct        1-1  truth direct      4  read 0  searches 0  $0.08
+                      Speed column in tier table: xx1-1
+t4-rename            sketch                   est direct      2-3.0  truth direct      4  read 0  searches 0  $0.08
+                      rename file and update references: xx2-3.0
+t5-keywords          sketch                   est direct        1-1  truth direct      1  read 0  searches 0  $0.08
+                      add keywords to prompt reminder hook: xx1-1
+p2-thinking          sketch                   est direct      3-4.0  truth direct      1  read 0  searches 0  $0.08
+                      normalize_effort drops trailing 'thinking': xx2-3.0
+                      guide documents the new normalization: xx1-1
+
+modes matching truth: 19; cost $2.12
+```
+
+19 of 19 modes match. The sketch alone settled 11 cases, all direct, with no file read, at $0.08 each; the other 8 went on to read files as before (none of them was certain from the sketch). Two sketches misjudged a part's kind without changing the mode: t3-speed-col called the table column internal (1, truth 4) and t4-rename gave reach 3.0 for truth 4. The bounds cover unknown lines and reach, not a wrong kind; quota-failover's sketch put the routing and the Codex switch in `unresolved`, which is what kept it from settling at 2-6.
