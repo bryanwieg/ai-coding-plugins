@@ -36,7 +36,10 @@ the tier alone. Rules, from the research on thinking levels:
   prefer a clearly faster model (1.2 times the speed) when scores are close.
 - Risk (K of 1 or more) raises the score floor.
 - Below the top tier a premium pair is used only when it costs no more
-  than the standard pick and scores at least as well (added 2026-11-23).
+  than the standard pick and scores at least as well, or when the standard
+  pairs cannot give a step up the stage asked for; then the cheapest pair
+  above the standard pick, the next model up at low thinking (added
+  2026-11-23).
 - Small models may use higher thinking levels, within their ceilings.
 
 Tiers stay in plans as a summary, so a plan still moves between tools.

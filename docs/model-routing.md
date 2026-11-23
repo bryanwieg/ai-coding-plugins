@@ -93,7 +93,12 @@ How it works now:
   - risk (K of 1 or more) moves one frontier pair up;
   - below `top`, a premium pair is kept only if it costs no more than the
     pick without premium pairs and scores at least as well (the user's rule:
-    Fable low may stand in for Opus when it is cheaper and as good);
+    Fable low may stand in for Opus when it is cheaper and as good); when
+    the standard pairs cannot give a step up the stage asked for (`middle+`,
+    risk, `--up`), the cheapest pair above the standard pick is taken. The
+    user's view, from practice: more thinking scores well on benchmarks but
+    can do worse on real work, so the next model up at low thinking beats a
+    smaller model above high. Hence Opus stays capped at `high`;
   - reviews (`--review`) run on `top` and ignore the stage's scores.
 - **Rule sweep, 2026-11-23** (free: all 6,561 score combinations through
   `route` on the live profiles):
@@ -105,9 +110,10 @@ How it works now:
   - The speed preference switched Fable low to Fable medium over 108 vs
     110 tokens a second, raising thinking on long stages; `SPEED_GAIN` 1.2
     stops that.
-  - With Opus capped at `high` (CEILINGS) and premium gated, `middle+` and
-    the risk step on `middle` both land on Opus high, the same as
-    `middle`: on today's data they add nothing below `top`.
+  - With the gate alone, `middle+` and the risk step on `middle` landed on
+    Opus high, the same as `middle`. With the step-up rule they take Fable
+    low: plain `middle` stays on Opus high, mechanical `middle` on Opus
+    medium.
   - The J2/C2 preference never fires: no pair scores at least Fable high
     at a lower thinking level. It waits for a larger model.
 - **Limits:** a token cap per stage (150k `small`, 400k `middle` and
