@@ -98,6 +98,14 @@ def test_route_stage_signals(offered, tmp_path):
     assert pair(route(offered, "J2F1R0C0K0P0V0S0")) == ("nova", "low")
     # Risk moves one frontier pair up from the middle pick, terra high.
     assert pair(route(offered, "J1F1R0C0K1P0V0S0")) == ("sol", "low")
+    # The J2 preference never undoes the risk step: without astra and sol high,
+    # J2 alone picks nova low, and with K1 the step up to nova medium holds.
+    narrow = tmp_path / "narrow.json"
+    narrow.write_text(json.dumps({**OFFERED, "models": [
+        m if m["id"] != "gpt-9-sol" else {**m, "efforts": ["low", "medium"]}
+        for m in OFFERED["models"] if m["id"] != "gpt-9-astra"]}))
+    assert pair(route(narrow, "J2F1R0C0K0P0V0S0")) == ("nova", "low")
+    assert pair(route(narrow, "J2F1R0C0K1P0V0S0")) == ("nova", "medium")
 
 
 def test_route_limits(offered):
@@ -113,3 +121,5 @@ def test_route_limits(offered):
         ("astra", "high"), "top", True, 10.0)
     # a review ignores the stage's scores: no caps or preferences shape it
     assert pair(route(offered, "J0F2R2C0K2P0V0S2", "--review")) == ("astra", "high")
+    assert run("route", offered, "--scores", "J1F1R0C0K0P0V0S0", "--profiles", PROFILES,
+               "--down", "-1").returncode == 2
