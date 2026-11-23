@@ -7,8 +7,9 @@ import sys
 
 PLUGIN = Path(__file__).resolve().parents[1]
 SCRIPT = PLUGIN / "scripts" / "select-models.py"
-REPORT = json.loads((PLUGIN / "model-report.json").read_text())
-AVAILABLE = PLUGIN.parents[1] / "docs" / "plans" / "model-profiles" / "models-available.json"
+# A frozen copy: the weekly refresh replaces model-report.json.
+REPORT = json.loads((PLUGIN / "tests" / "fixtures" / "model-report-2026-11-21.json").read_text())
+AVAILABLE = PLUGIN / "tests" / "fixtures" / "available-claude.json"
 
 
 def run(*args):
