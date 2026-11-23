@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: in progress (stages done: 02.1)
+Status: in progress (stages done: all; review pending)
 Before: models.md maps four tiers to one pair each, and every stage of a tier gets that pair. Nothing stops a runaway build or limits premium spend.
 After: `select-models.py route` prints one model and thinking level for a stage from its eight scores: only pairs on the score/cost frontier, no low-gain thinking steps, effort capped for mechanical and long or wide stages, larger models at lower thinking for design work, faster models for long work, and a token and dollar cap. `--down`, `--up`, `--premium-spent` and `--review` cover dropping a step, escalating, the premium budget and reviews.
 
@@ -25,7 +25,7 @@ Budget: python3 -m pytest -q plugins/phased-delivery/tests runs in under a minut
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
 | 02.1 | `select-models.py route` picks one pair per stage from the frontier of offered pairs, with tier floors, caps and the limit options. | top | first | done |
-| 02.2 | Route shapes the pick by what the stage's scores say: effort caps for mechanical and long or wide stages, larger models at lower thinking for design work, faster models for long work, a higher floor for risk. | middle | after 02.1 | planned |
+| 02.2 | Route shapes the pick by what the stage's scores say: effort caps for mechanical and long or wide stages, larger models at lower thinking for design work, faster models for long work, a higher floor for risk. | middle | after 02.1 | done |
 
 ## 02.1 route on the frontier with limits
 
@@ -134,3 +134,5 @@ Model basis: J1 F1 R0 C1 K0 P1 V0 S0 = 4 -> middle
 - Mechanical stages above the small tier are capped at medium thinking; small-tier stages keep the small model's higher levels within `CEILINGS`. Reason: Capping small stages would move them from Haiku high to Sonnet medium at 5.6 times the cost; the user chose the exemption in the review round.
 - Revised before building, 2026-11-23: the hand-built fixture moves to `tests/fixtures/profiles.json`, beside the fixtures phase 01's review added; select-models.py line numbers cited above moved in phase 01 (read the functions by name). Run tests with `--basetemp=/cache/...` (see 01's Notes).
 - 2026-11-23, after 02.1: on the committed profiles a small stage's `cap_usd` is $0.01 (150000 tokens at Haiku 5.5's $0.10 input price), likely below what one headless run costs. Left as designed; flagged for the calibration run and the PR, where a minimum cap would be the likely fix.
+- 2026-11-23, before 02.2: for a middle+ stage, "meeting the floor" in the stage-signal rules means scoring above the middle pick, as middle+ itself is defined in 02.1.
+- 2026-11-23, 02.2: `--review` ignores the stage's scores (no caps, risk step or preferences), since reviews always run on top; added by the orchestrator after the builder asked, with one assertion in test_route_limits.

@@ -90,6 +90,9 @@ CAP_TOKENS = {"small": 150000, "middle": 400000, "middle+": 400000, "top": 10000
 # Once a phase's premium spend reaches this many dollars, builds leave
 # premium pairs out.
 PREMIUM_BUDGET_USD = 10
+# Design (J2, C2) and long or wide (S2, R2, F2) stages may take another
+# frontier pair costing at most this multiple of the pick.
+PREFER_COST_RATIO = 1.5
 SCORES_FORM = "J F R C K P V S in that order, each followed by 0, 1 or 2, such as J1F1R0C0K0P0V0S0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -484,12 +487,24 @@ def frontier(pool):
     return sorted((c for c in pool if not beaten(c)), key=lambda c: (c["cost"], c["score"]))
 
 
+def meets_floor(front, tier, best):
+    """Frontier pairs meeting the tier's floor; for middle+, those above the middle pick."""
+    if tier == "middle+":
+        bar = frontier_pick(front, "middle", best)["score"]
+        return [c for c in front if c["score"] > bar]
+    return [c for c in front if c["score"] >= FLOORS[tier] * best]
+
+
+def effort_rank(effort):
+    return EFFORT_ORDER.index(effort) if effort in EFFORT_ORDER else len(EFFORT_ORDER)
+
+
 def frontier_pick(front, tier, best):
     """The tier's pair on the frontier: cheapest meeting the floor, then the tie rule."""
     if tier == "middle+":
         middle = front.index(frontier_pick(front, "middle", best))
         return front[min(middle + 1, len(front) - 1)]
-    meeting = [c for c in front if c["score"] >= FLOORS[tier] * best]
+    meeting = meets_floor(front, tier, best)
     if not meeting:
         return max(front, key=lambda c: c["score"])
     return prefer_cheaper(cheapest(meeting), front)
@@ -521,15 +536,42 @@ def route_main(args):
     if not allowed:
         print("no selectable pair within the premium budget", file=sys.stderr)
         return 4
-    front = frontier(allowed)
-    pick = frontier_pick(front, tier, best)
+    # A review runs on top as is: the stage's scores do not shape it.
+    scores = {m: 1 for m in "JFRCKPVS"} | {"K": 0} if options.review else options.scores
+    mechanical = tier != "small" and all(scores[m] == 0 for m in "JPV")
+    long_wide = any(scores[m] == 2 for m in "SRF")
+    cap = "medium" if mechanical else "high" if long_wide else None
+    capped = [c for c in allowed if not effort_denial(c["effort"], cap)]
+    if not capped:
+        print(f"no selectable pair at {cap} thinking or below", file=sys.stderr)
+        return 4
+    front = frontier(capped)
+    base = frontier_pick(front, tier, best)
+    meeting = meets_floor(front, tier, best)
+    risky = front[min(front.index(base) + 1, len(front) - 1)] if scores["K"] >= 1 else base
+    # The current pick comes first so that ties keep it.
+    lighter = min([risky] + [c for c in meeting if c["cost"] <= PREFER_COST_RATIO * risky["cost"]],
+                  key=lambda c: (effort_rank(c["effort"]), -c["score"])) \
+        if scores["J"] == 2 or scores["C"] == 2 else risky
+    pick = max([lighter] + [c for c in meeting if c["score"] >= lighter["score"] - TIE_POINTS
+                            and c["cost"] <= PREFER_COST_RATIO * lighter["cost"]],
+               key=lambda c: c["speed"]) if long_wide else lighter
     index = front.index(pick)
     moved = max(0, min(len(front) - 1, index + options.up - options.down))
     choice = front[moved]
     row = choice["row"]
+    uncapped = frontier_pick(frontier(allowed), tier, best)
     why = [f"tier {tier}" + (f" ({tier_why})" if tier_why else ""),
            *([f"premium budget ${PREMIUM_BUDGET_USD} reached "
               f"(${options.premium_spent:g} spent): premium pairs left out"] if over_budget else []),
+           *([f"{'mechanical' if mechanical else 'long or wide'} stage: thinking capped at {cap}"]
+             if base is not uncapped else []),
+           *([f"risk K{scores['K']}: one frontier pair up from {base['label']}"]
+             if risky is not base else []),
+           *([f"J2 or C2: lower thinking within {PREFER_COST_RATIO}x the cost of {risky['label']}"]
+             if lighter is not risky else []),
+           *([f"S2, R2 or F2: faster close pair than {lighter['label']}"]
+             if pick is not lighter else []),
            *([f"--{'down' if options.down else 'up'} {options.down or options.up}: moved "
               f"{abs(moved - index)} frontier pairs from {pick['label']}"]
              if options.down or options.up else [])]

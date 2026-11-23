@@ -82,7 +82,6 @@ def test_route_frontier(offered):
     assert pair(route(offered, "J1F1R0C0K0P2V0S0")) == ("sol", "low")
 
 
-@pytest.mark.xfail(strict=True, reason="stage signals are built in 02.2")
 def test_route_stage_signals(offered, tmp_path):
     # Mechanical middle stage: terra high without the cap, sol low at medium or below.
     assert pair(route(offered, "J0F1R1C1K0P0V0S1")) == ("sol", "low")
@@ -112,3 +111,5 @@ def test_route_limits(offered):
     review = route(offered, "J1F1R0C0K0P0V0S0", "--review", "--premium-spent", "10")
     assert (pair(review), review["tier"], review["premium"], review["cap_usd"]) == (
         ("astra", "high"), "top", True, 10.0)
+    # a review ignores the stage's scores: no caps or preferences shape it
+    assert pair(route(offered, "J0F2R2C0K2P0V0S2", "--review")) == ("astra", "high")
