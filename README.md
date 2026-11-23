@@ -31,9 +31,12 @@ plugin's hooks encourage it further:
 - **SessionStart** tells the agent when to use each skill, and lists
   unfinished phase files in the repository (found by the "Implement with the
   implement-in-phases skill" line every phase file carries).
-- **UserPromptSubmit** adds a one-line reminder when a prompt mentions
-  planning, phases, migrating, rewriting, refactoring or implementing. It is
-  silent otherwise.
+- **UserPromptSubmit** adds a one-line reminder when a prompt asks to plan,
+  build or change something (planning, phases, migrating, rewriting,
+  refactoring, implementing, adding, building, creating, changing, updating,
+  extending, replacing, supporting, integrating, features). The skill's capped
+  estimate sends small changes back to direct work. It is silent otherwise,
+  for example on questions and plain fixes.
 
 The hooks are POSIX `sh` with only `git`, `grep`, `sed` and `awk`; no `jq`
 or other install is needed. Both skills can
