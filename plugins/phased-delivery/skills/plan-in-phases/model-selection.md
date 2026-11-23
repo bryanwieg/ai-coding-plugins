@@ -208,10 +208,10 @@ at the top of the script.
 
 - **Stage caps:** `cap_tokens` is 150000 for `small`, 400000 for `middle`
   and `middle+`, 1000000 for `top`. `cap_usd` is that many tokens at the
-  pair's input price, rounded to cents; `claude-build.sh` stops the build
-  there. Known limit, until a paid calibration run sets the caps: on the
-  committed profiles a `small` stage's `cap_usd` is $0.01 (150000 tokens at
-  Haiku's input price), likely below what one headless run costs.
+  pair's input price, rounded to cents, and never below $0.25
+  (`MIN_CAP_USD`): at the input price alone a `small` stage on Haiku would
+  get $0.01, below one headless run. `claude-build.sh` stops the build
+  there. A paid calibration run is still to set the caps.
 - **Budget stop:** a build that `claude-build.sh` stops at its cap (exit 8)
   is retried one step down the frontier (see "Adjust while working").
 - **Premium budget, $10 per phase:** the implementer keeps a

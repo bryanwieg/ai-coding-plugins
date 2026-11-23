@@ -195,9 +195,9 @@ Side observations:
 
 - **Calibrate routing (paid run, ask first):** the 2-point and 1.5x
   low-gain cutoffs, the 1.5x preference window, the routing table and the
-  stage caps are unmeasured. Known limit: on the current profiles a `small`
-  stage's cap is $0.01 (150k tokens at Haiku's input price), likely below
-  one headless run; a minimum cap is the likely fix.
+  stage caps are unmeasured. At the input price alone a `small` stage's
+  cap on Haiku was $0.01, below one headless run (about $0.02 estimated),
+  so every cap is at least `MIN_CAP_USD` ($0.25).
 - **Headless build checks (paid run, ask first):** whether
   `--max-budget-usd` stops subscription runs and reports `total_cost_usd`,
   and whether an `acceptEdits` builder can edit and run the project's

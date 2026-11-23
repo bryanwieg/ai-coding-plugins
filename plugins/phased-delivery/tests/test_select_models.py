@@ -90,6 +90,7 @@ def test_route_stage_signals(offered, tmp_path):
     assert pair(route(offered, "J0F1R1C0K0P0V0S0")) == ("luna", "xhigh")
     claude = route(AVAILABLE, "J0F1R1C0K0P0V0S0", profiles=build_profiles(tmp_path, REPORT))
     assert pair(claude) == ("haiku", "high")
+    assert claude["cap_usd"] == 0.25  # MIN_CAP_USD: at Haiku's input price it would be $0.01
     # F2 caps at high: small would be luna xhigh.
     assert pair(route(offered, "J0F2R0C0K0P0V0S0")) == ("terra", "low")
     # F2 prefers the faster close pair: top is astra high, sol high is faster.

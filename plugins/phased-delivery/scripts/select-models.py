@@ -87,6 +87,9 @@ PROFILES_FILE = "model-profiles.json"
 # Tokens a stage may spend, by tier; passed on as a dollar cap at the pair's
 # input price.
 CAP_TOKENS = {"small": 150000, "middle": 400000, "middle+": 400000, "top": 1000000}
+# No build's dollar cap is lower than this: at the input price alone a cheap
+# model's cap rounds to a cent, below what one headless run costs.
+MIN_CAP_USD = 0.25
 # Once a phase's premium spend reaches this many dollars, builds leave
 # premium pairs out.
 PREMIUM_BUDGET_USD = 10
@@ -594,7 +597,7 @@ def route_main(args):
     print(json.dumps({"model": choice["tool_model"], "effort": choice["effort"], "tier": tier,
                       "premium": row["premium"], "score": choice["score"],
                       "cap_tokens": cap_tokens,
-                      "cap_usd": round(cap_tokens * row["price_in"] / 1000000, 2),
+                      "cap_usd": max(MIN_CAP_USD, round(cap_tokens * row["price_in"] / 1000000, 2)),
                       "why": "; ".join(why)}))
     return 0
 
