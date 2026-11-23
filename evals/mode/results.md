@@ -124,3 +124,62 @@ grill-step now direct (2.0). structured-planning fell to quick (13.5): the workf
 ## 2026-11-23, quick plan re-score test ($0.58)
 
 plan-in-phases with the new wiring on the structured-planning request, forced to quick: estimate quick 10.5; the agent's own re-score of its form repeated it (quick 10.5), so the form re-score is not an independent check. Replaced by plan-mode.py rescore, computed from plan.json: quick 12.5 on the same plan (it found implement-in-phases as a reader of the edited template). The user agreed quick is right for that request as scoped (rendered layout unchanged); the case's truth now labels the workflow change internal (10.5, quick).
+
+## 2026-11-23, final run (all 19 on the committed version, $2.51): 17 of 19
+
+```
+gitignore            est direct    0.5  truth direct      1  read 0  searches 0  $0.08
+                      root .gitignore for caches: 0.5x1x1
+test-exit-codes      est direct    1.5  truth direct    0.5  read 3  searches 0  $0.16
+                      codex-build.sh exit-code test with captured fixture: 0.5x1x1
+sandbox-env          est direct    3.0  truth direct    3.0  read 1  searches 1  $0.13
+                      CODEX_BUILD_SANDBOX env var for codex-build.sh: 2x1x1.5
+hook-trust           est direct      1  truth direct      1  read 1  searches 1  $0.11
+                      pass hook-trust bypass in danger-full-access: 1x1x1
+grill-step           est direct      4  truth direct      2  read 1  searches 1  $0.11
+                      grill interview step in skill: 1x2x1
+                      planner pushes back once: 1x1x1
+grill-collab         est direct      1  truth direct      1  read 1  searches 1  $0.10
+                      rewrite grill concerns paragraph as discussion: 1x1x1
+claude-usage         est direct    1.0  truth direct    1.0  read 2  searches 0  $0.13
+                      claude-usage script with tests: 0.5x2x1
+codex-reset          est direct      1  truth direct      1  read 1  searches 1  $0.10
+                      skip windows whose resets_at has passed: 1x1x1
+codex-off            est quick     7.0  truth direct    3.0  read 2  searches 1  $0.12
+                      report Codex off or signed out: 2x2x1.5
+exit-codes           est quick       6  truth quick       8  read 1  searches 1  $0.15
+                      codex-build.sh exits 7 on quota, 6 when unusable: 2x1x2
+                      callers fall back on exit 6/7: 1x1x1
+outcome-tests        est quick       6  truth quick       6  read 1  searches 2  $0.17
+                      grill outcomes and test rules in planning: 1x2x1
+                      phase file gains Outcome tests section: 2x1x1
+                      reviewers check outcome tests: 1x1x1
+                      implementation turns expected-fail tests on: 1x1x1
+split-skill          est quick       5  truth quick       6  read 1  searches 1  $0.13
+                      move sections verbatim into step files: 1x5x1
+structured-planning  est full     21.5  truth quick    10.5  read 2  searches 1  $0.18
+                      plan JSON schema and check/render script: 0.5x5x1
+                      plan-in-phases writes plan.json and renders phase files: 2x2x3
+                      plan review reports closed finding types: 2x2x1.5
+quota-failover       est full     24.0  truth full     39.5  read 5  searches 2  $0.22
+                      Claude plan usage reader: 0.5x2x1
+                      Codex usage reports out-of-quota / unusable state: 2x2x1.5
+                      Route stages to the tool with room, failing over both ways: 3x2x2
+                      Codex-off switch honored by codex-build.sh: 2x1x2
+t1-min-small         est direct      4  truth direct      4  read 2  searches 2  $0.13
+                      --min-small option sets absolute small floor: 2x1x2
+t3-speed-col         est direct      4  truth direct      4  read 2  searches 2  $0.13
+                      Speed column in rendered tier table: 2x1x2
+t4-rename            est direct      2  truth direct      4  read 1  searches 1  $0.10
+                      rename reviewer directions file and its link: 2x1x1
+t5-keywords          est direct      1  truth direct      1  read 2  searches 0  $0.12
+                      add keywords to reminder regex: 1x1x1
+p2-thinking          est direct      2  truth direct      1  read 1  searches 1  $0.13
+                      normalize_effort strips trailing thinking, with tests: 1x1x1
+                      guide notes the normalization: 1x1x1
+
+modes matching truth: 17; cost $2.51
+
+```
+
+Both misses err upward, by one mode. codex-off: lines guessed 30-150 for 14 (every run). structured-planning: listed the skill's name 'plan-in-phases' as the thing added to (reach 10+), despite the rule that the container counts only when its users must handle the addition; it has scored 15.5, 24.5, 13.5 and 21.5 across runs. No change is reached by the estimate making a quick or full change direct.
