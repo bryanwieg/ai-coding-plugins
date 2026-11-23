@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: in progress (stages done: all; review pending)
+Status: built 2f08ab4
 Before: The selector reads `model-report.json`, refuses it when older than 7 days, and is rerun before every phase. A workflow fetches the Artificial Analysis data daily and commits it when anything changed, or every 3 days as a heartbeat.
 After: `model-profiles.json` sits in the plugin with one entry per model and thinking level, its derived properties and a fingerprint of the model list and prices. The selector reads it at any age, writes the fingerprint into models.md, and `select-models.py check models.md` says whether models.md is still current. The workflow runs weekly and commits only when the fingerprint changes.
 
@@ -180,3 +180,5 @@ Model basis: J1 F1 R0 C0 K1 P1 V1 S0 = 5 -> middle
 - Profiles record no context window. Reason: The fetched Artificial Analysis fields have none (fetch-model-report.py rows_from); add it if the data gains one.
 - `route` reads `models-available.json` and the plugin's profiles; `models.md` stays the per-tier summary and records the profiles fingerprint. Reason: Routing needs every offered pair, not only the four tier picks.
 - Profiles are built by a `profiles` subcommand of select-models.py, not a separate script. Reason: Building them needs the selector's `EFFORT_ORDER` and `normalize_effort`; one file keeps those in one place.
+- Phase review 2026-11-23 (opus high): ready, 4 should-fix, all fixed: `profiles` exits 2 on any failure so a crash never reads as unchanged (3e19fa1); an unreadable profiles file is no longer silently replaced; tests read frozen fixtures under tests/fixtures (3e19fa1, fe210a1); report header wording (2f08ab4).
+- models.md regenerated with the new selector: same tiers, now with the Profiles line `check` reads.
