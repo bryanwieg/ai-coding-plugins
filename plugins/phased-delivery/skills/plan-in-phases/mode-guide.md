@@ -57,7 +57,9 @@ The files you read in step 3, at most 5.
 Split the change into pieces that differ in kind: usually one to five.
 Code that existing code will call is two parts: the new code (`new`) and
 the edit that calls it (`internal` or `interface`). Tests go in the part
-they test.
+they test. Text or code moved without changing what it says or does is one
+`internal` part, however many lines and new files it takes; a section
+heading is not a name others use unless something links to it.
 - `title`: a few words.
 - `kind`, by what the part changes, not by its size:
   - `new`: code nothing existing calls or reads (a script, a page, a
@@ -101,10 +103,13 @@ large; `changes: ["login"]`, a word that matches every file about logging
 in.
 
 ### unresolved
-What the request needs that you could not locate in the 5 files: one line
-each ("where sessions are stored", "which module renders the header").
-Empty when you found every part. Anything here makes the mode at least
-quick; the quick plan reads further.
+A part of the change you could not place: you do not know which component
+or file it lands in, so you cannot tell its kind or reach. One line each
+("which component checks permissions", "which module renders the
+header"). Details the builder reads while working are not unresolved:
+which test file to extend, which API or fixture a script uses, how a state
+is detected. Empty when every part has its files. Anything here makes the
+mode at least quick; the quick plan reads further.
 
 ### open_questions
 Questions the code cannot answer and only the user, or code not yet

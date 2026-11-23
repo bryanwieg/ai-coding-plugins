@@ -11,10 +11,11 @@ keeps its TERMS.json, FORM.json, the score output and the stream. Opus,
 medium effort, plugins off, no Grep/Glob/Agent/web tools, a $1 cap and a
 5-minute timeout per case. `compare` prints, per case, the estimate's mode
 against the truth's, the files it opened, the shell commands it ran other
-than plan-mode.py (searches the guide forbids), and the cost.
+than plan-mode.py that search (the guide forbids it), and the cost.
 """
 
 import json
+import re
 import os
 import subprocess
 import sys
@@ -54,21 +55,35 @@ def run(case):
                        cwd=repo, stdout=out, stderr=subprocess.DEVNULL)
 
 
+SEARCH = re.compile(r"\b(grep|rg|find|ls|git (grep|log|show))\b")
+READ = re.compile(r"\b(?:cat|head|tail|sed -n [^ ]+|less|wc)\s+((?:[^;|&>]+))")
+
+
 def calls(d):
-    reads, shell, cost = [], [], None
-    for line in open(os.path.join(d, "stream.jsonl")):
-        e = json.loads(line)
-        if e.get("type") == "assistant":
-            for c in e["message"]["content"]:
-                if c.get("type") != "tool_use":
-                    continue
-                if c["name"] == "Read":
-                    reads.append(os.path.relpath(c["input"]["file_path"], os.path.join(d, "repo")))
-                elif c["name"] == "Bash" and "plan-mode.py" not in c["input"]["command"]:
-                    shell.append(c["input"]["command"][:80])
+    """Files the model read in the repository, searches it ran itself, and the cost."""
+    repo = os.path.join(d, "repo")
+    reads, searches, cost = set(), [], None
+    with open(os.path.join(d, "stream.jsonl")) as fh:
+        events = [json.loads(line) for line in fh]
+    for e in events:
         if e.get("type") == "result":
             cost = e.get("total_cost_usd")
-    return [r for r in reads if not r.startswith("..")], shell, cost
+        if e.get("type") != "assistant":
+            continue
+        for c in e["message"]["content"]:
+            if c.get("type") != "tool_use":
+                continue
+            if c["name"] == "Read":
+                reads.add(os.path.relpath(c["input"]["file_path"], repo))
+            elif c["name"] == "Bash":
+                cmd = c["input"]["command"]
+                if "plan-mode.py" in cmd or "<<" in cmd or ROOT in cmd:  # the script, its forms, the guide
+                    continue
+                if SEARCH.search(cmd.replace(ROOT, "")):
+                    searches.append(cmd[:100])
+                for m in READ.finditer(cmd):
+                    reads |= {a for a in m.group(1).split() if not a.startswith(("-", "/", "2"))}
+    return sorted(r for r in reads if not r.startswith("..")), searches, cost
 
 
 def compare():
@@ -89,9 +104,9 @@ def compare():
         t = truth[case["id"]]["summary"]
         hits += s["mode"] == t["mode"]
         print(f"{case['id']:20} est {str(s['mode']):7}{str(s['total']):>6}  truth {t['mode']:7}{t['total']:>6}"
-              f"  read {len(reads)}  shell {len(shell)}  ${cost or 0:.2f}"
+              f"  read {len(reads)}  searches {len(shell)}  ${cost or 0:.2f}"
               + "".join(f"\n{'':22}{x['title']}: {x['weight']}x{x['size']}x{x['reach']}" for x in s["parts"])
-              + "".join(f"\n{'':22}SHELL {c}" for c in shell))
+              + "".join(f"\n{'':22}SEARCH {c}" for c in shell))
     print(f"\nmodes matching truth: {hits}; cost ${total:.2f}")
 
 
