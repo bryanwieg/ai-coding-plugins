@@ -1,0 +1,21 @@
+{
+  "type": "object", "additionalProperties": false,
+  "required": ["request", "parts", "open_questions"],
+  "properties": {
+    "request": {"type": "string"},
+    "parts": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false,
+      "required": ["title", "kind", "files", "lines", "reach", "search", "trust_boundary"],
+      "properties": {
+        "title": {"type": "string"},
+        "kind": {"enum": ["new", "internal", "interface", "architecture", "data"]},
+        "files": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false,
+          "required": ["path", "action"],
+          "properties": {"path": {"type": "string"}, "action": {"enum": ["create", "edit", "delete"]}}}},
+        "lines": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "reach": {"type": "array", "items": {"type": "string"}},
+        "search": {"type": "string"},
+        "existing_data": {"type": "boolean"},
+        "trust_boundary": {"type": "boolean"}}}},
+    "open_questions": {"type": "array", "items": {"type": "string"}}
+  }
+}

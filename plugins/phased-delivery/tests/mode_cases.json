@@ -1,0 +1,470 @@
+[
+ {
+  "request": "Fix a typo in the README",
+  "expected": "direct",
+  "form": {
+   "request": "Fix a typo in the README",
+   "parts": [
+    {
+     "title": "readme typo",
+     "kind": "internal",
+     "files": [
+      {
+       "path": "x/readme_typo.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 1,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Add a 300-line standalone report script",
+  "expected": "direct",
+  "form": {
+   "request": "Add a 300-line standalone report script",
+   "parts": [
+    {
+     "title": "report script",
+     "kind": "new",
+     "files": [
+      {
+       "path": "x/report_script.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 300,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Fix an off-by-one in one function (60 lines)",
+  "expected": "direct",
+  "form": {
+   "request": "Fix an off-by-one in one function (60 lines)",
+   "parts": [
+    {
+     "title": "date range fix",
+     "kind": "internal",
+     "files": [
+      {
+       "path": "x/date_range_fix.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 60,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Add a --json option to an existing CLI used in 2 docs",
+  "expected": "direct",
+  "form": {
+   "request": "Add a --json option to an existing CLI used in 2 docs",
+   "parts": [
+    {
+     "title": "json option",
+     "kind": "interface",
+     "files": [
+      {
+       "path": "x/json_option.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 20,
+     "reach": [
+      "r/json_option0.py",
+      "r/json_option1.py"
+     ],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Swap which storage class is wired in, one line, nothing else refers to it",
+  "expected": "direct",
+  "form": {
+   "request": "Swap which storage class is wired in, one line, nothing else refers to it",
+   "parts": [
+    {
+     "title": "storage swap",
+     "kind": "architecture",
+     "files": [
+      {
+       "path": "x/storage_swap.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 1,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Rewrite a module's internals, 400 lines, same interface",
+  "expected": "direct",
+  "form": {
+   "request": "Rewrite a module's internals, 400 lines, same interface",
+   "parts": [
+    {
+     "title": "parser rewrite",
+     "kind": "internal",
+     "files": [
+      {
+       "path": "x/parser_rewrite.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 400,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Rename a config key used in 4 files",
+  "expected": "quick",
+  "form": {
+   "request": "Rename a config key used in 4 files",
+   "parts": [
+    {
+     "title": "rename key",
+     "kind": "interface",
+     "files": [
+      {
+       "path": "x/rename_key.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 10,
+     "reach": [
+      "r/rename_key0.py",
+      "r/rename_key1.py",
+      "r/rename_key2.py",
+      "r/rename_key3.py"
+     ],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "One-line architecture change touching 6 call sites",
+  "expected": "quick",
+  "form": {
+   "request": "One-line architecture change touching 6 call sites",
+   "parts": [
+    {
+     "title": "inject clock",
+     "kind": "architecture",
+     "files": [
+      {
+       "path": "x/inject_clock.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 1,
+     "reach": [
+      "r/inject_clock0.py",
+      "r/inject_clock1.py",
+      "r/inject_clock2.py",
+      "r/inject_clock3.py",
+      "r/inject_clock4.py",
+      "r/inject_clock5.py"
+     ],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Validate uploaded file names (40 lines)",
+  "expected": "quick",
+  "form": {
+   "request": "Validate uploaded file names (40 lines)",
+   "parts": [
+    {
+     "title": "upload check",
+     "kind": "internal",
+     "files": [
+      {
+       "path": "x/upload_check.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 40,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": true
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "New page with a new route, registered in the router",
+  "expected": "quick",
+  "form": {
+   "request": "New page with a new route, registered in the router",
+   "parts": [
+    {
+     "title": "route",
+     "kind": "new",
+     "files": [
+      {
+       "path": "x/route.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 80,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": false
+    },
+    {
+     "title": "page",
+     "kind": "new",
+     "files": [
+      {
+       "path": "x/page.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 120,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": false
+    },
+    {
+     "title": "router entry",
+     "kind": "interface",
+     "files": [
+      {
+       "path": "x/router_entry.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 5,
+     "reach": [
+      "r/router_entry0.py",
+      "r/router_entry1.py"
+     ],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Plumb a new option through config, service and view",
+  "expected": "quick",
+  "form": {
+   "request": "Plumb a new option through config, service and view",
+   "parts": [
+    {
+     "title": "option plumbing",
+     "kind": "interface",
+     "files": [
+      {
+       "path": "x/option_plumbing.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 60,
+     "reach": [
+      "r/option_plumbing0.py",
+      "r/option_plumbing1.py",
+      "r/option_plumbing2.py"
+     ],
+     "search": "grep",
+     "trust_boundary": false
+    },
+    {
+     "title": "use option",
+     "kind": "internal",
+     "files": [
+      {
+       "path": "x/use_option.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 20,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "300-line architecture change touching 6 places",
+  "expected": "full",
+  "form": {
+   "request": "300-line architecture change touching 6 places",
+   "parts": [
+    {
+     "title": "move auth to middleware",
+     "kind": "architecture",
+     "files": [
+      {
+       "path": "x/move_auth_to_middleware.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 300,
+     "reach": [
+      "r/move_auth_to_middleware0.py",
+      "r/move_auth_to_middleware1.py",
+      "r/move_auth_to_middleware2.py",
+      "r/move_auth_to_middleware3.py",
+      "r/move_auth_to_middleware4.py",
+      "r/move_auth_to_middleware5.py"
+     ],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Change the on-disk cache format; old caches exist",
+  "expected": "full",
+  "form": {
+   "request": "Change the on-disk cache format; old caches exist",
+   "parts": [
+    {
+     "title": "cache format",
+     "kind": "data",
+     "files": [
+      {
+       "path": "x/cache_format.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 40,
+     "reach": [
+      "r/cache_format0.py"
+     ],
+     "search": "grep",
+     "trust_boundary": false,
+     "existing_data": true
+    }
+   ],
+   "open_questions": []
+  }
+ },
+ {
+  "request": "Login and roles for a web app (Fava auth task)",
+  "expected": "full",
+  "form": {
+   "request": "Login and roles for a web app (Fava auth task)",
+   "parts": [
+    {
+     "title": "auth module",
+     "kind": "new",
+     "files": [
+      {
+       "path": "x/auth_module.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 200,
+     "reach": [],
+     "search": "grep",
+     "trust_boundary": false
+    },
+    {
+     "title": "request gate",
+     "kind": "architecture",
+     "files": [
+      {
+       "path": "x/request_gate.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 120,
+     "reach": [
+      "r/request_gate0.py",
+      "r/request_gate1.py",
+      "r/request_gate2.py",
+      "r/request_gate3.py",
+      "r/request_gate4.py",
+      "r/request_gate5.py"
+     ],
+     "search": "grep",
+     "trust_boundary": true
+    },
+    {
+     "title": "frontend login handling",
+     "kind": "interface",
+     "files": [
+      {
+       "path": "x/frontend_login_handling.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 100,
+     "reach": [
+      "r/frontend_login_handling0.py",
+      "r/frontend_login_handling1.py",
+      "r/frontend_login_handling2.py",
+      "r/frontend_login_handling3.py",
+      "r/frontend_login_handling4.py"
+     ],
+     "search": "grep",
+     "trust_boundary": false
+    },
+    {
+     "title": "cli option",
+     "kind": "interface",
+     "files": [
+      {
+       "path": "x/cli_option.py",
+       "action": "edit"
+      }
+     ],
+     "lines": 20,
+     "reach": [
+      "r/cli_option0.py",
+      "r/cli_option1.py"
+     ],
+     "search": "grep",
+     "trust_boundary": false
+    }
+   ],
+   "open_questions": []
+  }
+ }
+]
