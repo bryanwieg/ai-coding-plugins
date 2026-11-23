@@ -69,6 +69,20 @@ the first report. When the report is missing or more than 7 days old, or
 Python is unavailable, the skills fall back to the tools' own model
 descriptions. Both scripts use only the Python standard library.
 
+### Plan checks
+
+plan-in-phases writes the plan as JSON in a `.plan/` folder while planning:
+`plan.json` (outcomes, cross-phase decisions, a contract registry, outcome
+tests, phases and stages) and one `NN.json` per phase. Field guides in the
+skill say what goes in each field, down to the interface level and no
+further. `plugins/phased-delivery/scripts/plan-check.py` checks what needs no
+judgment (each contract listed by its provider and users, build order, files,
+outcome coverage, tiers, spec and design quotes, code citations, no code in
+briefs) and renders the `NN-name.md` phase files, which are the plan once it
+is reported. The plan reviewer reports only a closed list of finding types.
+It uses only the Python standard library; without Python, the planner writes
+the phase files directly and checks by reading.
+
 Some tools, Codex among them, let subagents use a different model only when the
 user asks. To allow it, add to the project's `AGENTS.md` or `CLAUDE.md`:
 

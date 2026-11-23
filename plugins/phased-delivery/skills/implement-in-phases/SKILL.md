@@ -35,8 +35,9 @@ and briefs so each stage is correct for the repository as it is, and record each
 adjustment in the phase's Notes. Check each open assumption in the phase's
 Assumptions section against the code now: mark it verified with where it was
 checked, or, if it is wrong, revise the plan through plan-in-phases' revision
-rules before building. For a small plan, also confirm its Size criteria still
-hold; if not, the plan must become a full plan first. Planning-level changes
+rules ([revising.md](../plan-in-phases/revising.md)) before building. For a
+small plan, also confirm its Size criteria still hold; if not, the plan must
+become a full plan first. Planning-level changes
 inside the approved design need no approval. A change to the specification or design, or work the
 design lacks, goes to the user first.
 
@@ -132,7 +133,8 @@ finding.
 
 The review may remove, simplify or fix deviations. Anything it wants to add
 goes in the report as a question. Problems the plan does not cover go back
-through plan-in-phases' revision rules before any code changes.
+through plan-in-phases' revision rules
+([revising.md](../plan-in-phases/revising.md)) before any code changes.
 
 ### 4. Commit and stop
 
