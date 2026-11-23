@@ -37,11 +37,11 @@ MODES = ["direct", "quick", "full"]
 
 
 def size(lines):
-    return 1 if lines < 30 else 2 if lines <= 150 else 3
+    return 1 if lines < 30 else 2 if lines <= 150 else 5
 
 
 def reach(n):
-    return 1 if n == 0 else 2 if n <= 3 else 3
+    return 1 if n == 0 else 1.5 if n <= 3 else 2 if n <= 9 else 3
 
 
 def place(entry):
@@ -60,9 +60,6 @@ def score(form):
         if p["kind"] == "data" and p.get("existing_data"):
             floor = 2
             reasons.append(f"{p['title']}: changes data that already exists -> full")
-        if p.get("trust_boundary") and floor < 1:
-            floor = 1
-            reasons.append(f"{p['title']}: trust boundary -> at least quick")
     total = sum(r["score"] for r in rows) + len(form["open_questions"])
     mode = 0 if total <= DIRECT_MAX else 1 if total <= QUICK_MAX else 2
     return MODES[max(mode, floor)], total, rows, reasons

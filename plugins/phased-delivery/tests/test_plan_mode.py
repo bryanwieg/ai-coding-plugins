@@ -32,7 +32,7 @@ def run(tmp_path, form):
 
 def form(**part):
     p = {"title": "login", "kind": "interface", "files": [{"path": "app/views.py", "action": "edit"}],
-         "lines": 10, "reach": ["docs.md:1"], "search": "grep -rn login", "trust_boundary": False}
+         "lines": 10, "reach": ["docs.md:1"], "search": "grep -rn login"}
     p.update(part)
     return {"request": "r", "parts": [p], "open_questions": []}
 
@@ -40,12 +40,12 @@ def form(**part):
 def test_clean_form_scores(tmp_path):
     code, rows, s = run(tmp_path, form())
     assert code == 0 and rows == []
-    assert s["mode"] == "direct" and s["total"] == 4 and s["parts"][0]["reach"] == 2
+    assert s["mode"] == "direct" and s["total"] == 3 and s["parts"][0]["reach"] == 1.5
 
 
 def test_open_questions_add(tmp_path):
     f = form()
-    f["open_questions"] = ["which roles?"]
+    f["open_questions"] = ["which roles?", "keep the old key?"]
     assert run(tmp_path, f)[2]["mode"] == "quick"
 
 

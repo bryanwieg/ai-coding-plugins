@@ -16,8 +16,7 @@
      ],
      "lines": 1,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -40,8 +39,7 @@
      ],
      "lines": 300,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -64,8 +62,7 @@
      ],
      "lines": 60,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -91,8 +88,7 @@
       "r/json_option0.py",
       "r/json_option1.py"
      ],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -115,8 +111,7 @@
      ],
      "lines": 1,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -124,7 +119,7 @@
  },
  {
   "request": "Rewrite a module's internals, 400 lines, same interface",
-  "expected": "direct",
+  "expected": "quick",
   "form": {
    "request": "Rewrite a module's internals, 400 lines, same interface",
    "parts": [
@@ -139,8 +134,7 @@
      ],
      "lines": 400,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -148,7 +142,7 @@
  },
  {
   "request": "Rename a config key used in 4 files",
-  "expected": "quick",
+  "expected": "direct",
   "form": {
    "request": "Rename a config key used in 4 files",
    "parts": [
@@ -168,8 +162,7 @@
       "r/rename_key2.py",
       "r/rename_key3.py"
      ],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -199,8 +192,7 @@
       "r/inject_clock4.py",
       "r/inject_clock5.py"
      ],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -208,7 +200,7 @@
  },
  {
   "request": "Validate uploaded file names (40 lines)",
-  "expected": "quick",
+  "expected": "direct",
   "form": {
    "request": "Validate uploaded file names (40 lines)",
    "parts": [
@@ -223,8 +215,7 @@
      ],
      "lines": 40,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": true
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -247,8 +238,7 @@
      ],
      "lines": 80,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     },
     {
      "title": "page",
@@ -261,8 +251,7 @@
      ],
      "lines": 120,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     },
     {
      "title": "router entry",
@@ -278,8 +267,7 @@
       "r/router_entry0.py",
       "r/router_entry1.py"
      ],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -306,8 +294,7 @@
       "r/option_plumbing1.py",
       "r/option_plumbing2.py"
      ],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     },
     {
      "title": "use option",
@@ -320,8 +307,7 @@
      ],
      "lines": 20,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -351,8 +337,7 @@
       "r/move_auth_to_middleware4.py",
       "r/move_auth_to_middleware5.py"
      ],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
@@ -378,7 +363,6 @@
       "r/cache_format0.py"
      ],
      "search": "grep",
-     "trust_boundary": false,
      "existing_data": true
     }
    ],
@@ -402,8 +386,7 @@
      ],
      "lines": 200,
      "reach": [],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     },
     {
      "title": "request gate",
@@ -423,8 +406,7 @@
       "r/request_gate4.py",
       "r/request_gate5.py"
      ],
-     "search": "grep",
-     "trust_boundary": true
+     "search": "grep"
     },
     {
      "title": "frontend login handling",
@@ -443,8 +425,7 @@
       "r/frontend_login_handling3.py",
       "r/frontend_login_handling4.py"
      ],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     },
     {
      "title": "cli option",
@@ -460,8 +441,7 @@
       "r/cli_option0.py",
       "r/cli_option1.py"
      ],
-     "search": "grep",
-     "trust_boundary": false
+     "search": "grep"
     }
    ],
    "open_questions": []
