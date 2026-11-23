@@ -109,6 +109,34 @@ def test_route_stage_signals(offered, tmp_path):
     assert pair(route(narrow, "J2F1R0C0K1P0V0S0")) == ("nova", "medium")
 
 
+def edited_profiles(tmp_path, changes):
+    """The fixture profiles with some fields changed, keyed by (model, effort)."""
+    data = json.loads(PROFILES.read_text())
+    for row in data["pairs"] if "pairs" in data else data["profiles"]:
+        row.update(changes.get((row["model"], row["effort"]), {}))
+    path = tmp_path / "edited-profiles.json"
+    path.write_text(json.dumps(data))
+    return path
+
+
+def test_route_premium_below_top(offered, tmp_path):
+    # Two steps up from the middle+ pick, sol low, reach astra high (premium,
+    # 58.5 for 300); the standard route reaches sol high (58.6 for 320), which
+    # scores more, so astra is left out below top.
+    up = route(offered, "J1F1R0C0K0P2V0S0", "--up", "2")
+    assert pair(up) == ("sol", "high") and not up["premium"] and "below top" in up["why"]
+    # A premium pair scoring at least as well for less is kept.
+    better = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"intelligence": 59}})
+    kept = route(offered, "J1F1R0C0K0P2V0S0", "--up", "2", profiles=better)
+    assert pair(kept) == ("astra", "high") and kept["premium"]
+
+
+def test_route_speed_gain(offered, tmp_path):
+    # sol high at 45 is only 1.125x astra high's 40: under SPEED_GAIN, so F2 keeps astra.
+    slow = edited_profiles(tmp_path, {("GPT-9 Sol", "high"): {"speed": 45}})
+    assert pair(route(offered, "J1F2R1C1K0P2V2S0", profiles=slow)) == ("astra", "high")
+
+
 def test_route_limits(offered):
     # One step below terra high: luna max is beaten by terra low, terra medium is low gain.
     down = route(offered, "J1F1R0C0K0P0V0S0", "--down", "1")

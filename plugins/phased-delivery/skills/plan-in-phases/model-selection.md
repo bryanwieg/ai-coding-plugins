@@ -196,12 +196,13 @@ What `route` does, in this order:
 | Long or wide (S, R or F = 2) | Thinking at `high` or below. |
 | Risk (K of 1 or more) | One frontier pair up. |
 | Design or contract (J = 2 or C = 2) | Among pairs meeting the floor that score at least the pick and cost at most 1.5 times it, the lowest thinking level: a larger model at lower thinking. |
-| Long or wide (S, R or F = 2) | Among pairs meeting the floor within 3 points of the pick (with K of 1 or more, at least the risk step's score) and costing at most 1.5 times it, the fastest. |
+| Long or wide (S, R or F = 2) | Among pairs meeting the floor within 3 points of the pick (with K of 1 or more, at least the risk step's score) and costing at most 1.5 times it, the fastest, if at least 1.2 times the pick's speed (thinking levels of one model differ by a few percent). |
+| Premium below `top` | A premium pick below `top` is routed again without premium pairs; the premium pair stays only if it costs no more than that standard pick and scores at least as well. |
 | `--down N`, `--up N` | Move N frontier pairs cheaper or dearer from the pick, stopping at either end. N is 0 or more; not both at once. |
 | `--review` | `top`, ignoring premium spend and the stage's scores (no caps, risk step or preferences). |
 
 The constants (`LOW_GAIN_POINTS`, `LOW_GAIN_COST_RATIO`, `FLOORS`,
-`TIE_POINTS`, `PREMIUM_BUDGET_USD`, `PREFER_COST_RATIO`, `CAP_TOKENS`) are
+`TIE_POINTS`, `PREMIUM_BUDGET_USD`, `PREFER_COST_RATIO`, `SPEED_GAIN`, `CAP_TOKENS`) are
 at the top of the script.
 
 ### Limits

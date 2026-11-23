@@ -86,11 +86,30 @@ How it works now:
     below; `small` stages keep Haiku's higher levels, since capping them
     would move them to Sonnet medium at 5.6 times the cost;
   - long or wide stages (S2, R2, F2) run at `high` or below and take the
-    fastest pair within 3 points and 1.5 times the cost;
+    fastest pair within 3 points and 1.5 times the cost, if it is at least
+    1.2 times as fast (`SPEED_GAIN`);
   - design and contract stages (J2, C2) take a larger model at lower
     thinking within 1.5 times the cost (`PREFER_COST_RATIO`);
   - risk (K of 1 or more) moves one frontier pair up;
+  - below `top`, a premium pair is kept only if it costs no more than the
+    pick without premium pairs and scores at least as well (the user's rule:
+    Fable low may stand in for Opus when it is cheaper and as good);
   - reviews (`--review`) run on `top` and ignore the stage's scores.
+- **Rule sweep, 2026-11-23** (free: all 6,561 score combinations through
+  `route` on the live profiles):
+  - Before the premium gate, Fable was picked for 98% of combinations,
+    `middle` included: by benchmark run cost Fable 5.2 low ($2,862) is
+    barely dearer than Opus 5.5 high ($2,716) and scores 53.9 to 51.8, and
+    the mechanical cap pushed `middle` from Opus high to Fable medium. With
+    the gate, every stage below `top` runs on Opus, Sonnet or Haiku.
+  - The speed preference switched Fable low to Fable medium over 108 vs
+    110 tokens a second, raising thinking on long stages; `SPEED_GAIN` 1.2
+    stops that.
+  - With Opus capped at `high` (CEILINGS) and premium gated, `middle+` and
+    the risk step on `middle` both land on Opus high, the same as
+    `middle`: on today's data they add nothing below `top`.
+  - The J2/C2 preference never fires: no pair scores at least Fable high
+    at a lower thinking level. It waits for a larger model.
 - **Limits:** a token cap per stage (150k `small`, 400k `middle` and
   `middle+`, 1M `top`) passed to `claude -p` as a dollar cap at the pair's
   input price, since `--max-budget-usd` is the hard stop it offers. A build

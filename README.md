@@ -89,7 +89,8 @@ up for risk. Claude stages and phase reviews are then built headless by
 a dollar cap: 150k tokens for `small`, 400k for `middle`, 1M for `top`, at
 the pair's input price. A stage stopped at its cap is retried one step down
 the frontier; one that fails its checks, one step up. Premium models
-(output price of $30 or more per million tokens) get $10 per phase; past
+(output price of $30 or more per million tokens) are used below `top` only
+when cheaper than the standard pick and as good, and get $10 per phase; past
 that, builds use none. Reviews always run on `top`, and their cost counts
 against that budget. The builder may edit files and runs only the commands
 your project's permission rules allow; set

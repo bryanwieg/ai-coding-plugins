@@ -96,6 +96,9 @@ PREMIUM_BUDGET_USD = 10
 # Design (J2, C2) and long or wide (S2, R2, F2) stages may take another
 # frontier pair costing at most this multiple of the pick.
 PREFER_COST_RATIO = 1.5
+# A long or wide stage takes a faster pair only at this multiple of the pick's
+# speed: thinking levels of one model differ by a few percent, which is noise.
+SPEED_GAIN = 1.2
 SCORES_FORM = "J F R C K P V S in that order, each followed by 0, 1 or 2, such as J1F1R0C0K0P0V0S0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -520,6 +523,51 @@ def steps_count(text):
     return value
 
 
+def pick_pair(allowed, tier, best, scores, signals, up, down):
+    """Route one stage within the allowed pairs: (choice, reasons), or (None, error)."""
+    why = []
+    mechanical = signals and tier != "small" and all(scores[m] == 0 for m in "JPV")
+    long_wide = signals and any(scores[m] == 2 for m in "SRF")
+    cap = "medium" if mechanical else "high" if long_wide else None
+    capped = [c for c in allowed if not effort_denial(c["effort"], cap)]
+    if not capped:
+        return None, f"no selectable pair at {cap} thinking or below"
+    front = frontier(capped)
+    pick = frontier_pick(front, tier, best)
+    if cap and pick is not frontier_pick(frontier(allowed), tier, best):
+        why.append(f"{'mechanical' if mechanical else 'long or wide'} stage: thinking capped at {cap}")
+    meeting = meets_floor(front, tier, best)
+    if signals and scores["K"] >= 1:
+        stepped = front[min(front.index(pick) + 1, len(front) - 1)]
+        if stepped is not pick:
+            why.append(f"risk K{scores['K']}: one frontier pair up from {pick['label']}")
+        pick = stepped
+    # The preferences never go below this score, so they cannot undo the risk step.
+    least = pick["score"]
+    if signals and (scores["J"] == 2 or scores["C"] == 2):
+        lighter = min([pick] + [c for c in meeting if c["score"] >= least
+                                and c["cost"] <= PREFER_COST_RATIO * pick["cost"]],
+                      key=lambda c: (effort_rank(c["effort"]), -c["score"]))
+        if lighter is not pick:
+            why.append(f"J2 or C2: lower thinking within {PREFER_COST_RATIO}x the cost of {pick['label']}")
+        pick = lighter
+    if long_wide:
+        close = least if scores["K"] >= 1 else pick["score"] - TIE_POINTS
+        faster = max([pick] + [c for c in meeting if c["score"] >= close
+                               and c["cost"] <= PREFER_COST_RATIO * pick["cost"]
+                               and c["speed"] >= SPEED_GAIN * pick["speed"]],
+                     key=lambda c: c["speed"])
+        if faster is not pick:
+            why.append(f"S2, R2 or F2: faster close pair than {pick['label']}")
+        pick = faster
+    index = front.index(pick)
+    moved = max(0, min(len(front) - 1, index + up - down))
+    if down or up:
+        why.append(f"--{'down' if down else 'up'} {down or up}: moved "
+                   f"{abs(moved - index)} frontier pairs from {pick['label']}")
+    return front[moved], why
+
+
 def route_main(args):
     parser = argparse.ArgumentParser(prog="select-models.py route")
     parser.add_argument("available")
@@ -552,46 +600,20 @@ def route_main(args):
                    f"(${options.premium_spent:g} spent): premium pairs left out")
     scores = options.scores
     signals = not options.review  # a review runs on top as is: the stage's scores do not shape it
-    mechanical = signals and tier != "small" and all(scores[m] == 0 for m in "JPV")
-    long_wide = signals and any(scores[m] == 2 for m in "SRF")
-    cap = "medium" if mechanical else "high" if long_wide else None
-    capped = [c for c in allowed if not effort_denial(c["effort"], cap)]
-    if not capped:
-        print(f"no selectable pair at {cap} thinking or below", file=sys.stderr)
+    steps = (options.up, options.down)
+    choice, notes = pick_pair(allowed, tier, best, scores, signals, *steps)
+    if choice is None:
+        print(notes, file=sys.stderr)
         return 4
-    front = frontier(capped)
-    pick = frontier_pick(front, tier, best)
-    if cap and pick is not frontier_pick(frontier(allowed), tier, best):
-        why.append(f"{'mechanical' if mechanical else 'long or wide'} stage: thinking capped at {cap}")
-    meeting = meets_floor(front, tier, best)
-    if signals and scores["K"] >= 1:
-        stepped = front[min(front.index(pick) + 1, len(front) - 1)]
-        if stepped is not pick:
-            why.append(f"risk K{scores['K']}: one frontier pair up from {pick['label']}")
-        pick = stepped
-    # The preferences never go below this score, so they cannot undo the risk step.
-    least = pick["score"]
-    if signals and (scores["J"] == 2 or scores["C"] == 2):
-        lighter = min([pick] + [c for c in meeting if c["score"] >= least
-                                and c["cost"] <= PREFER_COST_RATIO * pick["cost"]],
-                      key=lambda c: (effort_rank(c["effort"]), -c["score"]))
-        if lighter is not pick:
-            why.append(f"J2 or C2: lower thinking within {PREFER_COST_RATIO}x the cost of {pick['label']}")
-        pick = lighter
-    if long_wide:
-        close = least if scores["K"] >= 1 else pick["score"] - TIE_POINTS
-        faster = max([pick] + [c for c in meeting if c["score"] >= close
-                               and c["cost"] <= PREFER_COST_RATIO * pick["cost"]],
-                     key=lambda c: c["speed"])
-        if faster is not pick:
-            why.append(f"S2, R2 or F2: faster close pair than {pick['label']}")
-        pick = faster
-    index = front.index(pick)
-    moved = max(0, min(len(front) - 1, index + options.up - options.down))
-    if options.down or options.up:
-        why.append(f"--{'down' if options.down else 'up'} {options.down or options.up}: moved "
-                   f"{abs(moved - index)} frontier pairs from {pick['label']}")
-    choice = front[moved]
+    standard = [c for c in allowed if not c["row"]["premium"]]
+    if tier != "top" and choice["row"]["premium"] and standard:
+        # Below top a premium pair must beat the standard pick on cost and score.
+        other, other_notes = pick_pair(standard, tier, best, scores, signals, *steps)
+        if other is not None and (choice["cost"] > other["cost"] or choice["score"] < other["score"]):
+            notes = other_notes + [f"premium {choice['label']} left out below top: "
+                                   f"{other['label']} costs less or scores at least as well"]
+            choice = other
+    why += notes
     row = choice["row"]
     cap_tokens = CAP_TOKENS[tier]
     print(json.dumps({"model": choice["tool_model"], "effort": choice["effort"], "tier": tier,

@@ -33,8 +33,10 @@ the tier alone. Rules, from the research on thinking levels:
 - Design and shared-contract stages (J2, C2) move up the model before the
   thinking level.
 - Long or wide stages (S2, R2, F2) run at high thinking or below, and
-  prefer the faster model when scores are close.
+  prefer a clearly faster model (1.2 times the speed) when scores are close.
 - Risk (K of 1 or more) raises the score floor.
+- Below the top tier a premium pair is used only when it costs no more
+  than the standard pick and scores at least as well (added 2026-11-23).
 - Small models may use higher thinking levels, within their ceilings.
 
 Tiers stay in plans as a summary, so a plan still moves between tools.
