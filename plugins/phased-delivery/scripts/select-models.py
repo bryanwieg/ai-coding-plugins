@@ -6,6 +6,9 @@ Usage:
                    [--out models.md] [--json models.json] [--today ignored]
   select-models.py check MODELS_MD [--profiles model-profiles.json]
   select-models.py profiles REPORT OUT_DIR
+  select-models.py route AVAILABLE.json --scores J1F1R0C0K0P0V0S0
+                   [--down N | --up N] [--premium-spent USD] [--review]
+                   [--profiles model-profiles.json]
 
 AVAILABLE.json is written by the planning agent from what the running tool
 offers now:
@@ -36,9 +39,19 @@ the selector); 3 profiles missing.
 writes it only when the fingerprint of the model list and prices changed.
 It prints the fingerprint and "changed" or "unchanged". Exit codes: 0
 written; 1 unchanged, nothing written; 2 bad or unreadable report.
+
+`route` prints one JSON line with the model and thinking level for a stage:
+{model, effort, tier, premium, score, cap_tokens, cap_usd, why}. It picks
+from the score/cost frontier of the offered pairs, leaving out low-gain
+thinking steps. --down and --up move N frontier pairs cheaper or dearer;
+--premium-spent at or above the phase budget leaves premium pairs out of
+builds; --review runs on top and ignores premium spend. Exit codes: 0
+printed; 2 bad input; 3 profiles missing; 4 no selectable pair.
 """
 
+import argparse
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -71,6 +84,13 @@ PREMIUM_PRICE_OUT = 30
 LOW_GAIN_POINTS = 2
 LOW_GAIN_COST_RATIO = 1.5
 PROFILES_FILE = "model-profiles.json"
+# Tokens a stage may spend, by tier; passed on as a dollar cap at the pair's
+# input price.
+CAP_TOKENS = {"small": 150000, "middle": 400000, "middle+": 400000, "top": 1000000}
+# Once a phase's premium spend reaches this many dollars, builds leave
+# premium pairs out.
+PREMIUM_BUDGET_USD = 10
+SCORES_FORM = "J F R C K P V S in that order, each followed by 0, 1 or 2, such as J1F1R0C0K0P0V0S0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_PROFILES = os.path.join(HERE, "..", PROFILES_FILE)
@@ -192,6 +212,37 @@ def build_candidates(available, profiles):
             reason = effort_denial(effort, ceiling) or "offered but not benchmarked"
             excluded.append((entry["id"], effort, reason))
     return candidates, excluded, matches
+
+
+def load_offered(available_path, profiles_path):
+    """(available, profiles, candidates, excluded, matches) after matching,
+    ceilings and the model lock. Exits 2 on a bad available file and 3 when
+    the profiles are missing."""
+    try:
+        with open(available_path) as source:
+            available = json.load(source)
+        if not isinstance(available, dict) or not available.get("models") \
+                or not available.get("tool"):
+            raise ValueError("needs 'tool' and a non-empty 'models' list")
+    except (OSError, ValueError) as error:
+        print(f"bad available file: {error}", file=sys.stderr)
+        raise SystemExit(2)
+    profiles = load_profiles(profiles_path)
+    if profiles is None:
+        raise SystemExit(3)
+    candidates, excluded, matches = build_candidates(available, profiles)
+    if not model_locked(available):
+        return available, profiles, candidates, excluded, matches
+    session = available.get("session_model")
+    if not session:
+        print("bad available file: subagents inherit the session model here, so"
+              " 'session_model' is required", file=sys.stderr)
+        raise SystemExit(2)
+    locked_out = [(c["tool_model"], c["effort"],
+                   "model choice not allowed: subagents inherit the session model")
+                  for c in candidates if c["tool_model"] != session]
+    return (available, profiles, [c for c in candidates if c["tool_model"] == session],
+            excluded + locked_out, matches)
 
 
 def score_and_cost(candidates):
@@ -411,34 +462,96 @@ def check_main(args):
     return 1
 
 
+def parse_scores(text):
+    if not re.fullmatch(r"J[012]F[012]R[012]C[012]K[012]P[012]V[012]S[012]", text):
+        raise argparse.ArgumentTypeError(f"expected {SCORES_FORM}, got {text!r}")
+    return {text[i]: int(text[i + 1]) for i in range(0, 16, 2)}
+
+
+def stage_tier(scores):
+    """plan-check.py's tier: (total, tier, why) with the model-selection overrides."""
+    spec = importlib.util.spec_from_file_location("plan_check", os.path.join(HERE, "plan-check.py"))
+    plan_check = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(plan_check)
+    return plan_check.tier(scores)
+
+
+def frontier(pool):
+    """Pairs no other pair beats on score and cost, cheapest first."""
+    def beaten(c):
+        return any(o["score"] >= c["score"] and o["cost"] <= c["cost"]
+                   and (o["score"], o["cost"]) != (c["score"], c["cost"]) for o in pool)
+    return sorted((c for c in pool if not beaten(c)), key=lambda c: (c["cost"], c["score"]))
+
+
+def frontier_pick(front, tier, best):
+    """The tier's pair on the frontier: cheapest meeting the floor, then the tie rule."""
+    if tier == "middle+":
+        middle = front.index(frontier_pick(front, "middle", best))
+        return front[min(middle + 1, len(front) - 1)]
+    meeting = [c for c in front if c["score"] >= FLOORS[tier] * best]
+    if not meeting:
+        return max(front, key=lambda c: c["score"])
+    return prefer_cheaper(cheapest(meeting), front)
+
+
+def route_main(args):
+    parser = argparse.ArgumentParser(prog="select-models.py route")
+    parser.add_argument("available")
+    parser.add_argument("--scores", required=True, type=parse_scores)
+    steps = parser.add_mutually_exclusive_group()
+    steps.add_argument("--down", type=int, default=0)
+    steps.add_argument("--up", type=int, default=0)
+    parser.add_argument("--premium-spent", type=float, default=0.0)
+    parser.add_argument("--review", action="store_true")
+    parser.add_argument("--profiles", default=DEFAULT_PROFILES)
+    options = parser.parse_args(args)
+    _, _, candidates, _, _ = load_offered(options.available, options.profiles)
+    usable = [c for c in candidates if not c["row"]["low_gain"]
+              and c["row"]["intelligence"] is not None and c["row"]["run_cost_usd"] is not None]
+    pool = score_and_cost(usable)[0]
+    if not pool:
+        print("no selectable pair", file=sys.stderr)
+        return 4
+    tier, tier_why = ("top", "phase reviews run on top") if options.review \
+        else stage_tier(options.scores)[1:]
+    best = max(c["score"] for c in pool)
+    over_budget = not options.review and options.premium_spent >= PREMIUM_BUDGET_USD
+    allowed = [c for c in pool if not c["row"]["premium"]] if over_budget else pool
+    if not allowed:
+        print("no selectable pair within the premium budget", file=sys.stderr)
+        return 4
+    front = frontier(allowed)
+    pick = frontier_pick(front, tier, best)
+    index = front.index(pick)
+    moved = max(0, min(len(front) - 1, index + options.up - options.down))
+    choice = front[moved]
+    row = choice["row"]
+    why = [f"tier {tier}" + (f" ({tier_why})" if tier_why else ""),
+           *([f"premium budget ${PREMIUM_BUDGET_USD} reached "
+              f"(${options.premium_spent:g} spent): premium pairs left out"] if over_budget else []),
+           *([f"--{'down' if options.down else 'up'} {options.down or options.up}: moved "
+              f"{abs(moved - index)} frontier pairs from {pick['label']}"]
+             if options.down or options.up else [])]
+    cap_tokens = CAP_TOKENS[tier]
+    print(json.dumps({"model": choice["tool_model"], "effort": choice["effort"], "tier": tier,
+                      "premium": row["premium"], "score": choice["score"],
+                      "cap_tokens": cap_tokens,
+                      "cap_usd": round(cap_tokens * row["price_in"] / 1000000, 2),
+                      "why": "; ".join(why)}))
+    return 0
+
+
 def main(argv):
+    if argv[1:2] == ["route"]:
+        return route_main(argv[2:])
     if argv[1:2] == ["profiles"]:
         return profiles_main(argv[2:])
     if argv[1:2] == ["check"]:
         return check_main(argv[2:])
     options = parse_args(argv)
-    try:
-        with open(options["available"]) as source:
-            available = json.load(source)
-        if not available.get("models") or not available.get("tool"):
-            raise ValueError("needs 'tool' and a non-empty 'models' list")
-    except (OSError, ValueError) as error:
-        print(f"bad available file: {error}", file=sys.stderr)
-        return 2
-    profiles = load_profiles(options["profiles"])
-    if profiles is None:
-        return 3
-    candidates, excluded, matches = build_candidates(available, profiles)
-    if model_locked(available):
-        session = available.get("session_model")
-        if not session:
-            print("bad available file: subagents inherit the session model here, so"
-                  " 'session_model' is required", file=sys.stderr)
-            return 2
-        excluded += [(c["tool_model"], c["effort"],
-                      "model choice not allowed: subagents inherit the session model")
-                     for c in candidates if c["tool_model"] != session]
-        candidates = [c for c in candidates if c["tool_model"] == session]
+    available, profiles, candidates, excluded, matches = load_offered(
+        options["available"], options["profiles"])
     scored, unscored, metric, cost_field = score_and_cost(candidates)
     excluded += unscored
     if not scored:
