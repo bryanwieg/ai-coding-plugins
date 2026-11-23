@@ -10,7 +10,8 @@
 # CLAUDE_BUILD_PERMISSIONS sets the permission mode (default acceptEdits:
 # file edits work and commands follow the project's allow rules). A session
 # already in a sandbox container sets it to bypassPermissions.
-# Prints "Tokens: N" (input, output, cache read and cache creation) and
+# Prints "Tokens: N" (input, output, cache read and cache creation, from
+# modelUsage, else usage) and
 # "Cost: X.XX" (USD), or unknown, for the stage commit.
 #
 # Exit: 0 built; 2 usage; 8 the budget was reached; other non-zero: the
@@ -45,9 +46,18 @@ for line in open(sys.argv[1]):
     if isinstance(event, dict) and event.get("type") == "result":
         result = event
 found = result or {}
+# modelUsage covers every model the run used and is filled even when a budget
+# stop leaves usage at zero; usage is the fallback.
+models = found.get("modelUsage")
 usage = found.get("usage")
-keys = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
-tokens = sum(usage.get(k) or 0 for k in keys) if isinstance(usage, dict) else "unknown"
+if isinstance(models, dict) and models:
+    keys = ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")
+    tokens = sum(m.get(k) or 0 for m in models.values() if isinstance(m, dict) for k in keys)
+elif isinstance(usage, dict):
+    keys = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+    tokens = sum(usage.get(k) or 0 for k in keys)
+else:
+    tokens = "unknown"
 cost = found.get("total_cost_usd")
 text = found.get("result")
 open(sys.argv[2], "w").write(text if isinstance(text, str) else "")

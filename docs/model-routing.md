@@ -198,10 +198,16 @@ Side observations:
   stage caps are unmeasured. At the input price alone a `small` stage's
   cap on Haiku was $0.01, below one headless run (about $0.02 estimated),
   so every cap is at least `MIN_CAP_USD` ($0.25).
-- **Headless build checks (paid run, ask first):** whether
-  `--max-budget-usd` stops subscription runs and reports `total_cost_usd`,
-  and whether an `acceptEdits` builder can edit and run the project's
-  allowed commands.
+- **Headless build checks: done 2026-11-23** (two Haiku-high runs on a
+  one-function stage, $0.006 together). On a subscription,
+  `total_cost_usd` is reported and `--max-budget-usd` stops the run: a
+  $0.001 cap stopped it after one turn at $0.002, exit 8, so a run can
+  overshoot its cap by one turn. The uncapped run cost $0.0043 for 112,771
+  tokens (98k of them cache reads) in 6 turns. Under `acceptEdits` the
+  builder edited files and ran read-only commands, but `python3 -m pytest`
+  was refused: a project must allow its test commands, or set
+  `CLAUDE_BUILD_PERMISSIONS=bypassPermissions` in a sandbox. A budget stop
+  reports zero `usage`; `claude-build.sh` counts tokens from `modelUsage`.
 
 - **More Codex evidence:** a few more probe runs and real phases before
   widening what goes to Codex; does a deeper stage (R = 1) work there?

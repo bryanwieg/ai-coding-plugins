@@ -12,7 +12,12 @@ USAGE = {"input_tokens": 100, "output_tokens": 5, "cache_read_input_tokens": 100
          "cache_creation_input_tokens": 20}
 BUILT = {"type": "result", "subtype": "success", "result": "Built it.", "usage": USAGE,
          "total_cost_usd": 0.1234}
-CAPPED = {"type": "result", "subtype": "error_max_budget_usd", "usage": USAGE, "total_cost_usd": 0.5}
+# A real budget stop (2026-11-23) reports zero usage and the counts under modelUsage.
+CAPPED = {"type": "result", "subtype": "error_max_budget_usd", "total_cost_usd": 0.5,
+          "usage": {k: 0 for k in USAGE},
+          "modelUsage": {"claude-haiku-5-5": {"inputTokens": 2, "outputTokens": 188,
+                                              "cacheReadInputTokens": 12427,
+                                              "cacheCreationInputTokens": 9070}}}
 
 
 def run(tmp_path, events, code=0, permissions=None):
@@ -39,7 +44,7 @@ def run(tmp_path, events, code=0, permissions=None):
     "events, status, code, message",
     [
         ([{"type": "system"}, BUILT], 0, 0, "Tokens: 1125\nCost: 0.12"),
-        ([CAPPED], 1, 8, "Budget of $2.5 reached"),
+        ([CAPPED], 1, 8, "Tokens: 21687"),
         ([{"type": "system"}], 0, 1, "claude failed"),
         ([], 3, 3, "Tokens: unknown\nCost: unknown"),
         # an error result is never "built", even when claude exits 0
