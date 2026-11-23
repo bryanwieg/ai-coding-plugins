@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: planned
+Status: in progress (stages done: 04.1)
 Before: codex-usage.py runs `codex login status` every time it is called, at the start of every phase. Codex found off stays off only until the session ends; the next session checks again from scratch.
 After: Codex availability is checked at most once a day. Once Codex is found off (not installed, not signed in, or a build showing it unusable), the result is cached for the day: codex-usage.py answers from the cache without running codex, and every session that day starts by telling the agent Codex is off and must not be considered. `codex-usage.py --recheck` checks again after the user fixes it.
 
@@ -24,7 +24,7 @@ Budget: python3 -m pytest -q plugins/phased-delivery/tests runs in under a minut
 
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
-| 04.1 | codex-usage.py caches an off result for the day and answers from it without running codex, with `--recheck` and `--record-off CAUSE`. | top | first | planned |
+| 04.1 | codex-usage.py caches an off result for the day and answers from it without running codex, with `--recheck` and `--record-off CAUSE`. | top | first | done |
 | 04.2 | The SessionStart hook checks Codex at most once a day through codex-usage.py and, when Codex is off, tells the agent not to consider it for the session. | middle | after 04.1 | planned |
 | 04.3 | The skills check Codex through the daily cache, record off with `--record-off`, and leave Codex out entirely while it is off. | middle+ | after 04.1 | planned |
 
@@ -115,8 +115,8 @@ Goal: The skills check Codex through the daily cache, record off with `--record-
 Context:
 - Builds on 04.1: codex-usage.py with `--recheck` and `--record-off`
 - Builds on 03.2: model-selection.md and implement-in-phases as switched to routing
-- `plugins/phased-delivery/skills/plan-in-phases/model-selection.md:195-208`: The availability table: causes, detection and actions.
-- `plugins/phased-delivery/skills/plan-in-phases/model-selection.md:226-236`: When to check, off means not loaded, and off lasting until the session ends.
+- `plugins/phased-delivery/skills/plan-in-phases/model-selection.md:304-320` (moved by 03.2): The availability table: causes, detection and actions.
+- `plugins/phased-delivery/skills/plan-in-phases/model-selection.md:331-350` (moved by 03.2): When to check, off means not loaded, and off lasting until the session ends.
 
 Contracts:
 - cli `codex-usage.py` (uses; 04.1): codex-usage.py [--max-window PCT] [--max-weekly PCT] [--recheck] [--record-off CAUSE]: exit 0 room, 1 over, 2 no data, 3 off (AI_CODEX=off, not installed, or cached off today), 4 not signed in (then cached off), 5 check timed out (off for this call, not cached)
@@ -158,3 +158,5 @@ Model basis: J1 F1 R1 C0 K0 P1 V2 S0 = 6 -> middle+ (override: middle with a mea
 - The thinking-level ceilings in `CEILINGS` stay; the low-gain rule and the stage caps apply within them. Reason: The ceilings were an earlier user decision and still hold.
 - Codex availability is cached per local day in `codex-availability.json` beside claude-usage.json; AI_CODEX=off is read every time and never cached. Reason: The user asked for a once-a-day check with Codex left out entirely while off; the switch is the user's and must take effect at once.
 - User's answer, departs from the design (Codex availability: "Not being signed in counts as off"): Not being signed in to Codex counts as off for the day: no sign-in prompt; the session-start line and the docs tell the user to sign in and run `codex-usage.py --recheck`. Reason: The user asked that Codex, when not available, be cached off and not considered for the rest of the day; signed out is not available.
+- Revised before building, 2026-11-23: 03.2 moved the availability text in model-selection.md (now lines 304-350, the routing note at 365); README.md:151 and docs/model-routing.md:124-127 also describe the per-session check and are in 04.3's files. Run tests with `--basetemp=/cache/...` (see 01's Notes); test_codex_usage.py's stub codex needs it.
+- 2026-11-23, 04.1: bad arguments now exit 2 (argparse); no caller passes any. The 5-second timeout (exit 5) was checked by hand with a sleeping stub, not by a test.
