@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: in progress (stages done: all; review pending)
+Status: built 63de83b
 Before: Claude stages are built by in-session subagents with no hard stop, and the skills map a stage to its tier's single pair from models.md, refreshed before every phase.
 After: Claude stages and reviews are built headless by `claude-build.sh`, each stopped at its dollar cap. implement-in-phases routes every dispatch through `select-models.py route`, reruns the selector only when `check` says models.md is out of date, drops one step after a capped-out build, tracks premium spend per phase, and keeps reviews on top. The docs describe the weekly, change-only refresh.
 
@@ -143,3 +143,4 @@ Model basis: J1 F2 R2 C1 K0 P1 V2 S0 = 9 -> top
 - Revised before building, 2026-11-23: phase 02 added that `route --review` ignores the stage's scores and that --down/--up must be 0 or more; 03.2's docs say so. The small-tier `cap_usd` is $0.01 on the committed profiles (see 02's Notes): 03.2's docs name it as a known limit for the calibration run. The paid checks in the Assumptions stay open: the user asked to approve paid runs, so they go to the PR's test plan. Run tests with `--basetemp=/cache/...` (see 01's Notes).
 - 2026-11-23, 03.1: the `--settings` value `{"enabledPlugins":{"phased-delivery@ai-coding-plugins":false}}` is the same key and plugin id the mode evals used to run with plugins off; an unreadable PROMPT exits 2.
 - 2026-11-23, 03.2: the docs settle five points the brief left open: route exit 3 or 4 falls back to models.md in session with no cap; `Cost: unknown` counts the run's cap_usd as spent; a review stopped at its cap is reported, not retried lower; `moved 0 frontier pairs` means revise the plan; --down and --up are netted.
+- Phase review 2026-11-23 (opus high): not ready, 1 blocking and 7 should-fix, all fixed by the orchestrator: the `moved 0` stop never fired after a clamped move (now: moved fewer than asked, or a pair already tried, goes back to planning; no netting of --down and --up); route exit 4 stops instead of falling back uncapped; Codex runs stay outside the premium budget; other claude-build.sh exits stop and report; an error result is never built (exit 1 or claude's status); stage-builder.md and phase-reviewer.md point at route; tests for permissions and flags.
