@@ -23,7 +23,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 context="The phased-delivery plugin is enabled.
-- Use the plan-in-phases skill to plan any multi-step change (a feature, migration, rewrite, or work touching several files, a shared contract or the architecture) before writing code. It decides from the code whether a small plan is enough; do not skip it because a change seems small or familiar.
+- Before a multi-step change (a feature, migration, rewrite, or work touching several files, a shared contract or the architecture), start the plan-in-phases skill. Its first step is a capped estimate (at most 5 files read) that picks direct work, a quick plan or a full plan; small changes go straight back to direct work.
 - Use the implement-in-phases skill to build any phased plan. Never build phase files without it."
 
 if [ -n "$unfinished" ]; then
@@ -32,6 +32,23 @@ if [ -n "$unfinished" ]; then
 Unfinished phased plans in this repository (phase file and status):
 ${unfinished}
 When the user wants this work continued, built or implemented, use implement-in-phases."
+fi
+
+# Codex availability, cached for the day by codex-usage.py; only exits 3 and 4 mean off.
+if command -v python3 >/dev/null 2>&1; then
+  codex_line=$(python3 "$(dirname "$0")/../scripts/codex-usage.py" 2>/dev/null)
+  case $? in
+    3|4)
+      if [ "$AI_CODEX" = off ]; then fix='Unset AI_CODEX to use it.'; else fix='Run codex-usage.py --recheck after fixing it.'; fi
+      context="${context}
+
+Codex is off today, so do not consider Codex this session: no Codex model files, usage checks or Codex builds and reviews. Cause: ${codex_line}
+${fix}" ;;
+    5)
+      context="${context}
+
+Codex check timed out at session start; the skills check again before using Codex." ;;
+  esac
 fi
 
 printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' \

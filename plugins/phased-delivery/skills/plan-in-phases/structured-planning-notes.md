@@ -118,3 +118,63 @@ one stage are now left to implementation, which reviews every diff.
 The skill's description said each phase is "split into stage briefs a fresh
 agent can build without further decisions"; it now says "without deciding
 anything other stages, code or the user see".
+
+## Replaced by the planning mode estimate (2026-11-23)
+
+The quick estimate in mode-guide.md and `scripts/plan-mode.py` replaced
+this section of SKILL.md, which made every plan full unless all seven
+criteria were shown and so chose full plans too often. Kept verbatim:
+
+## Size the plan from the code
+
+Every plan starts as a full plan. A plan may be small only after reading the
+code proves it, never because the change feels small or familiar. Measure
+first:
+
+1. List every file the change will create or edit, tests included.
+2. For every function, type, format or setting it changes, search for all
+   its users and list them. Do not reason about who "probably" uses it.
+3. Write down each assumption the change rests on and check it in the code.
+
+The plan is small only if every one of these holds, each with evidence from
+that reading:
+
+- About five files or fewer change, inside one component or module.
+- No contract used outside those files changes: no public or shared
+  signature, data or file format, schema, configuration key, command-line
+  interface, event, or persisted data.
+- No architecture changes: no new component, service, layer or dependency,
+  and no responsibility moves between components.
+- No migration, no data written by older versions to handle, and no existing
+  path to retire or switch over.
+- No trust boundary is added or changed.
+- Every assumption is verified now; none is open.
+- The work fits one phase of at most three stages.
+
+If any item fails or cannot be shown, write a full plan. Being unable to list
+the users of something, or needing words like "probably" or "should be fine",
+means the measuring is not done.
+
+A small plan is lighter in structure only:
+
+- One phase file, `01-short-name.md`, with the usual layout. It need not
+  follow the skeleton-to-cutover progression.
+- It adds a `Size` section listing the files, the users searched for and
+  found, and each criterion above with its evidence.
+- Reading the code, the Assumptions section, the Outcome tests section,
+  complete stage briefs and the plan review are never skipped. The review uses a fresh subagent, who also
+  re-measures the size: re-counts the files, re-searches the users and
+  rechecks each criterion. A small plan often needs only one review round.
+
+If the reviewer, later planning or implementation finds that any criterion
+fails, the plan is no longer small: rewrite it as a full plan before building
+further.
+
+
+plan-reviewer.md lost these two, since only full plans are reviewed now:
+
+- **Size:** if the plan claims to be small, re-measure it yourself: count the
+  files, search for every user of the changed code and check each size
+  criterion in plan-in-phases. Report any criterion that fails.
+
+| `size-wrong` | the plan claims to be small and a size criterion fails on re-measuring | |

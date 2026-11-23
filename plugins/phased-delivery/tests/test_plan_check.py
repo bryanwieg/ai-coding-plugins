@@ -26,10 +26,10 @@ PLAN = {
                        "passes_from": "01.2"}],
     "phases": [{"phase": "01", "file": "01-rate-limit.md", "name": "rate limit", "kind": "behaviour", "stages": [
         {"id": "01.1", "title": "limiter", "files": [{"path": "app/ratelimit.py", "action": "create"}],
-         "provides": ["C1"], "uses": [], "order": "first"},
+         "lines": "30-150", "provides": ["C1"], "uses": [], "order": "first"},
         {"id": "01.2", "title": "wire it in", "files": [{"path": "app/views.py", "action": "edit"},
                                                          {"path": "tests/test_limit.py", "action": "create"}],
-         "provides": [], "uses": ["C1", "C2"], "order": "after 01.1"}]}],
+         "lines": "under 30", "provides": [], "uses": ["C1", "C2"], "order": "after 01.1"}]}],
 }
 
 
@@ -152,8 +152,8 @@ def test_valid_citation_passes(tmp_path):
     assert run(tmp_path, PLAN, d)[0] == 0
 
 
-def test_small_plan_renders_size(tmp_path):
-    p = broken_plan(lambda p: p["size"].update(verdict="small", evidence=["3 files, one module"]))
+def test_quick_plan_renders_size(tmp_path):
+    p = broken_plan(lambda p: p["size"].update(verdict="quick", evidence=["total 6: one interface part"]))
     code, rows, _ = run(tmp_path, p, PHASE)
     assert code == 0, rows
-    assert "## Size\n\nSmall plan:\n- 3 files, one module" in (tmp_path / "plan" / "01-rate-limit.md").read_text()
+    assert "## Size\n\nQuick plan:\n- total 6: one interface part" in (tmp_path / "plan" / "01-rate-limit.md").read_text()

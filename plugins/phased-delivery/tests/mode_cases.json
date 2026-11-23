@@ -1,0 +1,277 @@
+[
+ {
+  "request": "Fix a typo in the README",
+  "expected": "direct",
+  "form": {
+   "request": "Fix a typo in the README",
+   "parts": [
+    {
+     "title": "readme typo",
+     "kind": "internal",
+     "lines": "under 30",
+     "reach_files": 0
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Add a 300-line standalone report script",
+  "expected": "direct",
+  "form": {
+   "request": "Add a 300-line standalone report script",
+   "parts": [
+    {
+     "title": "report script",
+     "kind": "new",
+     "lines": "over 150",
+     "reach_files": 0
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Fix an off-by-one in one function (60 lines)",
+  "expected": "direct",
+  "form": {
+   "request": "Fix an off-by-one in one function (60 lines)",
+   "parts": [
+    {
+     "title": "date range fix",
+     "kind": "internal",
+     "lines": "30-150",
+     "reach_files": 0
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Add a --json option to an existing CLI used in 2 docs",
+  "expected": "direct",
+  "form": {
+   "request": "Add a --json option to an existing CLI used in 2 docs",
+   "parts": [
+    {
+     "title": "json option",
+     "kind": "interface",
+     "lines": "under 30",
+     "reach_files": 2
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Swap which storage class is wired in, one line, nothing else refers to it",
+  "expected": "direct",
+  "form": {
+   "request": "Swap which storage class is wired in, one line, nothing else refers to it",
+   "parts": [
+    {
+     "title": "storage swap",
+     "kind": "architecture",
+     "lines": "under 30",
+     "reach_files": 0
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Rewrite a module's internals, 400 lines, same interface",
+  "expected": "quick",
+  "form": {
+   "request": "Rewrite a module's internals, 400 lines, same interface",
+   "parts": [
+    {
+     "title": "parser rewrite",
+     "kind": "internal",
+     "lines": "over 150",
+     "reach_files": 0
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Rename a config key used in 4 files",
+  "expected": "direct",
+  "form": {
+   "request": "Rename a config key used in 4 files",
+   "parts": [
+    {
+     "title": "rename key",
+     "kind": "interface",
+     "lines": "under 30",
+     "reach_files": 4
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "One-line architecture change touching 6 call sites",
+  "expected": "quick",
+  "form": {
+   "request": "One-line architecture change touching 6 call sites",
+   "parts": [
+    {
+     "title": "inject clock",
+     "kind": "architecture",
+     "lines": "under 30",
+     "reach_files": 6
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Validate uploaded file names (40 lines)",
+  "expected": "direct",
+  "form": {
+   "request": "Validate uploaded file names (40 lines)",
+   "parts": [
+    {
+     "title": "upload check",
+     "kind": "internal",
+     "lines": "30-150",
+     "reach_files": 0
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "New page with a new route, registered in the router",
+  "expected": "quick",
+  "form": {
+   "request": "New page with a new route, registered in the router",
+   "parts": [
+    {
+     "title": "route",
+     "kind": "new",
+     "lines": "30-150",
+     "reach_files": 0
+    },
+    {
+     "title": "page",
+     "kind": "new",
+     "lines": "30-150",
+     "reach_files": 0
+    },
+    {
+     "title": "router entry",
+     "kind": "interface",
+     "lines": "under 30",
+     "reach_files": 2
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Plumb a new option through config, service and view",
+  "expected": "quick",
+  "form": {
+   "request": "Plumb a new option through config, service and view",
+   "parts": [
+    {
+     "title": "option plumbing",
+     "kind": "interface",
+     "lines": "30-150",
+     "reach_files": 3
+    },
+    {
+     "title": "use option",
+     "kind": "internal",
+     "lines": "under 30",
+     "reach_files": 0
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "300-line architecture change touching 6 places",
+  "expected": "full",
+  "form": {
+   "request": "300-line architecture change touching 6 places",
+   "parts": [
+    {
+     "title": "move auth to middleware",
+     "kind": "architecture",
+     "lines": "over 150",
+     "reach_files": 6
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Change the on-disk cache format; old caches exist",
+  "expected": "full",
+  "form": {
+   "request": "Change the on-disk cache format; old caches exist",
+   "parts": [
+    {
+     "title": "cache format",
+     "kind": "data",
+     "lines": "30-150",
+     "existing_data": true,
+     "reach_files": 1
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ },
+ {
+  "request": "Login and roles for a web app (Fava auth task)",
+  "expected": "full",
+  "form": {
+   "request": "Login and roles for a web app (Fava auth task)",
+   "parts": [
+    {
+     "title": "auth module",
+     "kind": "new",
+     "lines": "over 150",
+     "reach_files": 0
+    },
+    {
+     "title": "request gate",
+     "kind": "architecture",
+     "lines": "30-150",
+     "reach_files": 6
+    },
+    {
+     "title": "frontend login handling",
+     "kind": "interface",
+     "lines": "30-150",
+     "reach_files": 5
+    },
+    {
+     "title": "cli option",
+     "kind": "interface",
+     "lines": "under 30",
+     "reach_files": 2
+    }
+   ],
+   "open_questions": [],
+   "unresolved": []
+  }
+ }
+]

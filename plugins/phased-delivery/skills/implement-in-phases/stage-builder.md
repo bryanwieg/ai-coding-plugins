@@ -1,9 +1,9 @@
 # Stage builder directions
 
-Give this file, unchanged, to each subagent that builds a stage, followed by
-the inputs below. Choose its tier with
-[model-selection.md](../plan-in-phases/model-selection.md), and its model and
-thinking level from the plan's `models.md`. The orchestrator
+Give this file, unchanged, to each builder of a stage, followed by the
+inputs below: through `scripts/claude-build.sh` or `scripts/codex-build.sh`,
+at the model and thinking level `select-models.py route` prints (see "Route
+each stage" in [model-selection.md](../plan-in-phases/model-selection.md)). The orchestrator
 follows these rules too when it builds a stage directly.
 
 Inputs the orchestrator fills in:

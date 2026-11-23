@@ -90,6 +90,13 @@ after step 1 alone, and that the cached base matches `PIN`.
 - Installed Codex plugins (for example a minimal-code skill) are loaded by
   `codex exec` and influence the build.
 
+- **Routing calibration, 2026-11-23** (headless via `claude-build.sh`,
+  15 runs, $0.57; details in `docs/model-routing.md`): Haiku high passed
+  all checks and stopped on p1; Haiku medium passed all checks but did not
+  stop on p1. Opus medium and low and Haiku high all kept the p2 step
+  order. Runs here go through `claude-build.sh` with `EVAL_HOME` in
+  `/cache` (a noexec `/tmp` breaks the checks' stubs).
+
 ## Notes
 
 - POSIX `sh` and the Python standard library only. Checks pass `--today`

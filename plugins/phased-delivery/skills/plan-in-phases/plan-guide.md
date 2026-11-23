@@ -15,9 +15,9 @@ appear nowhere. No string holds code; names, signatures, routes, keys and
 literal values in backticks are fine.
 
 ## size
-`verdict` full or small per SKILL.md "Size the plan from the code";
-`evidence` one line per criterion that decides it, citing the files and
-users found.
+`verdict` `quick` or `full`, the mode `scripts/plan-mode.py score`
+printed (see mode-guide.md); `evidence` its total and one line per part
+with its score, and any re-score.
 
 ## outcomes
 The outcomes the grill settled (see grill.md), O1.. in order.
@@ -81,6 +81,9 @@ In build order within the phase.
   `delete`. Edit and delete paths must exist (or be created by an earlier
   stage); create paths must not. Stages that run in parallel share no
   file.
+- `lines`: your estimate of lines added plus removed in the stage's
+  non-test files: `under 30`, `30-150` or `over 150`. A quick plan is
+  re-scored from these (mode-guide.md, "Re-scoring").
 - `provides` / `uses`: contract ids, matching the registry.
 - `order`: `first`, `after NN.n` or `parallel with NN.n`, naming a stage
   listed before it. Order a stage after the stage it depends on, not after

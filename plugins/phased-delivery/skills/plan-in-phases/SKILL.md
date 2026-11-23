@@ -1,6 +1,6 @@
 ---
 name: plan-in-phases
-description: "Turn an approved specification and design into a complete phased implementation plan: one self-contained NN-name.md file per phase, each split into stage briefs a fresh agent can build without deciding anything other stages, code or the user see. Planning only; writes no code. Use whenever the user asks to plan, break down, phase, stage or sequence a feature, migration, rewrite or other multi-step change (\"plan this\", \"break this into phases\", \"write the implementation plan\", \"how should we build this in stages\"), or to review, fix or rework an existing phased plan or revise a phase after implementation finds gaps. Use proactively, without being asked, before writing code for any change that touches several files, a shared contract or the architecture; it measures from the code whether a small plan is enough, so do not skip it because a change seems small. Not for one-file edits that change no contract, and not for building the plan; that is implement-in-phases."
+description: "Turn an approved specification and design into a complete phased implementation plan: one self-contained NN-name.md file per phase, each split into stage briefs a fresh agent can build without deciding anything other stages, code or the user see. Planning only; writes no code. Use whenever the user asks to plan, break down, phase, stage or sequence a feature, migration, rewrite or other multi-step change (\"plan this\", \"break this into phases\", \"write the implementation plan\", \"how should we build this in stages\"), or to review, fix or rework an existing phased plan or revise a phase after implementation finds gaps. Use proactively, without being asked, before writing code for any change that may touch several files, a shared contract or the architecture: its first step is a capped estimate (at most 5 files read) that sends small changes straight back to direct work, so starting it costs little. Not for one-file edits that change no contract, and not for building the plan; that is implement-in-phases."
 ---
 
 # Plan in phases
@@ -11,18 +11,45 @@ documents only; [implement-in-phases](../implement-in-phases/SKILL.md) builds th
 Anyone implementing the plan, agent or person, must use the
 implement-in-phases skill; every phase file says so in its header.
 
-The user approves the specification and the design. Before planning, grill
-the user on them (see [grill.md](grill.md)); that is the time to ask.
+The user approves the specification and the design. First estimate how much
+planning the change needs (below); a change that needs no plan leaves this
+skill there. Before planning, grill the user on them (see [grill.md](grill.md)); that is the time to ask.
 After it, settle every remaining decision with the context at hand and write
 it down. Ask the user again only when planning, review or implementation
 shows the specification or design is wrong, incomplete or contradictory, or
 that the work needs something the design lacks (a new component, dependency,
 tool or external system). Give options and a recommendation.
 
+## Estimate how much planning the change needs
+
+Before grilling or reading further, make the quick estimate in
+[mode-guide.md](mode-guide.md): sketch the change from the request and run
+`scripts/plan-mode.py sketch`, which stops when the mode is already certain;
+otherwise list the terms, run `scripts/plan-mode.py locate`, read at most 5
+of the files it lists, write the form and run `scripts/plan-mode.py score`.
+It has hard limits so that it stays an estimate; do not read more to
+improve it. Follow the mode it
+prints, unless the user asked for a particular one:
+
+- **direct:** do not plan. Leave this skill and make the change in context:
+  read the code it touches, make it, run the tests. When the work turns
+  out bigger, re-score as mode-guide.md says.
+- **quick:** grill, then write `plan.json` and one phase file,
+  `01-short-name.md`, through `plan-check.py` as below, with `size` set to
+  `quick` and the score in its evidence. It need not follow the
+  skeleton-to-cutover progression. No review subagent: the script's checks
+  stand in for it. When `plan.json` passes `--outline`, run
+  `scripts/plan-mode.py rescore` on the plan (mode-guide.md,
+  "Re-scoring"): on full, continue as a full plan; on direct, stop
+  planning and make the change.
+- **full:** everything below, with `size` set to `full`.
+
+Without Python, judge the mode from the tables in mode-guide.md by hand,
+and say so in the evidence.
+
 ## Grill the spec and design
 
-Read [grill.md](grill.md) now and follow all of it before sizing or phasing
-anything.
+Read [grill.md](grill.md) now and follow all of it before phasing anything.
 
 ## Read the code before deciding
 
@@ -48,51 +75,6 @@ for a decision.
   symbols you read, so the implementer and the reviewer can see the decision
   rests on real code. Cite the lines with words they show (see
   [phase-guide.md](phase-guide.md)); the script checks them.
-
-## Size the plan from the code
-
-Every plan starts as a full plan. A plan may be small only after reading the
-code proves it, never because the change feels small or familiar. Measure
-first:
-
-1. List every file the change will create or edit, tests included.
-2. For every function, type, format or setting it changes, search for all
-   its users and list them. Do not reason about who "probably" uses it.
-3. Write down each assumption the change rests on and check it in the code.
-
-The plan is small only if every one of these holds, each with evidence from
-that reading:
-
-- About five files or fewer change, inside one component or module.
-- No contract used outside those files changes: no public or shared
-  signature, data or file format, schema, configuration key, command-line
-  interface, event, or persisted data.
-- No architecture changes: no new component, service, layer or dependency,
-  and no responsibility moves between components.
-- No migration, no data written by older versions to handle, and no existing
-  path to retire or switch over.
-- No trust boundary is added or changed.
-- Every assumption is verified now; none is open.
-- The work fits one phase of at most three stages.
-
-If any item fails or cannot be shown, write a full plan. Being unable to list
-the users of something, or needing words like "probably" or "should be fine",
-means the measuring is not done.
-
-A small plan is lighter in structure only:
-
-- One phase file, `01-short-name.md`, with the usual layout. It need not
-  follow the skeleton-to-cutover progression.
-- It adds a `Size` section listing the files, the users searched for and
-  found, and each criterion above with its evidence.
-- Reading the code, the Assumptions section, the Outcome tests section,
-  complete stage briefs and the plan review are never skipped. The review uses a fresh subagent, who also
-  re-measures the size: re-counts the files, re-searches the users and
-  rechecks each criterion. A small plan often needs only one review round.
-
-If the reviewer, later planning or implementation finds that any criterion
-fails, the plan is no longer small: rewrite it as a full plan before building
-further.
 
 ## Compose the phases from high level to narrow
 
@@ -202,8 +184,8 @@ each field, and check each item above by reading.
 
 ## Review the written plan
 
-When all files are written and the script reports no errors, review the
-plan, not any implementation. Use a fresh reviewing subagent each round,
+Full plans only; a quick plan has no review subagent. When all files are
+written and the script reports no errors, review the plan, not any implementation. Use a fresh reviewing subagent each round,
 since it reads the files as an implementer will, without the planning
 session's context. Give it [plan-reviewer.md](plan-reviewer.md) unchanged,
 with its inputs filled in; that file holds what counts as a finding, where
