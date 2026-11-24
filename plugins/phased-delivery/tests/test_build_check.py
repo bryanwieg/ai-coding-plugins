@@ -210,7 +210,9 @@ def test_finish_phase(repo):
     stage_commit = git(repo, "rev-parse", "--short", "HEAD").strip()
     result = bc(repo, "finish", PHASE)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert f"Status: built {stage_commit}" in (repo / PHASE).read_text()
+    text = (repo / PHASE).read_text()
+    assert f"Status: built {stage_commit}" in text
+    assert "| 01.1 | Write a | middle | first | done |" in text and "| 01.2 | Write b | small | after 01.1 | done |" in text
     assert f"Phase: {PHASE}" in message(repo)
     assert set(changed(repo)) >= {PHASE, "docs/plan/.build/01-ledger.json", "docs/plan/.build/01-review.json"}
     assert git(repo, "status", "--porcelain") == ""
@@ -236,3 +238,23 @@ def test_rename_from_outside_fails(repo):
     result = record(repo, "01.1")
     assert result.returncode == 1
     assert "src/other.txt" in json.loads(result.stdout)["outside"]
+
+
+def test_reject_budget_stop_then_retry(repo):
+    bc(repo, "start", PHASE)
+    (repo / "src/other.txt").write_text("stray\n")
+    stopped = record(repo, "01.1", "haiku", "high", 8, "400", "0.25")
+    assert stopped.returncode == 3
+    assert json.loads(stopped.stdout)["outside"] == ["src/other.txt"]
+    git(repo, "checkout", "src/other.txt")
+    build_a(repo)
+    assert record(repo, "01.1", "sonnet", "high").returncode == 0
+    assert bc(repo, "reject", PHASE, "01.1", "tests check nothing\nsee diff").returncode == 0
+    assert bc(repo, "commit", PHASE, "01.1").returncode == 1
+    assert record(repo, "01.1", "opus", "high").returncode == 0
+    assert bc(repo, "commit", PHASE, "01.1").returncode == 0
+    msg = message(repo)
+    assert "Attempt: 3" in msg
+    assert "Earlier-Attempt: haiku high 400 budget reached" in msg
+    assert "Earlier-Attempt: sonnet high 1200 tests check nothing see diff" in msg
+    assert "1 accepted stages" in stats(repo)

@@ -306,13 +306,14 @@ def cmd_commit(a):
                 f"Tier: {stage['tier']}", f"Tool: {x['tool']}", f"Model: {x['model']}",
                 f"Effort: {x['effort']}", f"Attempt: {len(earlier) + 1}", f"Tokens: {count(x['tokens'])}",
                 f"Cost: {amount(x['cost'])}", f"Tool-Calls: {count(x['tool_calls'])}"]
-    trailers += [f"Earlier-Attempt: {y['model']} {y['effort']} {count(y['tokens'])} {y['why']}" for y in earlier]
+    trailers += [f"Earlier-Attempt: {y['model']} {y['effort']} {count(y['tokens'])} {' '.join(y['why'].split())}" for y in earlier]
     subject = f"{a.stage} {stage['title']}" + (f" {a.subject_suffix}" if a.subject_suffix else "")
     sha = git_commit(top, files, subject, trailers + a.extra_trailer)
     for y in earlier + [x]:
         y["commit"] = sha
     save(f["ledger"], ledger)
-    mark_done(a.phase_file, committed_stages(ledger))
+    if not x["fix"]:
+        mark_done(a.phase_file, committed_stages(ledger))
     print(sha)
     return 0
 
@@ -333,7 +334,11 @@ def cmd_finish(a):
         problems += [{"file": "ledger", "where": s, "msg": "stage has no commit"} for s in missing]
         if problems:
             return report(problems)
-        last = [x["commit"] for x in ledger["attempts"] if x["result"] == "accepted" and x["commit"]][-1]
+        top = toplevel(a.repo)
+        ours = {x["commit"] for x in ledger["attempts"] if x["result"] == "accepted" and x["commit"]}
+        log = git(top, "log", "--format=%h", "--abbrev=7", f"{ledger['start_commit']}..HEAD").split()
+        last = next(h for h in log if any(c.startswith(h) or h.startswith(c) for c in ours))
+        mark_done(a.phase_file, committed_stages(ledger))
         text = open(a.phase_file).read().split("\n")
         text = [f"Status: built {last}" if line.startswith("Status:") else line for line in text]
         open(a.phase_file, "w").write("\n".join(text))
