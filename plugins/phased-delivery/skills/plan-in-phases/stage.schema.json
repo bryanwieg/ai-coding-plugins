@@ -56,7 +56,7 @@
         "session_only": {"type": "boolean"}}},
     "record": {"type": "object", "additionalProperties": false,
       "properties": {
-        "revisions": {"type": "object"},
+        "revisions": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
         "attempts": {"type": "array", "items": {"type": "object", "additionalProperties": false,
           "required": ["revision", "n", "fix", "tool", "model", "effort", "exit", "tokens", "cost", "cap",
                        "tool_calls", "premium", "result", "why", "commit"],
@@ -64,7 +64,8 @@
             "revision": {"type": "integer", "minimum": 1}, "n": {"type": "integer", "minimum": 0},
             "fix": {"type": "boolean"}, "tool": {"type": "string"}, "model": {"type": "string"},
             "effort": {"type": "string"}, "exit": {"type": "integer"},
-            "tokens": {}, "cost": {}, "cap": {}, "tool_calls": {},
+            "tokens": {"type": ["number", "null"]}, "cost": {"type": ["number", "null"]},
+            "cap": {"type": ["number", "null"]}, "tool_calls": {"type": ["number", "null"]},
             "premium": {"type": "boolean"},
             "result": {"enum": ["accepted", "failed", "stopped", "error", "rejected"]},
             "why": {"type": "string"}, "commit": {"type": "string"}}}},

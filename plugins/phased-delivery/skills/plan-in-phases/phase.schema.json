@@ -16,12 +16,29 @@
       "properties": {
         "start_commit": {"type": "string"},
         "preexisting": {"type": "array", "items": {"type": "string"}},
-        "runs": {"type": "array", "items": {"type": "object"}},
+        "runs": {"type": "array", "items": {"type": "object", "additionalProperties": false,
+          "required": ["stage", "n", "fix", "tool", "model", "effort", "exit", "tokens", "cost", "cap",
+                       "tool_calls", "premium", "result", "why", "commit"],
+          "properties": {
+            "stage": {"enum": ["review", "revise"]}, "n": {"type": "integer", "minimum": 0},
+            "fix": {"type": "boolean"}, "tool": {"type": "string"}, "model": {"type": "string"},
+            "effort": {"type": "string"}, "exit": {"type": "integer"},
+            "tokens": {"type": ["number", "null"]}, "cost": {"type": ["number", "null"]},
+            "cap": {"type": ["number", "null"]}, "tool_calls": {"type": ["number", "null"]},
+            "premium": {"type": "boolean"}, "result": {"enum": ["review", "revise"]},
+            "why": {"type": "string"}, "commit": {"type": "string"}}}},
         "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false,
           "required": ["index", "status"],
           "properties": {"index": {"type": "integer", "minimum": 0},
             "status": {"enum": ["open", "fixed", "asked", "answered"]}}}},
-        "halt": {},
-        "built": {}}}
+        "halt": {"type": ["object", "null"], "additionalProperties": false,
+          "required": ["step", "stage", "reason", "detail", "next"],
+          "properties": {
+            "step": {"type": "string"}, "stage": {"type": ["string", "null"]},
+            "reason": {"enum": ["revise-failed", "escalated", "revise-capped", "builder-stopped", "brief-changed",
+                                "record-changed", "models-stale", "session-only", "build-error", "review-capped",
+                                "review-invalid", "plan-gap", "question", "fix-failed"]},
+            "detail": {"type": "string"}, "next": {"type": "string"}}},
+        "built": {"type": ["string", "null"]}}}
   }
 }
