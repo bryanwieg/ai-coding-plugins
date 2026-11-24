@@ -88,7 +88,7 @@ dispatches, records or commits.
 
 ## The driver (0.13.0)
 
-Built; the plan is `docs/plans/phase-driver/`. Until 0.12.x the session ran
+Built. Until 0.12.x the session ran
 the phase loop itself from SKILL.md and build-guide.md: revise, route,
 dispatch, gate, commit, review, finish. `scripts/run-phase.py` now owns
 that loop and the session only runs it and answers its halts.
