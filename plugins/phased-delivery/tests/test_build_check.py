@@ -324,3 +324,40 @@ def test_orchestrator_needs_session_only(repo):
     accepted = record(repo, "01.2", "orchestrator", "high")
     assert accepted.returncode == 0, accepted.stdout + accepted.stderr
     assert [x["model"] for x in stage_file(repo, "01.2")["record"]["attempts"]] == ["orchestrator"]
+
+
+def test_rebuild_needs_fix(repo):
+    bc(repo, "start", PHASE)
+    build_a(repo)
+    record(repo, "01.1")
+    bc(repo, "commit", PHASE, "01.1")
+    (repo / "src/a.txt").write_text("a3\n")
+    attempts = stage_file(repo, "01.1")["record"]["attempts"]
+    refused = record(repo, "01.1", "sonnet", "medium")
+    assert refused.returncode == 2 and "--fix" in refused.stderr
+    assert stage_file(repo, "01.1")["record"]["attempts"] == attempts
+    assert record(repo, "01.1", "sonnet", "medium", 0, "300", "0.05", "--fix").returncode == 0
+
+
+def test_invalid_stage_file_after_start(repo):
+    bc(repo, "start", PHASE)
+    assert bc(repo, "can-try", PHASE, "01.1", "opus", "high").returncode == 0
+    broken = stage_file(repo, "01.2")
+    write_json(repo / PHASE / "01.2.json", {"brief": broken["brief"]})
+    result = bc(repo, "can-try", PHASE, "01.1", "opus", "high")
+    assert result.returncode == 2 and "Traceback" not in result.stderr
+    assert any("record" in json.loads(x)["msg"] for x in result.stdout.splitlines())
+    write_json(repo / PHASE / "01.2.json", broken)
+    edit_brief(repo, "01.1", goal="Write a, edited")
+    assert bc(repo, "can-try", PHASE, "01.1", "opus", "high").returncode == 5
+
+
+def test_commit_staged_deletion(repo):
+    edit_brief(repo, "01.2", files=[{"path": "src/b.txt", "action": "delete", "role": "b"}])
+    bc(repo, "start", PHASE)
+    git(repo, "rm", "-q", "src/b.txt")
+    assert record(repo, "01.2", "haiku", "high").returncode == 0
+    done = bc(repo, "commit", PHASE, "01.2")
+    assert done.returncode == 0, done.stderr
+    assert changed(repo) == ["src/b.txt"]
+    assert "src/b.txt" not in git(repo, "ls-files")
