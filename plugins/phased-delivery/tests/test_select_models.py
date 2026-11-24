@@ -154,7 +154,7 @@ def test_route_fable_limits(tmp_path):
     # A --up retry after a failure still steps up to the premium pair.
     assert pair(route(narrow, "J1F1R0C0K0P2V0S0", "--up", "1")) == ("astra", "high")
     # Within PREMIUM_RATIO_MARGIN the premium pair is taken: 58.5 for 108 is
-    # 0.54, 5% below terra high's 0.57; 58.5 for 120 (0.49, 14% below) is not.
+    # 0.54, 4.8% below terra high's 0.57; 58.5 for 120 (0.49, 14% below) is not.
     near = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"run_cost_usd": 108}})
     assert pair(route(narrow, "J1F1R0C0K0P2V0S0", profiles=near)) == ("astra", "high")
     far = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"run_cost_usd": 120}})

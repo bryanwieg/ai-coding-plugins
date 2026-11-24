@@ -102,7 +102,7 @@ SPEED_GAIN = 1.2
 # A premium step-up below top is taken while its score per unit of run cost is
 # no more than this fraction worse than the standard pick's: a near tie goes to
 # the larger model, which may need fewer tokens than the benchmark shows.
-PREMIUM_RATIO_MARGIN = 0.10
+PREMIUM_RATIO_MARGIN = 0.05
 SCORES_FORM = "J F R C K P V S in that order, each followed by 0, 1 or 2, such as J1F1R0C0K0P0V0S0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))

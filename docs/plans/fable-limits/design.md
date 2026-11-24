@@ -25,7 +25,9 @@ it this often means the implementation criteria are not tuned.
 - Revised the same day: the user is "ok for now with letting fable low win
   if the cost is within an appropriate margin", since Fable should comprehend
   better and may need fewer tokens at low thinking. The premium pair's ratio
-  may be up to 10% below the standard pick's (`PREMIUM_RATIO_MARGIN`).
+  may be up to 5% below the standard pick's (`PREMIUM_RATIO_MARGIN`); 5%
+  rather than 10% because Fable has its own quota, and once it is used up
+  builds fall back to Opus anyway.
 
 ## Check
 

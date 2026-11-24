@@ -100,11 +100,12 @@ How it works now:
     can do worse on real work, so the next model up at low thinking beats a
     smaller model above high. Hence Opus stays capped at `high`. Since
     2026-11-24 that step takes the premium pair only when its score/cost
-    ratio is no more than 10% below the standard pick's
+    ratio is no more than 5% below the standard pick's
     (`PREMIUM_RATIO_MARGIN`), except on a `--up` retry after a failed
     build. The user's reasoning: Fable is expected to comprehend much better
     than Opus and may need fewer tokens at low thinking, so a near tie goes
-    to Fable low; a clearly worse ratio does not;
+    to Fable low; a clearly worse ratio does not. 5%, not 10%: Fable has its
+    own quota, and once it is used up builds fall back to Opus anyway;
   - reviews (`--review`) run on `top` and ignore the stage's scores.
 - **Rule sweep, 2026-11-23** (free: all 6,561 score combinations through
   `route` on the live profiles):
@@ -128,7 +129,7 @@ How it works now:
   and 10 to Fable low; 10 of the 15 `top` stages got there only through
   K = 2, at totals of 5 to 7. Two changes: `top` comes only from a total of
   9 or more (the "J, C or K = 2" override is gone), and the premium step-up
-  above needs a score/cost ratio within 10% of the standard pick's. After:
+  above needs a score/cost ratio within 5% of the standard pick's. After:
   2 stages (5%) on Fable high, both totalling 9; 23 on Fable low, the
   `middle+` and risk steps (on the current profiles Fable 5.2 low scores
   0.0188 points per unit of run cost, Opus 5.5 high 0.0191, 1.3% apart);
