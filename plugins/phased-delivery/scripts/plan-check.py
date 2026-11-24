@@ -177,7 +177,7 @@ def phase_status(record, stages):
         return f"built {record['built']}"
     halt = record.get("halt")
     if halt:
-        return f"halted: {halt.get('reason') if isinstance(halt, dict) else halt}"
+        return f"halted: {halt['reason']}"
     states = {sid: stage_status(s) for sid, s in stages.items()}
     if all(x == "planned" for x in states.values()):
         return "planned"
@@ -250,6 +250,8 @@ def check_plan(plan, stages, repo, docs, scope, outline, r):
         if c["kind"] == "other":
             r.add(G, w, "other", f"{c['name']}: kind other" + ("" if c.get("other_reason") else " without other_reason"))
     listed = list(stages)
+    written = {t["test"].strip("`") for s in stages.values() for t in s["brief"].get("tests", [])
+               if t["kind"] == "outcome" and t["action"] == "writes"}
     for sid, s in stages.items():
         b, G = s["brief"], s["file"]
         paths = {f["path"] for f in b["files"]}
@@ -280,6 +282,8 @@ def check_plan(plan, stages, repo, docs, scope, outline, r):
         for t in b.get("tests", []):
             if t["kind"] == "outcome" and t["action"] == "writes" and "outcome" not in t:
                 r.add(G, sid, "tests", f"outcome test {t['test']} needs the id of its outcome in `outcome`")
+            if t["kind"] == "outcome" and t["action"] == "turns on" and t["test"].strip("`") not in written:
+                r.add(G, sid, "ref", f"turns on {t['test']}, which no stage writes")
     rows = outcome_rows(stages)
     known = {x["id"] for x in plan["outcomes"]}
     if not outline:  # tests are not an outline field
@@ -327,9 +331,12 @@ def check_cite(file, where, cite, shows, repo, r):
 
 def check_revision(sid, s, r):
     revs, rev = s["record"].get("revisions", {}), s["brief"]["revision"]
+    bad = [n for n in revs if not n.isdecimal()]
+    if bad:
+        r.add(s["file"], sid, "revision", f"stage {sid}: revisions keys {bad} are not revision numbers")
     if str(rev) in revs and revs[str(rev)] != brief_hash(s["brief"]):
         r.add(s["file"], sid, "revision", f"stage {sid}: the brief changed since revision {rev} was built; raise revision")
-    elif any(int(n) > rev for n in revs):
+    elif any(int(n) > rev for n in revs if n.isdecimal()):
         r.add(s["file"], sid, "revision", f"stage {sid}: revision {rev} is lower than a revision already built")
 
 
