@@ -143,7 +143,9 @@ Each finding's status is kept in `record.findings` of `phase.json`:
 `build-check.py finish` checks `review.json` and that every stage has a
 commit and none is reopened, records the built commit, re-renders
 `phase.md` and `plan.md` and commits the plan directory with a `Phase:`
-trailer and each `--extra-trailer`. Its refusal halts `build-error`.
+trailer and each `--extra-trailer`; a plan directory git ignores (a plan
+kept out of the repository) is left uncommitted. Its refusal halts
+`build-error`.
 
 ## Premium spend
 

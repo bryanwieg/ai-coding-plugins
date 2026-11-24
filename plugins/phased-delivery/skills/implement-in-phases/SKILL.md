@@ -128,8 +128,8 @@ Continue to the next phase only when the user says so; a user stop wins.
 ## Report the models' work
 
 After the last phase is committed, write `work-report.md` in the plan
-directory, commit it with the trailer `Phase: <plan directory>`, and give
-the user its tables and Reading.
+directory, commit it with the trailer `Phase: <plan directory>` (unless git
+ignores the plan directory), and give the user its tables and Reading.
 
 1. Generate it, never by hand: `sh scripts/stage-stats.sh <plan start>..HEAD`.
    Per model and effort it gives stages, first-try and clean counts, failed

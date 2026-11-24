@@ -141,6 +141,20 @@ def test_builds_phase(repo):
         assert line in result.stderr, result.stderr
 
 
+def test_plan_ignored_by_git(repo):
+    # a plan kept out of the repository: stages are committed, the plan directory never is
+    (repo / ".gitignore").write_text(PLAN_DIR + "/\n")
+    git(repo, "rm", "-r", "-q", "--cached", PLAN_DIR)
+    git(repo, "add", ".gitignore")
+    git(repo, "commit", "-q", "-m", "ignore the plan")
+    result = drive(repo, [REVISED_NOTHING, BUILD_ONE, BUILD_TWO, REVIEW])
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Status: built" in (repo / PHASE / "phase.md").read_text()
+    assert [s[:4] for s in subjects(repo)[:2]] == ["01.2", "01.1"]
+    assert git(repo, "ls-files", PLAN_DIR) == ""
+    assert git(repo, "status", "--porcelain") == ""
+
+
 def test_rerun_of_built_phase(repo):
     drive(repo, [REVISED_NOTHING, BUILD_ONE, BUILD_TWO, REVIEW])
     head = git(repo, "rev-parse", "HEAD")
