@@ -113,8 +113,7 @@ stops there, before any file is read. Otherwise the agent lists up to 5
 terms, the script finds the files that mention them, the agent reads at most 5 and fills a
 form, and the script searches for the users of what changes and scores
 kind × size × reach per part. A quick plan is re-scored from its `plan.json`
-and can move up to full or down to direct. `evals/mode/` holds the
-calibration cases and their results.
+and can move up to full or down to direct.
 
 ### Plan checks
 
@@ -265,18 +264,6 @@ and add the plugin again, then start a new session:
 codex plugin marketplace upgrade ai-coding-plugins
 codex plugin add phased-delivery@ai-coding-plugins
 ```
-
-## Design notes
-
-[docs/model-routing.md](docs/model-routing.md): the goals behind model picking,
-Codex/Claude routing and work reports, the evidence so far, and open
-questions.
-
-## Evals
-
-`evals/` measures builder models on stage briefs with hidden checks and
-blind grading, for Claude Code subagents and `codex exec`. See
-[evals/README.md](evals/README.md).
 
 ## Adding a plugin
 

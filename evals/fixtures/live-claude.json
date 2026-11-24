@@ -1,9 +1,0 @@
-{"tool": "claude-code", "tool_version": "this session",
- "looked_up_from": "Agent tool parameter description: model enum and effort enum",
- "subagent_model_choice": "allowed",
- "models": [
-  {"id": "haiku",  "efforts": ["low", "medium", "high", "xhigh", "max"]},
-  {"id": "sonnet", "efforts": ["low", "medium", "high", "xhigh", "max"]},
-  {"id": "opus",   "efforts": ["low", "medium", "high", "xhigh", "max"]},
-  {"id": "fable",  "efforts": ["low", "medium", "high", "xhigh", "max"]}
- ]}
