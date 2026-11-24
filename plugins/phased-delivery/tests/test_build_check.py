@@ -227,3 +227,12 @@ def test_fix_commit(repo):
     msg = message(repo)
     assert "Fixes-Stage: 01.1" in msg and "Stage: 01.1\n" not in msg.replace("Fixes-Stage", "")
     assert "| opus | high | claude-code | 1 | 1/1 | 0/1 | 0 | 1 |" in stats(repo)
+
+
+def test_rename_from_outside_fails(repo):
+    bc(repo, "start", PHASE)
+    (repo / "src/a.txt").write_text("a2\n")
+    git(repo, "mv", "src/other.txt", "src/done.txt")  # into a stage file
+    result = record(repo, "01.1")
+    assert result.returncode == 1
+    assert "src/other.txt" in json.loads(result.stdout)["outside"]

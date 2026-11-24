@@ -67,7 +67,7 @@ def paths(phase_file):
     num = os.path.basename(phase_file)[:2]
     if not num.isdigit():
         raise Usage(f"phase file must be named NN-name.md: {phase_file}")
-    build = os.path.join(os.path.dirname(os.path.abspath(phase_file)), ".build")
+    build = os.path.join(os.path.dirname(os.path.realpath(phase_file)), ".build")
     return {k: os.path.join(build, f"{num}-{k}.json") for k in ("revision", "review", "ledger")}
 
 
@@ -95,7 +95,7 @@ def report(problems):
 def git(repo, *args, check=True):
     r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
     if check and r.returncode:
-        raise Usage(f"git {' '.join(args)}: {r.stderr.strip()}")
+        raise Usage(f"git {' '.join(args)}: {(r.stderr + r.stdout).strip()}")
     return r.stdout
 
 
@@ -114,8 +114,17 @@ def changed_paths(top):
             continue
         found.append(entry[3:])
         if entry[0] in "RC":
-            i += 1  # the rename's source path follows
+            found.append(out[i])  # the rename's source path: it changed too
+            i += 1
     return found
+
+
+def rel(top, path):
+    return os.path.relpath(os.path.realpath(path), top)
+
+
+def in_dir(path, directory):
+    return directory == "." or (path + "/").startswith(directory + "/")
 
 
 def is_cache(path):
@@ -145,14 +154,14 @@ def committed_stages(ledger):
 
 
 def outside_paths(top, phase_file, revision, ledger, stage):
-    plan_dir = os.path.relpath(os.path.dirname(os.path.abspath(phase_file)), top)
+    plan_dir = rel(top, os.path.dirname(os.path.realpath(phase_file)))
     done = committed_stages(ledger)
     allowed = set(stage_files(revision, stage)) | set(ledger["preexisting"])
     for s in revision["stages"]:
         if s["id"] not in done:
             allowed |= {f["path"] for f in s["files"]}
     return [p for p in changed_paths(top)
-            if p not in allowed and not is_cache(p) and not (p + "/").startswith(plan_dir + "/")]
+            if p not in allowed and not is_cache(p) and not in_dir(p, plan_dir)]
 
 
 def run_checks(top, commands):
@@ -196,7 +205,7 @@ def ledger_of(f):
 def cmd_can_try(a):
     ledger = ledger_of(paths(a.phase_file))
     for x in ledger["attempts"]:
-        if (x["stage"], x["model"], x["effort"]) == (a.stage, a.model, a.effort) and x["result"] not in ("error", "review"):
+        if (x["stage"], x["model"], x["effort"]) == (a.stage, a.model, a.effort) and x["result"] != "error":
             print(json.dumps(x))
             return 1
     return 0
@@ -212,7 +221,8 @@ def cmd_record(a):
     if a.stage != "review":
         revision = load(f["revision"])
         top = toplevel(a.repo)
-        same = [x for x in ledger["attempts"] if x["stage"] == a.stage and x["fix"] == a.fix and x["result"] != "error"]
+        same = [x for x in ledger["attempts"] if x["stage"] == a.stage and x["fix"] == a.fix
+                and x["result"] != "error" and not x["commit"]]
         attempt["n"] = len(same) + 1
         outside = outside_paths(top, a.phase_file, revision, ledger, a.stage)
         if a.exit_code == 8:
@@ -292,7 +302,7 @@ def cmd_commit(a):
                and y["result"] in ("failed", "stopped", "rejected") and not y["commit"]]
     stage = next(s for s in revision["stages"] if s["id"] == a.stage)
     trailers = [f"{'Fixes-Stage' if x['fix'] else 'Stage'}: {a.stage}",
-                f"Plan: {os.path.relpath(os.path.abspath(a.phase_file), top)}",
+                f"Plan: {rel(top, a.phase_file)}",
                 f"Tier: {stage['tier']}", f"Tool: {x['tool']}", f"Model: {x['model']}",
                 f"Effort: {x['effort']}", f"Attempt: {len(earlier) + 1}", f"Tokens: {count(x['tokens'])}",
                 f"Cost: {amount(x['cost'])}", f"Tool-Calls: {count(x['tool_calls'])}"]
@@ -328,8 +338,8 @@ def cmd_finish(a):
         text = [f"Status: built {last}" if line.startswith("Status:") else line for line in text]
         open(a.phase_file, "w").write("\n".join(text))
     top = toplevel(a.repo)
-    plan_dir = os.path.relpath(os.path.dirname(os.path.abspath(a.phase_file)), top)
-    phase = os.path.relpath(os.path.abspath(a.phase_file), top)
+    plan_dir = rel(top, os.path.dirname(os.path.realpath(a.phase_file)))
+    phase = rel(top, a.phase_file)
     subject = f"Phase {os.path.basename(a.phase_file)[:2]} {'stopped' if a.stopped else 'built'}: status and notes"
     print(git_commit(top, [plan_dir], subject, [f"Phase: {phase}"] + a.extra_trailer))
     return 0
@@ -394,7 +404,7 @@ def main(argv):
     a = parse_args(argv)
     try:
         return COMMANDS[a.cmd](a)
-    except Usage as e:
+    except (Usage, OSError, ValueError) as e:
         print(e, file=sys.stderr)
         return 2
 
