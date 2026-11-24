@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: planned
+Status: built cb5dd40
 Before: implement-in-phases is one 231-line prose SKILL.md; the orchestrator keeps attempts, trailers and premium spend by hand; the phase reviewer has an open list of checks and writes prose findings. build-check.py works but no skill uses it.
 After: SKILL.md is short and sends each step to its guide (revise-guide.md, build-guide.md, phase-reviewer.md); the orchestrator writes the revision JSON, calls build-check.py for every gate, commit and spend, and the reviewer writes review JSON with closed finding types. A notes file records why, and the driver-script option as a todo. One paid run shows the skill builds a real phase.
 
@@ -22,10 +22,10 @@ Budget: The plugin suite stays under a minute; 03.4's paid run has a ceiling of 
 
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
-| 03.1 | SKILL.md is a short outline that sends revising to revise-guide.md and building, routing, failures and commits to build-guide.md, with every bookkeeping step done through build-check.py. | top | first | planned |
-| 03.2 | phase-reviewer.md limits findings to the closed types and has the reviewer write the review JSON. | middle+ | parallel with 03.1 | planned |
-| 03.3 | A notes file explains why implementation uses JSON, a script gate and closed review types, and records the driver script as a todo; the README and plugin version describe the change. | middle | after 03.1 | planned |
-| 03.4 | One paid run of the restructured skill, built in this session, implements the p2-multistep eval task as a one-phase plan, and its result is recorded in the notes file. | middle+ | after 03.3 | planned |
+| 03.1 | SKILL.md is a short outline that sends revising to revise-guide.md and building, routing, failures and commits to build-guide.md, with every bookkeeping step done through build-check.py. | top | first | done |
+| 03.2 | phase-reviewer.md limits findings to the closed types and has the reviewer write the review JSON. | middle+ | parallel with 03.1 | done |
+| 03.3 | A notes file explains why implementation uses JSON, a script gate and closed review types, and records the driver script as a todo; the README and plugin version describe the change. | middle | after 03.1 | done |
+| 03.4 | One paid run of the restructured skill, built in this session, implements the p2-multistep eval task as a one-phase plan, and its result is recorded in the notes file. | middle+ | after 03.3 | done |
 
 ## 03.1 Thin SKILL.md and step guides
 
@@ -216,3 +216,9 @@ Model basis: J1 F0 R1 C0 K0 P1 V1 S2 = 6 -> middle+ (override: middle with a mea
 - Stage commits hold only the stage's files; the phase file, `.build/` and any regenerated plan files are updated in the working tree and committed by `finish` (with `--stopped` at a routing stop, which skips the review and completeness checks and leaves the status in progress). Reason: Keeps the design's 'staging only the stage's files'; resume reads the working tree.
 - A review is recorded as stage `review`; `spend` counts only attempts recorded with `--premium`, which the build guide sets for premium-pair builds and for every review run by claude-build.sh, never for Codex. Reason: Matches model-selection.md's premium budget rules.
 - commit takes `--subject-suffix TEXT` for subject annotations such as `[skip ci]` and `--extra-trailer LINE` for added trailers such as `Co-Authored-By`. Reason: Project rules may require both; today the orchestrator adds them by hand.
+- 2026-11-24: stages built directly by the orchestrator, as in phases 01 and 02; 03.3 was committed before 03.2 (they share no file).
+- 2026-11-24: 03.1 Done when, side-by-side read: every rule of the old SKILL.md is in SKILL.md, revise-guide.md, build-guide.md or model-selection.md; "two stages sharing a commit" is gone, since build-check.py commits one stage at a time. SKILL.md is 109 lines.
+- 2026-11-24: 03.4 run: RESULT pass, $0.84 in total (session $0.54, review $0.30); details in structured-implementation-notes.md, "Measured". Open assumption on `--plugin-dir` verified: only the branch's plugin loaded (`phased-delivery@inline`, 0.11.0).
+- 2026-11-24: phase review (fable high, in-session subagent, new phase-reviewer.md with review JSON): ready, 0 blocking, 2 should-fix, both fixed: plan-directory edits recorded in the Notes count as traced (c9c27fd, a revision of 03.2's brief wording); phase-level fixes are recorded against the stage they change (d1ca4e9). Commit trailers of 03.2 and 03.4 say middle and small where the plan said middle+; all stages were built by the orchestrator.
+- 2026-11-24: the notes file points at the plan-phase-driver branch, which exists only locally; push it before relying on that pointer.
+- 2026-11-24: commit 064c397 (CI workflow for pull requests) is outside the plan, added for the PR at the user's request.
