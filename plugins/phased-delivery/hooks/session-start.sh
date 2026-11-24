@@ -12,7 +12,7 @@ json_escape() {
 unfinished=""
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   unfinished=$(git grep -l --untracked -F "$marker" -- '*.md' 2>/dev/null |
-    grep -E '(^|/)[0-9][0-9]-[^/]*\.md$' | head -50 |
+    grep -E '(^|/)[0-9][0-9]-[^/]*(/phase)?\.md$' | head -50 |
     while IFS= read -r f; do
       status=$(grep -m1 '^Status:' "$f" | sed 's/^Status:[[:space:]]*//')
       case "$status" in

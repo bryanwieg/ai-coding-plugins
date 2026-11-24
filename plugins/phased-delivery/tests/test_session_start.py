@@ -34,3 +34,15 @@ def test_codex_off_line(tmp_path):
 
     cache.write_text(json.dumps({"date": today, "on": True}))
     assert "Codex" not in hook_context(tmp_path)
+
+
+def test_lists_phase_folders(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for name, status in (("01-a", "planned"), ("02-b", "built abc123")):
+        d = tmp_path / "docs" / "plans" / "x" / name
+        d.mkdir(parents=True)
+        (d / "phase.md").write_text(
+            f"# Phase\n\nImplement with the implement-in-phases skill; do not build.\nStatus: {status}\n")
+    context = hook_context(tmp_path)
+    assert "- docs/plans/x/01-a/phase.md (planned)" in context
+    assert "02-b" not in context
