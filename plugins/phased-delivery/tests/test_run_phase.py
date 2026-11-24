@@ -247,7 +247,10 @@ def test_stalled_call_is_undone_and_run_again(repo):
     result = drive(repo, [REVISED_NOTHING, {**BUILD_ONE, "sleep": 6}, BUILD_ONE, BUILD_TWO, REVIEW], stall=2)
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls(repo) == 5
-    assert len(read(repo, "01.1.json")["record"]["attempts"]) == 1  # the stall is not a try of the pair
+    # the stall is recorded as an error, not a try of the pair, at its cap for the premium spend
+    stall, built = read(repo, "01.1.json")["record"]["attempts"]
+    assert (stall["result"], stall["exit"], stall["cost"], stall["cap"]) == ("error", 7, None, 0.75)
+    assert built["result"] == "accepted"
 
 
 def test_second_stall_halts(repo):
@@ -256,4 +259,14 @@ def test_second_stall_halts(repo):
     assert result.returncode == 10, result.stdout + result.stderr
     assert halt(repo) == ("stalled", "01.1")
     assert not (repo / "src/one.txt").exists()
-    assert not read(repo, "01.1.json")["record"].get("attempts")
+    assert [x["exit"] for x in read(repo, "01.1.json")["record"]["attempts"]] == [7, 7]
+
+
+def test_stalled_revise_runs_again(repo):
+    stalled = {**REVISED_NOTHING, "sleep": 6}
+    assert drive(repo, [stalled, stalled], stall=2).returncode == 10
+    runs = read(repo, "phase.json")["record"]["runs"]
+    assert [(x["stage"], x["exit"]) for x in runs] == [("revise", 7), ("revise", 7)]
+    result = drive(repo, [REVISED_NOTHING, BUILD_ONE, BUILD_TWO, REVIEW])
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(repo) == 4  # the revise ran again

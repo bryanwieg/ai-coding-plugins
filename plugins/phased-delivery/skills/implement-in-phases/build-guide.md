@@ -87,8 +87,10 @@ parallel is not built in parallel. For each:
      the stage is routed again;
    - stalled (`claude-build.sh` exit 7: no output for `CLAUDE_BUILD_STALL`
      seconds): the call's edits are undone and it runs once more, not as a
-     try of the pair; a second stall halts `stalled`. This holds for every
-     model call, not only builds;
+     try of the pair; a second stall halts `stalled`. Each stalled call is
+     recorded with exit 7 (for a stage, as an error attempt), so its cap
+     counts in the premium spend; a stalled revise does not count as the
+     phase's revise. This holds for every model call, not only builds;
    - error (a build exit other than 0, 7 and 8; not a try of the pair): halt
      `build-error`;
    - the builder's report ends `Result: stopped`: the attempt is rejected

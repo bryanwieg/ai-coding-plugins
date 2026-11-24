@@ -226,8 +226,10 @@ def route(c, *options):
     return json.loads(r.stdout)
 
 
-def call(c, label, guide, inputs, pair, keep_briefs):
-    """One model call through claude-build.sh: {exit, tokens, cost, line (the report's last), stderr, edited}."""
+def call(c, label, guide, inputs, pair, keep_briefs, what, *flags):
+    """One model call through claude-build.sh: {exit, tokens, cost, line (the report's last), stderr, edited}.
+
+    WHAT and FLAGS record a stalled try (build-check.py record), so its cap counts in the premium spend."""
     out = os.path.join(c.work, f"{len(os.listdir(c.work)) + 1:02d}-{label}")
     os.makedirs(out)
     prompt = os.path.join(out, "prompt.md")
@@ -251,6 +253,9 @@ def call(c, label, guide, inputs, pair, keep_briefs):
             build_check.save(p, doc)
         restore(c, [build_check.rel(c.top, p) for p in sorted(plan_files(c.plan_dir) - present)])
         restore(c)
+        # recorded after the undo, which puts the plan's files back as they were
+        must(record(c, what, pair, {"exit": 7, "tokens": "unknown", "cost": "unknown"}, *flags), "record", (0, 4))
+        before = plan_docs(c.plan_dir)  # the guard's baseline now holds that record
     else:
         raise Halt("stalled", f"the {label} call stalled twice: {last(r.stderr)}")
     records, briefs = guard(before, keep_briefs)
@@ -317,7 +322,7 @@ def revise(c, problem):
               f"- The plugin's guides (absolute paths): `{os.path.join(SKILLS, 'plan-in-phases')}` holds "
               f"revising.md and the field guides; plan-check.py is `{os.path.join(HERE, 'plan-check.py')}`; "
               f"the repository is `{c.top}`"]
-    res = call(c, "revise", REVISE_GUIDE, inputs, pair, False)
+    res = call(c, "revise", REVISE_GUIDE, inputs, pair, False, "revise")
     if res["exit"] not in (0, 8):
         raise Halt("build-error", res["stderr"])
     must(record(c, "revise", pair, res), "record")
@@ -331,7 +336,7 @@ def revise(c, problem):
 def pre_phase(c, stages):
     """Revise and start a phase not yet revised; check the plan while no stage has an attempt."""
     runs = plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"].get("runs", [])
-    if not any(x["stage"] == "revise" for x in runs):
+    if not any(x["stage"] == "revise" and x["exit"] != 7 for x in runs):  # a stalled revise is not one
         started = py("build-check.py", "start", c.pdir, "--repo", c.top)
         if started.returncode:
             raise Halt("revise-failed", (started.stdout + started.stderr).strip())
@@ -377,7 +382,7 @@ def build(c, sid, s, times):
                "against the brief in the packet"] if fix else []
     inputs = [c.instructions, "- Anything else the brief links to: none", *earlier, "- Stage packet:", "",
               plan_check.packet(c.plan_dir, sid)]
-    res = call(c, f"build-{sid}", STAGE_BUILDER, inputs, pair, True)
+    res = call(c, f"build-{sid}", STAGE_BUILDER, inputs, pair, True, sid, *(["--fix"] if fix else []))
     logged = record(c, sid, pair, res, *(["--fix"] if fix else []))
     if logged.returncode == 4:
         raise Halt("build-error", res["stderr"])
@@ -441,7 +446,7 @@ def review(c, stages):
               + (", ".join(f"`{p}`" for p in rec["preexisting"]) or "none"),
               c.instructions, f"- Review file to write: `{path}`",
               "- Stages with no check commands, which only this review checks: " + (", ".join(unchecked) or "none")]
-    res = call(c, "review", PHASE_REVIEWER, inputs, pair, False)
+    res = call(c, "review", PHASE_REVIEWER, inputs, pair, False, "review")
     if res["exit"] and os.path.isfile(path):
         os.remove(path)  # a review cut short is not a review; the rerun reviews again
     if res["exit"] not in (0, 8):
@@ -473,7 +478,7 @@ def fix(c, sid, s, f):
     inputs = [c.instructions, f"- Finding: `{f['type']}` at `{f['file']}:{f['line']}`",
               f"  - Evidence: {f['evidence']}", f"  - Action: {f['action']}", "- Stage packet:", "",
               plan_check.packet(c.plan_dir, sid)]
-    res = call(c, f"fix-{sid}", STAGE_BUILDER, inputs, pair, True)
+    res = call(c, f"fix-{sid}", STAGE_BUILDER, inputs, pair, True, sid, "--fix")
     logged = must(record(c, sid, pair, res, "--fix"), "record", (0, 1, 3, 4))
     stopped = re.match(r"Result: stopped:?\s*(.*)", res["line"])
     why = ((stopped.group(1) or "the builder stopped") if stopped else "edited the plan" if res["edited"]
