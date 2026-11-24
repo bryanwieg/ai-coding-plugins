@@ -215,12 +215,12 @@ at the top of the script.
   there. A paid calibration run is still to set the caps.
 - **Budget stop:** a build that `claude-build.sh` stops at its cap (exit 8)
   is retried one step down the frontier (see "Adjust while working").
-- **Premium budget, $10 per phase:** the implementer keeps a
-  `Premium spend: $X of $10` line in the phase's Notes. After each
+- **Premium budget, $10 per phase:** the implementer records each
   `claude-build.sh` run of a pair `route` printed with `"premium": true`,
-  and after every phase review it runs, it adds the run's `Cost:` (its
-  `cap_usd` when the cost is `unknown`) and passes X to `route` as
-  `--premium-spent`. Once X reaches $10, builds get no premium pair for
+  and every phase review it runs, with `build-check.py record ...
+  --premium`, and passes `build-check.py spend <phase file>` (the runs'
+  `Cost:`, or `cap_usd` when the cost is `unknown`) to `route` as
+  `--premium-spent`. Once it reaches $10, builds get no premium pair for
   the rest of the phase.
 - **Reviews** use `route --review`: always `top`, their cost counted
   against the premium budget when built by `claude-build.sh`, never a step
@@ -294,7 +294,8 @@ R = 2, check whether the stage should be split.
 - **Planning and plan revision** use `top`.
 - Never dispatch a pair below the one `route` prints for the stage's scores
   without a written reason in the phase's Notes; a `--down` retry after a
-  budget stop is recorded by its Earlier-Attempt trailer.
+  budget stop is recorded by its Earlier-Attempt trailer, which
+  `build-check.py commit` writes from the ledger.
 
 ## Builders in another tool
 
@@ -423,7 +424,7 @@ the session cannot continue does sparing its quota outweigh that.
   `route` reads the new scores.
 - If `claude-build.sh` stops a build at its cap (exit 8), retry it with
   `route --down 1`, and one step further on each further stop (`--down 2`,
-  and so on). Record each stopped attempt as an Earlier-Attempt. When
+  and so on). Each stopped attempt becomes an Earlier-Attempt (`build-check.py`). When
   `why` says it moved fewer pairs than asked, or `route` prints a pair
   already tried for this stage, the stage is too big for its cap: revise
   the plan.
