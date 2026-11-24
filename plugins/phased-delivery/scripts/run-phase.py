@@ -467,8 +467,9 @@ def report(c, halt):
 def run(a):
     pdir = os.path.realpath(a.phase_dir)
     plan_dir = os.path.dirname(pdir)
+    rec = plan_check.read_json(os.path.join(pdir, "phase.json"))["record"]
     # a rerun means the session has handled the halt; resuming reads the records only
-    if plan_check.read_json(os.path.join(pdir, "phase.json"))["record"].get("halt"):
+    if rec.get("halt") and not rec.get("built"):
         set_halt(pdir, plan_dir, None)
     work = a.work or tempfile.mkdtemp(prefix="run-phase-")
     os.makedirs(work, exist_ok=True)
@@ -479,6 +480,9 @@ def run(a):
         trailers=[x for line in a.extra_trailer for x in ("--extra-trailer", line)],
         instructions="- Project instructions: "
                      + (", ".join(f"`{os.path.abspath(p)}`" for p in a.instructions) or "none"))
+    if rec.get("built"):  # already built: report it and write nothing
+        print("\n".join(report(c, None)))
+        return 0
     try:
         pre_phase(c, read_stages(pdir))
         stage_loop(c)

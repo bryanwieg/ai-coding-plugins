@@ -136,6 +136,17 @@ def test_builds_phase(repo):
     assert "Codex: off (driver version 1)" in result.stdout
 
 
+def test_rerun_of_built_phase(repo):
+    drive(repo, [REVISED_NOTHING, BUILD_ONE, BUILD_TWO, REVIEW])
+    head = git(repo, "rev-parse", "HEAD")
+    result = drive(repo, [])
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(repo) == 0
+    assert git(repo, "rev-parse", "HEAD") == head
+    assert git(repo, "status", "--porcelain") == ""
+    assert "Halt: none" in result.stdout
+
+
 def test_revise_then_halt(repo):
     steps = [REVISED_NOTHING, BUILD_ONE, FAILED_TWO, raise_two(2), FAILED_TWO, raise_two(3), FAILED_TWO]
     result = drive(repo, steps)
