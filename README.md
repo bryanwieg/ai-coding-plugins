@@ -118,29 +118,34 @@ calibration cases and their results.
 
 ### Plan checks
 
-plan-in-phases writes the plan as JSON in a `.plan/` folder while planning:
-`plan.json` (outcomes, cross-phase decisions, a contract registry, outcome
-tests, phases and stages) and one `NN.json` per phase. Field guides in the
-skill say what goes in each field, down to the interface level and no
-further. `plugins/phased-delivery/scripts/plan-check.py` checks what needs no
+plan-in-phases writes the plan as JSON and keeps it for the plan's whole
+life: `plan.json` (outcomes, cross-phase decisions, a contract registry,
+outcome tests, phases) and, per phase, a folder `NN-name` holding
+`phase.json` and one stage file `NN.n.json` per stage. Each of those has a
+`brief`, written by planning and revising, and a `record`, written only by
+the build scripts. Field guides in the skill say what goes in each field,
+down to the interface level and no further. `plugins/phased-delivery/scripts/plan-check.py` checks what needs no
 judgment (each contract listed by its provider and users, build order, files,
 outcome coverage, tiers, spec and design quotes, code citations, no code in
-briefs) and renders the `NN-name.md` phase files, which are the plan once it
-is reported. The plan reviewer reports only a closed list of finding types.
-It uses only the Python standard library; without Python, the planner writes
-the phase files directly and checks by reading.
+briefs) and renders `plan.md` and each phase folder's `phase.md` for
+reading; the rendered files are never edited. The plan reviewer reports only a closed list of finding types.
+It uses only the Python standard library; without Python, the planner
+checks by reading.
 
 ### Build checks
 
-implement-in-phases follows the same pattern. Revising a phase ends in
-`.build/NN-revision.json` (each stage's files, check commands and scores),
-and `plugins/phased-delivery/scripts/build-check.py` does the bookkeeping:
-it gates each build (no changed file outside the stage, every check
-passes), refuses a model and thinking level already tried for the stage,
-sums the premium spend for routing, and makes each stage, fix and phase
-commit with its trailers. A ledger in `.build/` keeps every attempt, so a
-resumed session picks up where it stopped. The phase reviewer writes
-`.build/NN-review.json` with a closed list of finding types. SKILL.md is a
+implement-in-phases builds from the same files. Revising a phase edits its
+stage files and raises the `revision` of each changed brief, and
+`plugins/phased-delivery/scripts/build-check.py` does the bookkeeping from
+a phase folder: it gates each build with the stage file's files and check
+commands, refuses a model and thinking level already tried for the stage at
+its current revision (a brief changed without a higher revision is an
+error), lets the session build only a stage marked `session_only`, sums the
+premium spend for routing, and makes each stage, fix and phase commit with
+its trailers. Every attempt goes into the stage file's `record`, and
+`phase.md`'s status is rendered from the records, so a resumed session
+picks up where it stopped. The phase reviewer writes `review.json` in the
+phase folder with a closed list of finding types. SKILL.md is a
 short outline; each step's directions are in its own guide.
 
 Some tools, Codex among them, let subagents use a different model only when the

@@ -1,4 +1,4 @@
-# Why implementation uses a revision JSON, a script gate and closed review types
+# Why implementation uses stage files, a script gate and closed review types
 
 Background for maintainers of this skill; the orchestrator and the reviewer
 do not need it. Changed 2026-11-24 (plugin 0.11.0). The plan that built it
@@ -37,13 +37,50 @@ stopped ratcheting. implement-in-phases now follows the same pattern:
   ask for more every round. Unneeded code (unused, unasked-for or
   duplicated) keeps the useful part.
 
+## Why the revision JSON went away (0.12.0)
+
+History: until 0.11.x a revised phase had three homes for a stage: the
+`NN-name.md` phase file, the `.build/NN-revision.json` the revise step wrote
+from it, and a ledger of attempts beside it in `.build/`. The planning JSON
+was deleted once the plan was reported, so a revision edited prose and then
+restated it as JSON, and the two could drift apart.
+
+Now the plan's JSON is kept for its whole life (see
+[structured-planning-notes.md](../plan-in-phases/structured-planning-notes.md)),
+and `build-check.py` takes a phase folder and reads each stage file directly:
+
+- **Revise is an edit of the JSON.** A stage's `files`, `checks` and
+  `model_basis` are already in its brief, so the revision JSON and its
+  schema had nothing left to say. The reviser edits briefs, raises their
+  `revision` and reruns `plan-check.py`.
+- **Records beside the briefs.** Each stage file is `{brief, record}`;
+  attempts go into the stage's `record`, review and revise runs into
+  `phase.json`'s. Only the scripts write a `record`, so two writers never
+  share a part of a file, and status in `phase.md` is rendered from the
+  records, never edited.
+- **A brief's hash is kept per revision.** A brief edited without a higher
+  `revision` is an error (exit 5), and the pairs already tried are counted
+  per revision: a changed brief may be tried again on every pair.
+- **A built stage can be reopened** by raising its brief's revision; it is
+  rebuilt as a fix commit. Freezing built briefs left facts about later
+  stages unmovable.
+- **Only a `session_only` stage may be recorded as built by the
+  orchestrator.** The 0.11.0 validation run below built a stage itself to
+  save money; the script now refuses that.
+- **One guide for every revision.** revise-guide.md takes the problem as an
+  input (none before a phase) and ends in a result line, so a session and a
+  headless reviser follow the same rules.
+
+The sections above and below describe 0.11.0 where they name the revision
+JSON or the ledger.
+
 ## Decisions worth keeping
 
 - A build exit other than 0 and 8 is `error`, not a try: sign-in, service
   and Codex availability failures say nothing about the model, so they
   neither block the pair nor count against it in the work report.
-- Stage commits hold only the stage's files; the phase file, `.build/` and
-  regenerated plan files are committed by `finish`, so the orchestrator's
+- Stage commits hold only the stage's files; the plan directory (the JSON
+  with its records, and the rendered files) is committed by `finish`, so
   plan edits mid-phase never fail a gate.
 - Files of other stages count as in scope only until those stages are
   committed: parallel stages work, and a committed stage cannot change

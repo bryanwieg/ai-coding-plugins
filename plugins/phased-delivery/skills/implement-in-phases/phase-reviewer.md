@@ -8,11 +8,11 @@ to Codex. It must not be an agent that built any stage of the phase.
 
 Inputs the orchestrator fills in:
 
-- Phase file: `<path>`
+- Phase folder: `<plan>/NN-name` (read its `phase.md`; the stage files `NN.n.json` hold each brief's `files` and `checks`)
 - Diff of the phase: `<command or base commit, for example git diff <base>>`
 - Edits that were present before the phase and are not part of it: `<list or "none">`
 - Project instructions: `<paths, such as CLAUDE.md or AGENTS.md>`
-- Review file to write: `<plan>/.build/NN-review.json`
+- Review file to write: `<plan>/NN-name/review.json`
 
 ---
 
@@ -40,7 +40,7 @@ judgment.
 - **Done:** each stage's "Done when" is met, and the phase's "After" holds.
   Say which you confirmed by running something and which only by reading.
 - **Tests:** the tests each brief names exist, check what a user would
-  observe, and pass; the outcome tests the phase file says pass from this
+  observe, and pass; the outcome tests `phase.md` says pass from this
   phase have no expected-fail mark left.
 - **Assumptions:** the phase's assumptions still hold in the built code.
 - **Rules:** project rules and limits are kept.
@@ -51,7 +51,7 @@ judgment.
 
 | Type | Report it when | Not this |
 | --- | --- | --- |
-| `untraced-change` | a changed line maps to no stage brief, including a change in the plan directory that the phase's Notes do not record (revisions, re-scores and regenerated model files are recorded there; status, stage table, `.build` files and `work-report.md` need no note) | a line the brief's goal plainly needs |
+| `untraced-change` | a changed line maps to no stage brief, including a change in the plan directory that the phase's Notes do not record (revisions, re-scores and regenerated model files are recorded there; the `record` parts of the JSON, the rendered `plan.md` and `phase.md`, `review.json` and `work-report.md` need no note) | a line the brief's goal plainly needs |
 | `internal-check` | a validation or error check on data this code produced or received through a settled contract | a check at an external input a brief lists |
 | `bug` | the code does something a brief's goal, contract or behaviour rule says it must not, or breaks a caller or another stage's contract; shown by a run or a cited line | behaviour the brief leaves to the builder |
 | `not-done` | a "Done when" item or the phase's "After" does not hold | an item you could only check by reading and have no reason to doubt |

@@ -221,7 +221,7 @@ at the top of the script.
 - **Premium budget, $10 per phase:** the implementer records each
   `claude-build.sh` run of a pair `route` printed with `"premium": true`,
   and every phase review it runs, with `build-check.py record ...
-  --premium`, and passes `build-check.py spend <phase file>` (the runs'
+  --premium`, and passes `build-check.py spend <phase dir>` (the runs'
   `Cost:`, or `cap_usd` when the cost is `unknown`) to `route` as
   `--premium-spent`. Once it reaches $10, builds get no premium pair for
   the rest of the phase.
@@ -299,7 +299,7 @@ R = 2, check whether the stage should be split.
 - Never dispatch a pair below the one `route` prints for the stage's scores
   without a written reason in the phase's Notes; a `--down` retry after a
   budget stop is recorded by its Earlier-Attempt trailer, which
-  `build-check.py commit` writes from the ledger.
+  `build-check.py commit` writes from the stage file's record.
 
 ## Builders in another tool
 
