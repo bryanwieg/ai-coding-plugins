@@ -2,45 +2,56 @@
 """Gate, record and commit the stages of a phase for implement-in-phases.
 
 Usage:
-  build-check.py start PHASE_FILE [--repo DIR]
-  build-check.py can-try PHASE_FILE STAGE MODEL EFFORT
-  build-check.py record PHASE_FILE STAGE|review --tool T --model M --effort E
-                 --exit N --tokens X --cost Y [--cap USD] [--tool-calls N]
-                 [--premium] [--fix] [--repo DIR]
-  build-check.py reject PHASE_FILE STAGE WHY
-  build-check.py commit PHASE_FILE STAGE [--subject-suffix TEXT]
+  build-check.py start PHASE_DIR [--repo DIR]
+  build-check.py can-try PHASE_DIR STAGE MODEL EFFORT
+  build-check.py record PHASE_DIR STAGE|review|revise --tool T --model M
+                 --effort E --exit N --tokens X --cost Y [--cap USD]
+                 [--tool-calls N] [--premium] [--fix] [--repo DIR]
+  build-check.py reject PHASE_DIR STAGE WHY
+  build-check.py commit PHASE_DIR STAGE [--subject-suffix TEXT]
                  [--extra-trailer LINE]... [--repo DIR]
-  build-check.py spend PHASE_FILE
-  build-check.py finish PHASE_FILE [--stopped] [--extra-trailer LINE]...
+  build-check.py spend PHASE_DIR
+  build-check.py finish PHASE_DIR [--stopped] [--extra-trailer LINE]...
                  [--repo DIR]
 
-PHASE_FILE is a plan's NN-name.md. The script keeps its files next to it in
-.build/: NN-revision.json (written by the orchestrator, revision.schema.json
-in skills/implement-in-phases), NN-review.json (written by the phase
-reviewer, review.schema.json) and NN-ledger.json (written here: the start
-state and every attempt). --repo defaults to the current directory.
+PHASE_DIR is a plan's phase folder NN-name: phase.json, one stage file
+NN.n.json per stage (phase.schema.json and stage.schema.json in
+skills/plan-in-phases) and review.json (written by the phase reviewer,
+review.schema.json in skills/implement-in-phases). The script reads the
+briefs and writes only the records: the start state, review and revise runs
+and the built commit in phase.json, and each stage's revisions, attempts and
+commit in its stage file. Status is never edited: phase.md and plan.md are
+re-rendered from the records. --repo defaults to the current directory.
 
-start     validates the revision and writes the ledger with HEAD and the
-          paths already modified (kept as is when it exists: resume). Exit 1
-          on an invalid revision or a stage file already modified.
-can-try   exit 1 when the stage already has a non-error attempt on the pair.
+start     validates phase.json and the stage files and writes HEAD and the
+          paths already modified into phase.json's record (kept as is when
+          set: resume). Exit 1 on invalid JSON or a stage's file already
+          modified.
+can-try   exit 1 when the stage already has a non-error attempt on the pair
+          at the brief's current revision.
 record    logs an attempt and gates a build: no uncommitted path outside the
           scope rule, and every check command of the stage passes. Prints one
           JSON line {stage, attempt, result, outside, checks}. Exit 0
           accepted; 1 failed; 3 budget stop (build exit 8); 4 error (any
-          other build exit: not a try of the pair). Stage "review" is logged
-          for spend only.
+          other build exit: not a try of the pair). Exit 2, nothing logged,
+          for --model orchestrator on a stage that is not session_only.
+          Stages "review" and "revise" are logged for spend only.
 reject    marks the stage's accepted, uncommitted attempt rejected.
-commit    commits the stage's changed files with the stage trailers and
-          marks the stage done in the phase file (working tree only).
+commit    commits the stage's changed files with the stage trailers (an
+          empty commit for a session-only or reopened stage with none),
+          writes the commit into the stage's record and re-renders.
 spend     prints the premium spend: costs of --premium attempts (cap when
           the cost is unknown), as a bare number.
-finish    validates the review, sets "Status: built <commit>" and commits
-          the phase file's directory with a Phase: trailer. --stopped skips
-          the review and status and only commits the directory.
+finish    refuses while a stage has no commit or is reopened, validates the
+          review, sets the record's built commit, re-renders and commits the
+          plan directory with a Phase: trailer. --stopped only commits.
+
+can-try and record store the hash of the stage's brief under its revision;
+they exit 5, nothing logged, when the brief changed since its revision was
+stored or the revision is lower than a stored one: raise the revision.
 
 Exit codes not listed: 0 done; 1 refused (one JSON line per problem for
-invalid JSON); 2 bad usage or a missing file.
+invalid JSON); 2 bad usage, a missing file, or start has not run.
 """
 
 import argparse
@@ -61,14 +72,14 @@ class Usage(Exception):
     pass
 
 
-def paths(phase_file):
-    if not os.path.isfile(phase_file):
-        raise Usage(f"no phase file: {phase_file}")
-    num = os.path.basename(phase_file)[:2]
-    if not num.isdigit():
-        raise Usage(f"phase file must be named NN-name.md: {phase_file}")
-    build = os.path.join(os.path.dirname(os.path.realpath(phase_file)), ".build")
-    return {k: os.path.join(build, f"{num}-{k}.json") for k in ("revision", "review", "ledger")}
+def phase_paths(phase_dir):
+    """(the phase folder, its plan directory), both real paths."""
+    pdir = os.path.realpath(phase_dir)
+    if not os.path.basename(pdir)[:2].isdigit():
+        raise Usage(f"phase folder must be named NN-name: {phase_dir}")
+    if not os.path.isfile(os.path.join(pdir, "phase.json")):
+        raise Usage(f"missing {os.path.join(phase_dir, 'phase.json')}")
+    return pdir, os.path.dirname(pdir)
 
 
 def load_checked(path, schema_name, label):
@@ -90,7 +101,7 @@ def report(problems):
     return 1 if problems else 0
 
 
-# ---- repository and ledger
+# ---- repository and records
 
 def git(repo, *args, check=True):
     r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
@@ -132,36 +143,62 @@ def is_cache(path):
     return "__pycache__" in parts or ".pytest_cache" in parts or path.endswith(".pyc")
 
 
-def load(path):
-    return json.load(open(path))
-
-
 def save(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=1)
         f.write("\n")
 
 
-def stage_files(revision, stage):
-    for s in revision["stages"]:
-        if s["id"] == stage:
-            return [f["path"] for f in s["files"]]
-    raise Usage(f"stage {stage} is not in the revision")
+def read_phase(phase_dir):
+    """(phase folder, plan directory, phase.json, {stage id: stage file}) of a started phase."""
+    pdir, plan_dir = phase_paths(phase_dir)
+    pj = plan_check.read_json(os.path.join(pdir, "phase.json"))
+    if not pj["record"].get("start_commit"):
+        raise Usage(f"{phase_dir} has no start_commit: run start first")
+    stages = {n[:-5]: plan_check.read_json(os.path.join(pdir, n)) for n in plan_check.stage_files(pdir)}
+    return pdir, plan_dir, pj, stages
 
 
-def committed_stages(ledger):
-    return {a["stage"] for a in ledger["attempts"] if a["result"] == "accepted" and a["commit"] and not a["fix"]}
+def stage_of(stages, sid):
+    if sid not in stages:
+        raise Usage(f"stage {sid} has no stage file")
+    return stages[sid]
 
 
-def outside_paths(top, phase_file, revision, ledger, stage):
-    plan_dir = rel(top, os.path.dirname(os.path.realpath(phase_file)))
-    done = committed_stages(ledger)
-    allowed = set(stage_files(revision, stage)) | set(ledger["preexisting"])
-    for s in revision["stages"]:
-        if s["id"] not in done:
-            allowed |= {f["path"] for f in s["files"]}
+def with_record(doc, **fields):
+    return {**doc, "record": {**doc["record"], **fields}}
+
+
+def attempts_of(s):
+    return s["record"].get("attempts", [])
+
+
+def brief_files(s):
+    return [f["path"] for f in s["brief"]["files"]]
+
+
+def pinned(pdir, sid, s):
+    """The stage with its brief's hash stored under its revision, saved; None, the reason
+    printed, when the brief changed without a higher revision."""
+    r = plan_check.Report()
+    plan_check.check_revision(sid, {**s, "file": f"{sid}.json"}, r)
+    if r.items:
+        for x in r.items:
+            print(x["msg"], file=sys.stderr)
+        return None
+    revs, rev = s["record"].get("revisions", {}), str(s["brief"]["revision"])
+    if rev in revs:
+        return s
+    new = with_record(s, revisions={**revs, rev: plan_check.brief_hash(s["brief"])})
+    save(os.path.join(pdir, f"{sid}.json"), new)
+    return new
+
+
+def outside_paths(top, plan_dir, pj, stages, sid):
+    uncommitted = {p for s in stages.values() if not s["record"].get("commit") for p in brief_files(s)}
+    allowed = set(brief_files(stages[sid])) | set(pj["record"]["preexisting"]) | uncommitted
     return [p for p in changed_paths(top)
-            if p not in allowed and not is_cache(p) and not in_dir(p, plan_dir)]
+            if p not in allowed and not is_cache(p) and not in_dir(p, rel(top, plan_dir))]
 
 
 def run_checks(top, commands):
@@ -180,173 +217,177 @@ def count(x):
 # ---- subcommands
 
 def cmd_start(a):
-    f = paths(a.phase_file)
-    revision, problems = load_checked(f["revision"], "revision.schema.json", "revision")
-    if problems:
-        return report(problems)
-    if os.path.exists(f["ledger"]):
+    pdir, _ = phase_paths(a.phase_dir)
+    name, r = os.path.basename(pdir), plan_check.Report()
+    pj = plan_check.load(os.path.join(pdir, "phase.json"), plan_check.schema_for("phase.schema.json"), r,
+                         f"{name}/phase.json")
+    schema = plan_check.schema_for("stage.schema.json")
+    loaded = {n[:-5]: plan_check.load(os.path.join(pdir, n), schema, r, f"{name}/{n}")
+              for n in plan_check.stage_files(pdir)}
+    stages = {sid: s for sid, s in loaded.items() if s is not None}
+    if not loaded:
+        r.add(f"{name}/phase.json", "-", "missing", f"no stage files in {name}")
+    for sid, s in stages.items():
+        plan_check.check_revision(sid, {**s, "file": f"{name}/{sid}.json"}, r)
+    if r.items:
+        return report(r.items)
+    if pj["record"].get("start_commit"):
         return 0
     top = toplevel(a.repo)
     now = changed_paths(top)
-    dirty = [{"file": "revision", "where": s["id"], "msg": f"stage file already modified: {p}"}
-             for s in revision["stages"] for p in stage_files(revision, s["id"]) if p in now]
+    dirty = [{"file": f"{name}/{sid}.json", "where": sid, "msg": f"stage file already modified: {p}"}
+             for sid, s in stages.items() for p in brief_files(s) if p in now]
     if dirty:
         return report(dirty)
-    save(f["ledger"], {"start_commit": git(top, "rev-parse", "HEAD").strip(), "preexisting": now, "attempts": []})
+    save(os.path.join(pdir, "phase.json"),
+         with_record(pj, start_commit=git(top, "rev-parse", "HEAD").strip(), preexisting=now))
     return 0
 
 
-def ledger_of(f):
-    if not os.path.exists(f["ledger"]):
-        raise Usage(f"missing {f['ledger']}: run start first")
-    return load(f["ledger"])
-
-
 def cmd_can_try(a):
-    ledger = ledger_of(paths(a.phase_file))
-    for x in ledger["attempts"]:
-        if (x["stage"], x["model"], x["effort"]) == (a.stage, a.model, a.effort) and x["result"] != "error":
+    pdir, _, _, stages = read_phase(a.phase_dir)
+    s = pinned(pdir, a.stage, stage_of(stages, a.stage))
+    if s is None:
+        return 5
+    for x in attempts_of(s):
+        if ((x["model"], x["effort"], x["revision"]) == (a.model, a.effort, s["brief"]["revision"])
+                and x["result"] != "error"):
             print(json.dumps(x))
             return 1
     return 0
 
 
 def cmd_record(a):
-    f = paths(a.phase_file)
-    ledger = ledger_of(f)
-    attempt = {"stage": a.stage, "n": 0, "fix": a.fix, "tool": a.tool, "model": a.model, "effort": a.effort,
-               "exit": a.exit_code, "tokens": a.tokens, "cost": a.cost, "cap": a.cap,
-               "tool_calls": a.tool_calls, "premium": a.premium, "result": "review", "why": "", "commit": ""}
-    outside, checks, code = [], [], 0
-    if a.stage != "review":
-        revision = load(f["revision"])
-        top = toplevel(a.repo)
-        same = [x for x in ledger["attempts"] if x["stage"] == a.stage and x["fix"] == a.fix
-                and x["result"] != "error" and not x["commit"]]
-        attempt["n"] = len(same) + 1
-        outside = outside_paths(top, a.phase_file, revision, ledger, a.stage)
-        if a.exit_code == 8:
-            attempt.update(result="stopped", why="budget reached")
-            code = 3
-        elif a.exit_code != 0:
-            attempt.update(result="error", why=f"build exit {a.exit_code}", n=0)
-            code = 4
-        elif outside:
-            attempt.update(result="failed", why="changed files outside the stage")
-            code = 1
-        else:
-            checks = run_checks(top, next(s["checks"] for s in revision["stages"] if s["id"] == a.stage))
-            failed = any(c["exit"] for c in checks)
-            attempt.update(result="failed" if failed else "accepted", why="check failed" if failed else "")
-            code = 1 if failed else 0
-    ledger["attempts"].append(attempt)
-    save(f["ledger"], ledger)
+    pdir, plan_dir, pj, stages = read_phase(a.phase_dir)
+    base = {"n": 0, "fix": a.fix, "tool": a.tool, "model": a.model, "effort": a.effort,
+            "exit": a.exit_code, "tokens": a.tokens, "cost": a.cost, "cap": a.cap,
+            "tool_calls": a.tool_calls, "premium": a.premium, "why": "", "commit": ""}
+    if a.stage in ("review", "revise"):
+        run = {"stage": a.stage, **base, "result": a.stage}
+        save(os.path.join(pdir, "phase.json"), with_record(pj, runs=pj["record"].get("runs", []) + [run]))
+        print(json.dumps({"stage": a.stage, "attempt": 0, "result": a.stage, "outside": [], "checks": []}))
+        return 0
+    if a.model == "orchestrator" and not stage_of(stages, a.stage)["brief"].get("session_only"):
+        print(f"stage {a.stage} is not session_only: the orchestrator may not build it", file=sys.stderr)
+        return 2
+    s = pinned(pdir, a.stage, stage_of(stages, a.stage))
+    if s is None:
+        return 5
+    top = toplevel(a.repo)
+    same = [x for x in attempts_of(s) if x["fix"] == a.fix and x["result"] != "error" and not x["commit"]]
+    outside = outside_paths(top, plan_dir, pj, stages, a.stage)
+    checks = [] if a.exit_code or outside else run_checks(top, s["brief"]["checks"])
+    if a.exit_code == 8:
+        outcome, code = {"result": "stopped", "why": "budget reached"}, 3
+    elif a.exit_code != 0:
+        outcome, code = {"result": "error", "why": f"build exit {a.exit_code}", "n": 0}, 4
+    elif outside:
+        outcome, code = {"result": "failed", "why": "changed files outside the stage"}, 1
+    elif any(c["exit"] for c in checks):
+        outcome, code = {"result": "failed", "why": "check failed"}, 1
+    else:
+        outcome, code = {"result": "accepted"}, 0
+    attempt = {"revision": s["brief"]["revision"], **base, "n": len(same) + 1, **outcome}
+    save(os.path.join(pdir, f"{a.stage}.json"), with_record(s, attempts=attempts_of(s) + [attempt]))
     print(json.dumps({"stage": a.stage, "attempt": attempt["n"], "result": attempt["result"],
                       "outside": outside, "checks": checks}))
     return code
 
 
-def open_attempt(ledger, stage):
-    for x in reversed(ledger["attempts"]):
-        if x["stage"] == stage and x["result"] == "accepted" and not x["commit"]:
+def open_attempt(s):
+    for x in reversed(attempts_of(s)):
+        if x["result"] == "accepted" and not x["commit"]:
             return x
     return None
 
 
+def replaced(s, marked, **fields):
+    """The stage's attempts with `fields` set on the ones in `marked`."""
+    return [{**y, **fields} if any(y is m for m in marked) else y for y in attempts_of(s)]
+
+
 def cmd_reject(a):
-    f = paths(a.phase_file)
-    ledger = ledger_of(f)
-    x = open_attempt(ledger, a.stage)
+    pdir, _, _, stages = read_phase(a.phase_dir)
+    s = stage_of(stages, a.stage)
+    x = open_attempt(s)
     if x is None:
         print(f"no accepted, uncommitted attempt for {a.stage}", file=sys.stderr)
         return 1
-    x.update(result="rejected", why=a.why)
-    save(f["ledger"], ledger)
+    save(os.path.join(pdir, f"{a.stage}.json"),
+         with_record(s, attempts=replaced(s, [x], result="rejected", why=a.why)))
     return 0
 
 
 def git_commit(top, files, subject, trailers):
-    git(top, "add", "-A", "--", *files)
     body = "\n".join(trailers)
-    git(top, "commit", "-q", "-m", subject, "-m", body, "--", *files)
+    if files:
+        git(top, "add", "-A", "--", *files)
+        git(top, "commit", "-q", "-m", subject, "-m", body, "--", *files)
+    else:
+        # an empty commit made from HEAD's tree, so that paths staged by someone else stay out of it
+        new = git(top, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", subject, "-m", body).strip()
+        git(top, "update-ref", "HEAD", new)
     return git(top, "rev-parse", "--short", "HEAD").strip()
 
 
-def mark_done(phase_file, done):
-    """Set the done stages' table cells and the Status line in the working tree."""
-    lines = open(phase_file).read().split("\n")
-    for i, line in enumerate(lines):
-        cells = line.split("|")
-        if len(cells) > 6 and cells[1].strip() in done:
-            cells[-2] = " done "
-            lines[i] = "|".join(cells)
-        elif line.startswith("Status:"):
-            lines[i] = f"Status: in progress (stages done: {', '.join(sorted(done))})"
-    open(phase_file, "w").write("\n".join(lines))
-
-
 def cmd_commit(a):
-    f = paths(a.phase_file)
-    ledger, revision = ledger_of(f), load(f["revision"])
-    x = open_attempt(ledger, a.stage)
+    pdir, plan_dir, pj, stages = read_phase(a.phase_dir)
+    s = stage_of(stages, a.stage)
+    x = open_attempt(s)
     if x is None:
         print(f"no accepted, uncommitted attempt for {a.stage}", file=sys.stderr)
         return 1
     top = toplevel(a.repo)
-    now = set(changed_paths(top)) - set(ledger["preexisting"])
-    files = [p for p in stage_files(revision, a.stage) if p in now]
-    if not files:
+    now = set(changed_paths(top)) - set(pj["record"]["preexisting"])
+    files = [p for p in brief_files(s) if p in now]
+    if not files and not (s["brief"].get("session_only") or plan_check.stage_status(s) == "reopened"):
         print(f"no changed files for {a.stage}", file=sys.stderr)
         return 1
-    earlier = [y for y in ledger["attempts"] if y["stage"] == a.stage and y["fix"] == x["fix"]
+    earlier = [y for y in attempts_of(s) if y["fix"] == x["fix"]
                and y["result"] in ("failed", "stopped", "rejected") and not y["commit"]]
-    stage = next(s for s in revision["stages"] if s["id"] == a.stage)
     trailers = [f"{'Fixes-Stage' if x['fix'] else 'Stage'}: {a.stage}",
-                f"Plan: {rel(top, a.phase_file)}",
-                f"Tier: {stage['tier']}", f"Tool: {x['tool']}", f"Model: {x['model']}",
-                f"Effort: {x['effort']}", f"Attempt: {len(earlier) + 1}", f"Tokens: {count(x['tokens'])}",
-                f"Cost: {amount(x['cost'])}", f"Tool-Calls: {count(x['tool_calls'])}"]
-    trailers += [f"Earlier-Attempt: {y['model']} {y['effort']} {count(y['tokens'])} {' '.join(y['why'].split())}" for y in earlier]
-    subject = f"{a.stage} {stage['title']}" + (f" {a.subject_suffix}" if a.subject_suffix else "")
-    sha = git_commit(top, files, subject, trailers + a.extra_trailer)
-    for y in earlier + [x]:
-        y["commit"] = sha
-    save(f["ledger"], ledger)
-    if not x["fix"]:
-        mark_done(a.phase_file, committed_stages(ledger))
+                f"Plan: {rel(top, pdir)}",
+                f"Tier: {plan_check.tier(s['brief']['model_basis'])[1]}", f"Tool: {x['tool']}",
+                f"Model: {x['model']}", f"Effort: {x['effort']}", f"Attempt: {len(earlier) + 1}",
+                f"Tokens: {count(x['tokens'])}", f"Cost: {amount(x['cost'])}",
+                f"Tool-Calls: {count(x['tool_calls'])}"]
+    earlier_lines = [f"Earlier-Attempt: {y['model']} {y['effort']} {count(y['tokens'])} {' '.join(y['why'].split())}"
+                     for y in earlier]
+    subject = f"{a.stage} {s['brief']['title']}" + (f" {a.subject_suffix}" if a.subject_suffix else "")
+    sha = git_commit(top, files, subject, trailers + earlier_lines + a.extra_trailer)
+    save(os.path.join(pdir, f"{a.stage}.json"),
+         with_record(s, attempts=replaced(s, earlier + [x], commit=sha), commit=sha))
+    plan_check.render_plan(plan_dir)
     print(sha)
     return 0
 
 
 def cmd_spend(a):
-    ledger = ledger_of(paths(a.phase_file))
-    total = sum((x["cost"] if x["cost"] is not None else x["cap"] or 0) for x in ledger["attempts"] if x["premium"])
+    _, _, pj, stages = read_phase(a.phase_dir)
+    spent = pj["record"].get("runs", []) + [x for s in stages.values() for x in attempts_of(s)]
+    total = sum((x["cost"] if x["cost"] is not None else x["cap"] or 0) for x in spent if x["premium"])
     print(f"{total:.2f}")
     return 0
 
 
 def cmd_finish(a):
-    f = paths(a.phase_file)
-    ledger, revision = ledger_of(f), load(f["revision"])
-    if not a.stopped:
-        _, problems = load_checked(f["review"], "review.schema.json", "review")
-        missing = [s["id"] for s in revision["stages"] if s["id"] not in committed_stages(ledger)]
-        problems += [{"file": "ledger", "where": s, "msg": "stage has no commit"} for s in missing]
-        if problems:
-            return report(problems)
-        top = toplevel(a.repo)
-        ours = {x["commit"] for x in ledger["attempts"] if x["result"] == "accepted" and x["commit"]}
-        log = git(top, "log", "--format=%h", "--abbrev=7", f"{ledger['start_commit']}..HEAD").split()
-        last = next(h for h in log if any(c.startswith(h) or h.startswith(c) for c in ours))
-        mark_done(a.phase_file, committed_stages(ledger))
-        text = open(a.phase_file).read().split("\n")
-        text = [f"Status: built {last}" if line.startswith("Status:") else line for line in text]
-        open(a.phase_file, "w").write("\n".join(text))
+    pdir, plan_dir, pj, stages = read_phase(a.phase_dir)
     top = toplevel(a.repo)
-    plan_dir = rel(top, os.path.dirname(os.path.realpath(a.phase_file)))
-    phase = rel(top, a.phase_file)
-    subject = f"Phase {os.path.basename(a.phase_file)[:2]} {'stopped' if a.stopped else 'built'}: status and notes"
-    print(git_commit(top, [plan_dir], subject, [f"Phase: {phase}"] + a.extra_trailer))
+    if not a.stopped:
+        _, review_problems = load_checked(os.path.join(pdir, "review.json"), "review.schema.json", "review")
+        states = {sid: plan_check.stage_status(s) for sid, s in stages.items()}
+        unbuilt = [{"file": f"{sid}.json", "where": sid,
+                    "msg": "stage is reopened" if state == "reopened" else "stage has no commit"}
+                   for sid, state in states.items() if state != "done"]
+        if review_problems or unbuilt:
+            return report(review_problems + unbuilt)
+        ours = {s["record"]["commit"] for s in stages.values()}
+        log = git(top, "log", "--format=%h", "--abbrev=7", f"{pj['record']['start_commit']}..HEAD").split()
+        last = next(h for h in log if any(c.startswith(h) or h.startswith(c) for c in ours))
+        save(os.path.join(pdir, "phase.json"), with_record(pj, built=last))
+        plan_check.render_plan(plan_dir)
+    subject = f"Phase {os.path.basename(pdir)[:2]} {'stopped' if a.stopped else 'built'}: status and notes"
+    print(git_commit(top, [rel(top, plan_dir)], subject, [f"Phase: {rel(top, pdir)}"] + a.extra_trailer))
     return 0
 
 
@@ -364,13 +405,13 @@ def parse_args(argv):
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("start")
-    s.add_argument("phase_file")
+    s.add_argument("phase_dir")
     s.add_argument("--repo", default=".")
     s = sub.add_parser("can-try")
-    for k in ("phase_file", "stage", "model", "effort"):
+    for k in ("phase_dir", "stage", "model", "effort"):
         s.add_argument(k)
     s = sub.add_parser("record")
-    s.add_argument("phase_file")
+    s.add_argument("phase_dir")
     s.add_argument("stage")
     for k in ("--tool", "--model", "--effort"):
         s.add_argument(k, required=True)
@@ -383,18 +424,18 @@ def parse_args(argv):
     s.add_argument("--fix", action="store_true")
     s.add_argument("--repo", default=".")
     s = sub.add_parser("reject")
-    for k in ("phase_file", "stage", "why"):
+    for k in ("phase_dir", "stage", "why"):
         s.add_argument(k)
     s = sub.add_parser("commit")
-    s.add_argument("phase_file")
+    s.add_argument("phase_dir")
     s.add_argument("stage")
     s.add_argument("--subject-suffix", default="")
     s.add_argument("--extra-trailer", action="append", default=[])
     s.add_argument("--repo", default=".")
     s = sub.add_parser("spend")
-    s.add_argument("phase_file")
+    s.add_argument("phase_dir")
     s = sub.add_parser("finish")
-    s.add_argument("phase_file")
+    s.add_argument("phase_dir")
     s.add_argument("--stopped", action="store_true")
     s.add_argument("--extra-trailer", action="append", default=[])
     s.add_argument("--repo", default=".")
