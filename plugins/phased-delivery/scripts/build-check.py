@@ -47,8 +47,12 @@ finish    refuses while a stage has no commit or is reopened, validates the
           plan directory with a Phase: trailer. --stopped only commits.
 
 can-try and record store the hash of the stage's brief under its revision;
-they exit 5, nothing logged, when the brief changed since its revision was
-stored or the revision is lower than a stored one: raise the revision.
+every subcommand but start exits 5, nothing changed, when a brief changed
+since its revision was stored or the revision is lower than a stored one:
+raise the revision. Every subcommand validates phase.json and the stage
+files as start does; but for start, another problem is exit 2, one JSON
+line each.
+record exits 2, nothing logged, for a stage with a commit without --fix.
 
 Exit codes not listed: 0 done; 1 refused (one JSON line per problem for
 invalid JSON); 2 bad usage, a missing file, or start has not run.
@@ -72,6 +76,10 @@ class Usage(Exception):
     pass
 
 
+class Invalid(Exception):
+    """(problems, exit code): the phase failed validation; main prints the problems as JSON lines."""
+
+
 def phase_paths(phase_dir):
     """(the phase folder, its plan directory), both real paths."""
     pdir = os.path.realpath(phase_dir)
@@ -93,6 +101,22 @@ def load_checked(path, schema_name, label):
     schema = json.load(open(os.path.join(SKILL, schema_name)))
     errs = plan_check.validate(data, schema)
     return (None if errs else data), [{"file": label, "where": w or "/", "msg": m} for w, m in errs]
+
+
+def checked_phase(pdir):
+    """(phase.json, {stage id: stage file}, problems): the schemas, then the revision check."""
+    name, r = os.path.basename(pdir), plan_check.Report()
+    pj = plan_check.load(os.path.join(pdir, "phase.json"), plan_check.schema_for("phase.schema.json"), r,
+                         f"{name}/phase.json")
+    schema = plan_check.schema_for("stage.schema.json")
+    loaded = {n[:-5]: plan_check.load(os.path.join(pdir, n), schema, r, f"{name}/{n}")
+              for n in plan_check.stage_files(pdir)}
+    stages = {sid: s for sid, s in loaded.items() if s is not None}
+    if not loaded:
+        r.add(f"{name}/phase.json", "-", "missing", f"no stage files in {name}")
+    for sid, s in stages.items():
+        plan_check.check_revision(sid, {**s, "file": f"{name}/{sid}.json"}, r)
+    return pj, stages, r.items
 
 
 def report(problems):
@@ -152,10 +176,12 @@ def save(path, data):
 def read_phase(phase_dir):
     """(phase folder, plan directory, phase.json, {stage id: stage file}) of a started phase."""
     pdir, plan_dir = phase_paths(phase_dir)
-    pj = plan_check.read_json(os.path.join(pdir, "phase.json"))
+    pj, stages, problems = checked_phase(pdir)
+    if problems:
+        # a brief edited without a higher revision keeps exit 5; any other problem is exit 2
+        raise Invalid(problems, 5 if all(p["kind"] == "revision" for p in problems) else 2)
     if not pj["record"].get("start_commit"):
         raise Usage(f"{phase_dir} has no start_commit: run start first")
-    stages = {n[:-5]: plan_check.read_json(os.path.join(pdir, n)) for n in plan_check.stage_files(pdir)}
     return pdir, plan_dir, pj, stages
 
 
@@ -178,14 +204,7 @@ def brief_files(s):
 
 
 def pinned(pdir, sid, s):
-    """The stage with its brief's hash stored under its revision, saved; None, the reason
-    printed, when the brief changed without a higher revision."""
-    r = plan_check.Report()
-    plan_check.check_revision(sid, {**s, "file": f"{sid}.json"}, r)
-    if r.items:
-        for x in r.items:
-            print(x["msg"], file=sys.stderr)
-        return None
+    """The stage with its brief's hash stored under its revision, saved; read_phase has run the revision check."""
     revs, rev = s["record"].get("revisions", {}), str(s["brief"]["revision"])
     if rev in revs:
         return s
@@ -218,19 +237,10 @@ def count(x):
 
 def cmd_start(a):
     pdir, _ = phase_paths(a.phase_dir)
-    name, r = os.path.basename(pdir), plan_check.Report()
-    pj = plan_check.load(os.path.join(pdir, "phase.json"), plan_check.schema_for("phase.schema.json"), r,
-                         f"{name}/phase.json")
-    schema = plan_check.schema_for("stage.schema.json")
-    loaded = {n[:-5]: plan_check.load(os.path.join(pdir, n), schema, r, f"{name}/{n}")
-              for n in plan_check.stage_files(pdir)}
-    stages = {sid: s for sid, s in loaded.items() if s is not None}
-    if not loaded:
-        r.add(f"{name}/phase.json", "-", "missing", f"no stage files in {name}")
-    for sid, s in stages.items():
-        plan_check.check_revision(sid, {**s, "file": f"{name}/{sid}.json"}, r)
-    if r.items:
-        return report(r.items)
+    name = os.path.basename(pdir)
+    pj, stages, problems = checked_phase(pdir)
+    if problems:
+        return report(problems)
     if pj["record"].get("start_commit"):
         return 0
     top = toplevel(a.repo)
@@ -247,8 +257,6 @@ def cmd_start(a):
 def cmd_can_try(a):
     pdir, _, _, stages = read_phase(a.phase_dir)
     s = pinned(pdir, a.stage, stage_of(stages, a.stage))
-    if s is None:
-        return 5
     for x in attempts_of(s):
         if ((x["model"], x["effort"], x["revision"]) == (a.model, a.effort, s["brief"]["revision"])
                 and x["result"] != "error"):
@@ -270,9 +278,10 @@ def cmd_record(a):
     if a.model == "orchestrator" and not stage_of(stages, a.stage)["brief"].get("session_only"):
         print(f"stage {a.stage} is not session_only: the orchestrator may not build it", file=sys.stderr)
         return 2
-    s = pinned(pdir, a.stage, stage_of(stages, a.stage))
-    if s is None:
-        return 5
+    if stage_of(stages, a.stage)["record"].get("commit") and not a.fix:
+        print(f"stage {a.stage} already has a commit: pass --fix to record its rebuild", file=sys.stderr)
+        return 2
+    s = pinned(pdir, a.stage, stages[a.stage])
     top = toplevel(a.repo)
     same = [x for x in attempts_of(s) if x["fix"] == a.fix and x["result"] != "error" and not x["commit"]]
     outside = outside_paths(top, plan_dir, pj, stages, a.stage)
@@ -321,7 +330,10 @@ def cmd_reject(a):
 def git_commit(top, files, subject, trailers):
     body = "\n".join(trailers)
     if files:
-        git(top, "add", "-A", "--", *files)
+        # a deletion is left to commit's pathspec: git add fails on one already staged (git rm)
+        present = [p for p in files if os.path.lexists(os.path.join(top, p))]
+        if present:
+            git(top, "add", "-A", "--", *present)
         git(top, "commit", "-q", "-m", subject, "-m", body, "--", *files)
     else:
         # an empty commit made from HEAD's tree, so that paths staged by someone else stay out of it
@@ -450,6 +462,9 @@ def main(argv):
     a = parse_args(argv)
     try:
         return COMMANDS[a.cmd](a)
+    except Invalid as e:
+        report(e.args[0])
+        return e.args[1]
     except (Usage, OSError, ValueError) as e:
         print(e, file=sys.stderr)
         return 2
