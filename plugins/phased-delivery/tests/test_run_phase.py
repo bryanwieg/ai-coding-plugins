@@ -137,7 +137,6 @@ def test_builds_phase(repo):
     assert "Codex: off (driver version 1)" in result.stdout
 
 
-@pytest.mark.xfail(strict=True, reason="the driver's steps are mocks until 05.1")
 def test_revise_then_halt(repo):
     steps = [REVISED_NOTHING, BUILD_ONE, FAILED_TWO, raise_two(2), FAILED_TWO, raise_two(3), FAILED_TWO]
     result = drive(repo, steps)
@@ -151,7 +150,6 @@ def test_revise_then_halt(repo):
     assert "Halt: revise-capped at build 01.2" in result.stdout
 
 
-@pytest.mark.xfail(strict=True, reason="the driver's steps are mocks until 05.1")
 def test_resume_after_halt(repo):
     # claude exits 3 after writing the file: an error that is not the model's
     first = drive(repo, [REVISED_NOTHING, {**BUILD_ONE, "exit": 3}])

@@ -15,16 +15,21 @@ When a step cannot go on, the driver writes a halt into phase.json's record,
 says what the session does before rerunning; a rerun clears the halt and
 resumes from the records.
 
-In this version every step is a mock that returns a fixed result: nothing is
-built, reviewed or committed.
+In this version the review is a mock and the phase is not finished: the
+driver revises, starts and builds the stages.
 
 Exit codes: 0 built; 10 halted (the halt is in phase.json's record); 2 usage.
 """
 
 import argparse
 import importlib.util
+import json
 import os
+import re
+import subprocess
 import sys
+import tempfile
+from types import SimpleNamespace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("plan_check", os.path.join(HERE, "plan-check.py"))
@@ -76,15 +81,236 @@ def set_halt(pdir, plan_dir, halt):
     plan_check.render_plan(plan_dir)
 
 
-# ---- steps: mocks, each returning a fixed result. A step that cannot go on returns
-# {"halt": reason, "detail": text} instead.
+SKILLS = os.path.join(os.path.dirname(HERE), "skills")
+REVISE_GUIDE = os.path.join(SKILLS, "implement-in-phases", "revise-guide.md")
+STAGE_BUILDER = os.path.join(SKILLS, "implement-in-phases", "stage-builder.md")
+MAX_REVISIONS = 2  # failure-driven revisions of one stage in a run before the user is asked
 
-def revise(a, pdir, sid):
-    return {"result": "mock"}
+
+class Halt(Exception):
+    """A step cannot go on: the reason (a key of NEXT), the detail, and where it happened."""
+
+    def __init__(self, reason, detail, step="revise", stage=None):
+        super().__init__(reason, detail)
+        self.reason, self.detail, self.step, self.stage = reason, detail, step, stage
 
 
-def build(a, pdir, sid):
-    return {"result": "mock"}
+# ---- tools
+
+def sh(*cmd):
+    return subprocess.run([str(x) for x in cmd], capture_output=True, text=True)
+
+
+def py(script, *args):
+    return sh(sys.executable, os.path.join(HERE, script), *args)
+
+
+def last(text):
+    lines = [x for x in text.splitlines() if x.strip()]
+    return lines[-1].strip() if lines else ""
+
+
+def must(r, what, ok=(0,)):
+    """The finished command, or a halt: brief-changed for exit 5, build-error for any other exit not in OK."""
+    if r.returncode == 5:
+        raise Halt("brief-changed", r.stdout.strip() or last(r.stderr))
+    if r.returncode not in ok:
+        raise Halt("build-error", f"{what}: {last(r.stderr) or last(r.stdout)}")
+    return r
+
+
+def restore(c, paths=None):
+    """Put PATHS back as HEAD has them; by default every uncommitted path but the plan's and the preexisting ones."""
+    if paths is None:
+        kept = plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"].get("preexisting", [])
+        plan_rel = build_check.rel(c.top, c.plan_dir)
+        paths = [p for p in build_check.changed_paths(c.top) if p not in kept
+                 and not build_check.is_cache(p) and not build_check.in_dir(p, plan_rel)]
+    for p in paths:
+        if sh("git", "-C", c.top, "cat-file", "-e", f"HEAD:{p}").returncode == 0:
+            build_check.git(c.top, "restore", "--source=HEAD", "--staged", "--worktree", "--", p)
+        else:
+            build_check.git(c.top, "rm", "-q", "--cached", "--ignore-unmatch", "--", p)
+            if os.path.lexists(os.path.join(c.top, p)):
+                os.remove(os.path.join(c.top, p))
+
+
+def plan_docs(plan_dir):
+    """{path: content} of every phase.json and stage file of the plan."""
+    dirs = [os.path.join(plan_dir, ph["dir"]) for ph in plan_check.read_json(os.path.join(plan_dir, "plan.json"))["phases"]]
+    return {os.path.join(d, n): plan_check.read_json(os.path.join(d, n))
+            for d in dirs for n in ["phase.json"] + plan_check.stage_files(d)}
+
+
+def guard(before, keep_briefs):
+    """Undo what a model call may not change in the plan: (a record changed, a brief changed and was restored)."""
+    def now(path):
+        try:
+            doc = plan_check.read_json(path)
+        except (OSError, ValueError):
+            return None
+        return doc if isinstance(doc, dict) else None
+    after = {p: now(p) for p in before}
+    for p, old in before.items():
+        new = after[p]
+        right = old if new is None or keep_briefs else {**new, "record": old["record"]}
+        if right != new:
+            build_check.save(p, right)
+    records = any(after[p] is None or after[p].get("record") != old["record"] for p, old in before.items())
+    briefs = keep_briefs and any(after[p] is not None and after[p].get("brief") != old["brief"]
+                                 for p, old in before.items())
+    return records, briefs
+
+
+def route(c, *options):
+    r = must(py("select-models.py", "route", c.available, *c.profiles, *options), "route")
+    return json.loads(r.stdout)
+
+
+def call(c, label, guide, inputs, pair, keep_briefs):
+    """One model call through claude-build.sh: {exit, tokens, cost, line (the report's last), stderr, edited}."""
+    out = os.path.join(c.work, f"{len(os.listdir(c.work)) + 1:02d}-{label}")
+    os.makedirs(out)
+    prompt = os.path.join(out, "prompt.md")
+    with open(guide) as g, open(prompt, "w") as f:
+        f.write(g.read() + "\n## Inputs\n\n" + "\n".join(inputs) + "\n")
+    before = plan_docs(c.plan_dir)
+    r = sh("sh", os.path.join(HERE, "claude-build.sh"), c.top, prompt, pair["model"], pair["effort"],
+           pair["cap_usd"], out)
+    records, briefs = guard(before, keep_briefs)
+    if records:
+        raise Halt("record-changed", f"the {label} call changed a record; its directions: {guide}")
+    printed = dict(re.findall(r"^(Tokens|Cost): (\S+)$", r.stdout, re.MULTILINE))
+    report_path = os.path.join(out, "report.md")
+    text = open(report_path).read() if os.path.isfile(report_path) else ""
+    return {"exit": r.returncode, "tokens": printed.get("Tokens", "unknown"), "cost": printed.get("Cost", "unknown"),
+            "line": last(text), "stderr": last(r.stderr), "edited": briefs}
+
+
+def record(c, what, pair, res, *flags):
+    return py("build-check.py", "record", c.pdir, what, "--tool", "claude-code", "--model", pair["model"],
+              "--effort", pair["effort"], "--exit", res["exit"], "--tokens", res["tokens"], "--cost", res["cost"],
+              "--cap", pair["cap_usd"], *(["--premium"] if pair["premium"] else []), *flags, "--repo", c.top)
+
+
+# ---- steps. A step that cannot go on raises Halt.
+
+def check_plan(c):
+    number = next(ph["phase"] for ph in plan_check.read_json(os.path.join(c.plan_dir, "plan.json"))["phases"]
+                  if ph["dir"] == os.path.basename(c.pdir))
+    r = py("plan-check.py", c.plan_dir, "--repo", c.top, "--phase", number)
+    if r.returncode:
+        raise Halt("revise-failed", (r.stdout + r.stderr).strip())
+
+
+def revise(c, problem):
+    """Run the reviser on the phase and check its plan: 'revised' or 'unchanged'."""
+    pair = route(c, "--scores", "J0F0R0C0K0P0V0S0", "--review")
+    inputs = [f"- Phase folder: `{c.pdir}`", f"- Problem: {problem}", c.instructions,
+              f"- The plugin's guides (absolute paths): `{os.path.join(SKILLS, 'plan-in-phases')}` holds "
+              f"revising.md and the field guides; plan-check.py is `{os.path.join(HERE, 'plan-check.py')}`; "
+              f"the repository is `{c.top}`"]
+    res = call(c, "revise", REVISE_GUIDE, inputs, pair, False)
+    if res["exit"] not in (0, 8):
+        raise Halt("build-error", res["stderr"])
+    must(record(c, "revise", pair, res), "record")
+    word = re.fullmatch(r"Result: (revised|unchanged)", res["line"])
+    if not word:  # an escalate line, or none
+        raise Halt("escalated", res["line"] or "the reviser's report has no result line")
+    check_plan(c)
+    return word.group(1)
+
+
+def pre_phase(c, stages):
+    """Revise and start a phase not yet revised; check the plan while no stage has an attempt."""
+    runs = plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"].get("runs", [])
+    if not any(x["stage"] == "revise" for x in runs):
+        started = py("build-check.py", "start", c.pdir, "--repo", c.top)
+        if started.returncode:
+            raise Halt("revise-failed", (started.stdout + started.stderr).strip())
+        current = py("select-models.py", "check", os.path.join(c.plan_dir, "models.md"), *c.profiles)
+        if current.returncode:
+            raise Halt("models-stale", last(current.stdout + current.stderr))
+        revise(c, "none")
+    elif not any(s["record"].get("attempts") for s in stages.values()):
+        check_plan(c)
+
+
+def read_stages(pdir):
+    return {n[:-5]: plan_check.read_json(os.path.join(pdir, n)) for n in plan_check.stage_files(pdir)}
+
+
+def failed(c, sid, times, unchanged, why):
+    """A stage that cannot be built on its revision: clean the tree and revise the phase for it."""
+    restore(c)
+    if times >= MAX_REVISIONS:
+        raise Halt("revise-capped", f"stage {sid} was revised {times} times for failures in this run; then: {why}")
+    if revise(c, f"stage {sid}: {why}") == "unchanged":
+        raise Halt(unchanged, why)
+    return "revised"
+
+
+def build(c, sid, s, times):
+    """One step on a stage, read from its record: a build ('built' or 'retry'), or a revision ('revised')."""
+    brief, rec = s["brief"], s["record"]
+    if brief.get("session_only"):
+        raise Halt("session-only", f"stage {sid} is built in the session")
+    tried = [x for x in rec.get("attempts", []) if x["revision"] == brief["revision"]]
+    up = sum(x["result"] in ("failed", "rejected") for x in tried)
+    down = sum(x["result"] == "stopped" for x in tried)
+    if up and down:
+        return failed(c, sid, times, "revise-capped", "its builds both failed and reached their budget")
+    spent = must(py("build-check.py", "spend", c.pdir), "spend").stdout.strip()
+    steps = ["--up", up] if up else ["--down", down] if down else []
+    scores = "".join(f"{k}{brief['model_basis'][k]}" for k in "JFRCKPVS")
+    pair = route(c, "--scores", scores, "--premium-spent", spent, *steps)
+    # a ladder moved fewer steps than asked lands on a pair already tried, so can-try covers that too
+    if must(py("build-check.py", "can-try", c.pdir, sid, pair["model"], pair["effort"]), "can-try", (0, 1)).returncode:
+        return failed(c, sid, times, "revise-capped",
+                      f"every model pair of its ladder was tried; the last attempt: {tried[-1]['why'] if tried else ''}")
+    fix = bool(rec.get("commit"))  # reopened: rebuilt against the new brief as a fix
+    earlier = [f"- Earlier commit: `{rec['commit']}` built this stage from an earlier brief; rebuild it "
+               "against the brief in the packet"] if fix else []
+    inputs = [c.instructions, "- Anything else the brief links to: none", *earlier, "- Stage packet:", "",
+              plan_check.packet(c.plan_dir, sid)]
+    res = call(c, f"build-{sid}", STAGE_BUILDER, inputs, pair, True)
+    logged = record(c, sid, pair, res, *(["--fix"] if fix else []))
+    if logged.returncode == 4:
+        raise Halt("build-error", res["stderr"])
+    accepted = must(logged, "record", (0, 1, 3)).returncode == 0
+    stopped = re.match(r"Result: stopped:?\s*(.*)", res["line"])
+    if stopped or (accepted and res["edited"]):
+        why = "edited the plan" if not stopped else stopped.group(1) or "the builder stopped"
+        if accepted:
+            must(py("build-check.py", "reject", c.pdir, sid, why), "reject")
+        return failed(c, sid, times, "builder-stopped", why) if stopped else "retry"
+    if accepted:
+        trailers = [x for line in c.a.extra_trailer for x in ("--extra-trailer", line)]
+        must(py("build-check.py", "commit", c.pdir, sid, "--subject-suffix", c.a.subject_suffix, *trailers,
+                "--repo", c.top), "commit")
+        return "built"
+    restore(c, json.loads(last(logged.stdout))["outside"])
+    return "retry"
+
+
+def stage_loop(c):
+    """Build the stages not done, in id order: (the (step, stage, result) of each one built, the Halt or None)."""
+    done, revisions = [], {}
+    while True:
+        stages = read_stages(c.pdir)
+        todo = [sid for sid, s in stages.items() if plan_check.stage_status(s) != "done"]
+        if not todo:
+            return done, None
+        sid = todo[0]
+        try:
+            result = build(c, sid, stages[sid], revisions.get(sid, 0))
+        except Halt as h:
+            restore(c)  # a rerun starts from a clean tree
+            return done, Halt(h.reason, h.detail, "build", sid)
+        if result == "built":
+            done = done + [("build", sid, {"result": "built"})]
+        if result == "revised":
+            revisions = {**revisions, sid: revisions.get(sid, 0) + 1}
 
 
 def review(a, pdir, sid):
@@ -112,18 +338,26 @@ def run(a):
     # a rerun means the session has handled the halt; resuming reads the records only
     if plan_check.read_json(os.path.join(pdir, "phase.json"))["record"].get("halt"):
         set_halt(pdir, plan_dir, None)
-    steps = ([("revise", None, revise)]
-             + [("build", n[:-5], build) for n in plan_check.stage_files(pdir)]
-             + [("review", None, review)])
-    done, halt = [], None
-    for step, sid, fn in steps:
-        result = fn(a, pdir, sid)
-        done = done + [(step, sid, result)]
-        if "halt" in result:
-            halt = {"step": step, "stage": sid, "reason": result["halt"], "detail": result["detail"],
-                    "next": NEXT[result["halt"]]}
-            set_halt(pdir, plan_dir, halt)
-            break
+    work = a.work or tempfile.mkdtemp(prefix="run-phase-")
+    os.makedirs(work, exist_ok=True)
+    c = SimpleNamespace(
+        a=a, pdir=pdir, plan_dir=plan_dir, top=build_check.toplevel(a.repo), work=work,
+        available=os.path.join(plan_dir, "models-available.json"),
+        profiles=["--profiles", a.profiles] if a.profiles else [],
+        instructions="- Project instructions: "
+                     + (", ".join(f"`{os.path.abspath(p)}`" for p in a.instructions) or "none"))
+    try:
+        pre_phase(c, read_stages(pdir))
+        done, stopped = stage_loop(c)
+    except Halt as h:
+        done, stopped = [], h
+    halt = None
+    if stopped:
+        halt = {"step": stopped.step, "stage": stopped.stage, "reason": stopped.reason, "detail": stopped.detail,
+                "next": NEXT[stopped.reason]}
+        set_halt(pdir, plan_dir, halt)
+    else:
+        done = done + [("review", None, review(a, pdir, None))]
     print("\n".join(report(os.path.basename(pdir), done, halt)))
     return 10 if halt else 0
 
