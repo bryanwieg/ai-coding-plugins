@@ -61,7 +61,8 @@ def test_outcomes(tmp_path, events, status, code, message):
     assert args[:2] == ["-p", "Build stage 03.1."]
     for flag, value in [("--model", "opus"), ("--effort", "high"), ("--max-budget-usd", "2.5"),
                         ("--permission-mode", "acceptEdits"), ("--output-format", "stream-json"),
-                        ("--settings", '{"enabledPlugins":{"phased-delivery@ai-coding-plugins":false}}')]:
+                        ("--settings", '{"enabledPlugins":{"phased-delivery@ai-coding-plugins":false}}'),
+                        ("--thinking-display", "summarized")]:
         assert args[args.index(flag) + 1] == value
     assert "--no-session-persistence" in args
     if events and events[-1] is BUILT:

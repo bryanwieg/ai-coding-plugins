@@ -51,7 +51,11 @@ works this way is in
    Pass each project instruction file (CLAUDE.md, AGENTS.md) with
    `--instructions`, and the project's required commit subject annotation
    and trailers with the other two options. It prints a report and exits 0
-   (built), 10 (halted) or 2 (bad usage: fix the command).
+   (built), 10 (halted) or 2 (bad usage: fix the command). Run it as a
+   background shell: a phase outlasts a foreground command's time limit,
+   and the user watches the live feed on its stderr (each call's thinking,
+   messages and tool calls) in the tool's view of that shell. Do not read
+   the feed into your own context; wait for the exit and read the report.
 2. **On exit 10, answer the halt.** Read `record.halt` in the phase's
    `phase.json` (the report prints it too): `step`, `stage`, `reason`,
    `detail` and `next`. Do what `next` says, as the table below expands it,
@@ -124,8 +128,8 @@ Continue to the next phase only when the user says so; a user stop wins.
 ## Report the models' work
 
 After the last phase is committed, write `work-report.md` in the plan
-directory, commit it with the trailer `Phase: <plan directory>`, and give
-the user its tables and Reading.
+directory, commit it with the trailer `Phase: <plan directory>` (unless git
+ignores the plan directory), and give the user its tables and Reading.
 
 1. Generate it, never by hand: `sh scripts/stage-stats.sh <plan start>..HEAD`.
    Per model and effort it gives stages, first-try and clean counts, failed

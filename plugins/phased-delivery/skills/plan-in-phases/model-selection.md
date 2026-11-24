@@ -47,6 +47,15 @@ more does. (Changed 2026-11-24: the old override, any of J, C or K at 2
 means `top`, sent 39% of stages to the most expensive pair.) A measure at 2
 raises `middle` to `middle+` (override 2).
 
+`top` has a step above it for the most extreme complexity: **`top+`** is a
+`top` stage with a total of 12 or more, or with K = 2 (`plan-check.py`'s
+`hardest`). Only `top+` stages, and the reviews of phases that hold one,
+get the most capable pair (Fable high today); other `top` stages get the
+frontier pair one below it (Fable medium), and a failed build there steps
+up with `--up`. (Changed 2026-11-24: `top` on the most capable pair sent
+every review and every total of 9 to Fable high, at about twice Fable
+medium's run cost.)
+
 Overrides, which always win over the total:
 
 1. **`small` only for mechanical stages:** J, C, K and S all 0, P = 0 (the
@@ -129,7 +138,9 @@ What the code enforces, so the agent does not:
   best** (the floors are constants at the top of the script). So a large
   model at low thinking beats a small model at high thinking when it scores
   as well for less. `middle+` is the next more capable candidate above
-  `middle`.
+  `middle`. `top+` takes the floor of 97% of the best score; `top` is the
+  frontier pair one below `top+`'s, or `middle+`'s pick when that scores
+  more.
 - **Within 3 points, the cheaper candidate wins.** After a tier picks, any
   cheaper candidate scoring within 3 index points of the pick replaces it,
   even across a floor (for `middle+`, only candidates still above
@@ -198,16 +209,16 @@ What `route` does, in this order:
 | --- | --- |
 | Candidates | Offered pairs within the thinking-level ceilings that have a score and a benchmark run cost, minus low-gain thinking steps: a step up gaining under 2 points for more than 1.5 times the run cost of the level below. |
 | Frontier | Only pairs on the score/cost frontier: a pair another beats on both score and cost is never chosen. |
-| Tier | The tier from the scores with the overrides above; `--review` uses `top`. The pick is the cheapest frontier pair meeting the tier's floor, then any cheaper pair within 3 points; `middle+` is the next frontier pair above the `middle` pick. |
+| Tier | The tier from the scores with the overrides above, and `top+` for the hardest `top` stages; `--review` uses `top`, or `top+` when its scores are a `top+` stage's. The pick is the cheapest frontier pair meeting the tier's floor, then any cheaper pair within 3 points; `middle+` is the next frontier pair above the `middle` pick; `top` is the frontier pair one below the `top+` pick, never below `middle+`'s. |
 | Premium budget | With `--premium-spent` at or above $10, builds leave premium pairs out. |
 | Mechanical (J, P and V all 0, tier above `small`) | Thinking at `medium` or below. `small` stages keep the small model's higher levels. |
 | Long or wide (S, R or F = 2) | Thinking at `high` or below. |
-| Risk (K of 1 or more) | One frontier pair up. |
+| Risk (K of 1 or more) | One frontier pair up, below `top` only: K = 2 makes a `top` stage `top+`. |
 | Design or contract (J = 2 or C = 2) | Among pairs meeting the floor that score at least the pick and cost at most 1.5 times it, the lowest thinking level: a larger model at lower thinking. |
 | Long or wide (S, R or F = 2) | Among pairs meeting the floor within 3 points of the pick (with K of 1 or more, at least the risk step's score) and costing at most 1.5 times it, the fastest, if at least 1.2 times the pick's speed (thinking levels of one model differ by a few percent). |
-| Premium below `top` | A premium pick below `top` is routed again without premium pairs; the premium pair stays only if it costs no more than that standard pick and scores at least as well. When the standard pairs run out before a step up the stage asked for (`middle+`, risk, `--up`), the cheapest pair scoring above the standard pick is taken instead (the next model up at low thinking, not more thinking on a smaller model), but only when its score divided by its benchmark run cost is no more than 5% below the standard pick's (`PREMIUM_RATIO_MARGIN`); otherwise the standard pick stays. A `--up` retry after a failed build takes it regardless. |
+| Premium below `top` | A premium pick below `top` (and `top+`) is routed again without premium pairs; the premium pair stays only if it costs no more than that standard pick and scores at least as well. When the standard pairs run out before a step up the stage asked for (`middle+`, risk, `--up`), the cheapest pair scoring above the standard pick is taken instead (the next model up at low thinking, not more thinking on a smaller model), but only when its score divided by its benchmark run cost is no more than 5% below the standard pick's (`PREMIUM_RATIO_MARGIN`); otherwise the standard pick stays. A `--up` retry after a failed build takes it regardless. |
 | `--down N`, `--up N` | Move N frontier pairs cheaper or dearer from the pick, stopping at either end. N is 0 or more; not both at once. |
-| `--review` | `top`, ignoring premium spend and the stage's scores (no caps, risk step or preferences). |
+| `--review` | `top`, or `top+` when `--scores` are a `top+` stage's (the driver passes the phase's hardest stage); premium spend and the scores' other signals do not shape it (no caps, risk step or preferences). |
 
 The constants (`LOW_GAIN_POINTS`, `LOW_GAIN_COST_RATIO`, `FLOORS`,
 `TIE_POINTS`, `PREMIUM_BUDGET_USD`, `PREFER_COST_RATIO`, `SPEED_GAIN`, `CAP_TOKENS`) are
@@ -216,7 +227,7 @@ at the top of the script.
 ### Limits
 
 - **Stage caps:** `cap_tokens` is 150000 for `small`, 400000 for `middle`
-  and `middle+`, 1000000 for `top`. `cap_usd` is that many tokens at the
+  and `middle+`, 1000000 for `top` and `top+`. `cap_usd` is that many tokens at the
   pair's input price, rounded to cents, and never below $0.25
   (`MIN_CAP_USD`): at the input price alone a `small` stage on Haiku would
   get $0.01, below one headless run. `claude-build.sh` stops the build
@@ -230,7 +241,8 @@ at the top of the script.
   `Cost:`, or `cap_usd` when the cost is `unknown`) to `route` as
   `--premium-spent`. Once it reaches $10, builds get no premium pair for
   the rest of the phase.
-- **Reviews** use `route --review`: always `top`, their cost counted
+- **Reviews** use `route --review`: `top`, or `top+` for a phase with a
+  `top+` stage, their cost counted
   against the premium budget when built by `claude-build.sh`, never a step
   down. A review stopped at its
   cap is reported to the user, not retried lower.
@@ -287,7 +299,7 @@ brief is revised; the driver routes from them (see "Adjust while working").
   = 7 -> override 2 -> `middle+`. Better still, the planner should settle
   the approach and re-score.
 - Replace the session store with a new one, migrating stored sessions and
-  retiring the old path: J1 F2 R2 C2 K2 P2 V1 S1 = 13 -> `top`.
+  retiring the old path: J1 F2 R2 C2 K2 P2 V1 S1 = 13 -> `top+`.
 
 A high score can also mean the stage is too big: before accepting F = 2 or
 R = 2, check whether the stage should be split.
@@ -296,11 +308,13 @@ R = 2, check whether the stage should be split.
 
 - **Reviews run on `top`** through `route --review` (on
   `models-available-codex.json` when the routing rule sends the review to
-  Codex), whatever the tier of the work under review. A review exists to
-  catch what the author missed, including bad assumptions; a weaker
-  reviewer defeats the point. Its cost counts against the premium budget,
-  but it never drops a step.
-- **Planning and plan revision** use `top`.
+  Codex), or on `top+` when the phase holds a `top+` stage. A review exists
+  to catch what the author missed, including bad assumptions; it never runs
+  below `top`, but the most capable pair on every review is more than most
+  phases need. Its cost counts against the premium budget, but it never
+  drops a step.
+- **Planning and plan revision** use `top`; a plan review uses `top+` when
+  the plan holds a `top+` stage.
 - Never dispatch a pair below the one `route` prints for the stage's scores
   without a written reason in the phase's Notes; a `--down` retry after a
   budget stop is recorded by its Earlier-Attempt trailer, which

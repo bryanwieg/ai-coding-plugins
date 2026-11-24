@@ -16,7 +16,10 @@ in `record.halt` of the phase's `phase.json`. Exit 2: bad usage. Each run
 prints a report: every stage and its status, the review findings and their
 outcome, the halt, that Codex is off and, for a built phase,
 `stage-stats.sh`'s table. `--work` keeps each call's prompt, output and
-`report.md` in a numbered folder (a temporary directory otherwise).
+`report.md` in a numbered folder (a temporary directory otherwise). While a
+call runs, the driver prints its feed to stderr, each line tagged with the
+call (`[build-01.2]`): its thinking summaries, messages, tool calls, failed
+tool results and result.
 
 ## The parts
 
@@ -140,7 +143,9 @@ Each finding's status is kept in `record.findings` of `phase.json`:
 `build-check.py finish` checks `review.json` and that every stage has a
 commit and none is reopened, records the built commit, re-renders
 `phase.md` and `plan.md` and commits the plan directory with a `Phase:`
-trailer and each `--extra-trailer`. Its refusal halts `build-error`.
+trailer and each `--extra-trailer`; a plan directory git ignores (a plan
+kept out of the repository) is left uncommitted. Its refusal halts
+`build-error`.
 
 ## Premium spend
 

@@ -59,8 +59,10 @@ import re
 import sys
 
 # Tier floors: a candidate qualifies if its score is at least this share of
-# the best candidate's score; the cheapest qualifying candidate wins.
-FLOORS = {"top": 0.97, "middle": 0.85, "small": 0.50}
+# the best candidate's score; the cheapest qualifying candidate wins. Only the
+# hardest stages (plan-check.py's hardest) and their phases' reviews get top+;
+# top is the frontier pair one below it, never below middle+.
+FLOORS = {"top+": 0.97, "middle": 0.85, "small": 0.50}
 # After a tier picks a candidate, any cheaper candidate scoring within this
 # many index points (the index runs 0-100) of the pick is taken instead.
 TIE_POINTS = 3.0
@@ -86,7 +88,7 @@ LOW_GAIN_COST_RATIO = 1.5
 PROFILES_FILE = "model-profiles.json"
 # Tokens a stage may spend, by tier; passed on as a dollar cap at the pair's
 # input price.
-CAP_TOKENS = {"small": 150000, "middle": 400000, "middle+": 400000, "top": 1000000}
+CAP_TOKENS = {"small": 150000, "middle": 400000, "middle+": 400000, "top": 1000000, "top+": 1000000}
 # No build's dollar cap is lower than this: at the input price alone a cheap
 # model's cap rounds to a cent, below what one headless run costs.
 MIN_CAP_USD = 0.25
@@ -306,8 +308,15 @@ def assign_tiers(scored):
         pick = min(above, key=lambda c: (c["score"], c["cost"]))
         tiers["middle+"] = prefer_cheaper(pick, above)
     else:
-        tiers["middle+"] = tiers["top"]
+        tiers["middle+"] = tiers["top+"]
+    tiers["top"] = below_top_plus(frontier(scored), tiers["top+"], tiers["middle+"])
     return best, tiers
+
+
+def below_top_plus(front, top_plus, middle_plus):
+    """top: the frontier pair one below top+'s pick, or middle+'s pick when that scores more."""
+    lower = [c for c in front if c["score"] < top_plus["score"]]  # front is cheapest first
+    return max(lower[-1:] + [middle_plus], key=lambda c: c["score"])
 
 
 def money(value):
@@ -338,7 +347,7 @@ def render(available, profiles, metric, cost_field, best, tiers, scored, exclude
         "| Tier | Model | Effort | Score | Cost | Report row |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
-    for tier in ["small", "middle", "middle+", "top"]:
+    for tier in ["small", "middle", "middle+", "top", "top+"]:
         c = tiers[tier]
         lines.append(f"| {tier} | {c['tool_model']} | {c['effort']} | {c['score']:.1f}"
                      f" | {money(c['cost'])} | {c['row']['name']} |")
@@ -481,12 +490,20 @@ def parse_scores(text):
     return {text[i]: int(text[i + 1]) for i in range(0, 16, 2)}
 
 
-def stage_tier(scores):
-    """plan-check.py's tier: (total, tier, why) with the model-selection overrides."""
+def plan_check():
     spec = importlib.util.spec_from_file_location("plan_check", os.path.join(HERE, "plan-check.py"))
-    plan_check = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(plan_check)
-    return plan_check.tier(scores)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def stage_tier(scores):
+    """plan-check.py's tier: (total, tier, why), with top+ for its hardest stages."""
+    checks = plan_check()
+    total, tier, why = checks.tier(scores)
+    if checks.hardest(scores):
+        return total, "top+", "total of 12 or more, or risk K2"
+    return total, tier, why
 
 
 def frontier(pool):
@@ -502,6 +519,8 @@ def meets_floor(front, tier, best):
     if tier == "middle+":
         bar = frontier_pick(front, "middle", best)["score"]
         return [c for c in front if c["score"] > bar]
+    if tier == "top":
+        return [c for c in front if c["score"] >= frontier_pick(front, tier, best)["score"]]
     return [c for c in front if c["score"] >= FLOORS[tier] * best]
 
 
@@ -514,6 +533,8 @@ def frontier_pick(front, tier, best):
     if tier == "middle+":
         middle = front.index(frontier_pick(front, "middle", best))
         return front[min(middle + 1, len(front) - 1)]
+    if tier == "top":
+        return below_top_plus(front, frontier_pick(front, "top+", best), frontier_pick(front, "middle+", best))
     meeting = meets_floor(front, tier, best)
     if not meeting:
         return max(front, key=lambda c: c["score"])
@@ -544,7 +565,7 @@ def pick_pair(allowed, tier, best, scores, signals, up, down):
     if cap and pick is not frontier_pick(frontier(allowed), tier, best):
         why.append(f"{'mechanical' if mechanical else 'long or wide'} stage: thinking capped at {cap}")
     meeting = meets_floor(front, tier, best)
-    if signals and scores["K"] >= 1:
+    if signals and scores["K"] >= 1 and tier not in ("top", "top+"):  # top+ already takes K2
         short = short or front.index(pick) == last
         stepped = front[min(front.index(pick) + 1, last)]
         if stepped is not pick:
@@ -595,8 +616,10 @@ def route_main(args):
     if not pool:
         print("no selectable pair", file=sys.stderr)
         return 4
-    tier, tier_why = ("top", "phase reviews run on top") if options.review \
-        else stage_tier(options.scores)[1:]
+    tier, tier_why = stage_tier(options.scores)[1:]
+    if options.review:  # a review runs on top, or top+ when its scores are the phase's hardest stage's
+        tier, tier_why = ("top+", "review of a phase with a top+ stage") if tier == "top+" \
+            else ("top", "reviews run on top")
     best = max(c["score"] for c in pool)
     over_budget = not options.review and options.premium_spent >= PREMIUM_BUDGET_USD
     allowed = [c for c in pool if not c["row"]["premium"]] if over_budget else pool
@@ -615,7 +638,7 @@ def route_main(args):
         print(notes, file=sys.stderr)
         return 4
     standard = [c for c in allowed if not c["row"]["premium"]]
-    if tier != "top" and choice["row"]["premium"] and standard:
+    if tier not in ("top", "top+") and choice["row"]["premium"] and standard:
         # Below top a premium pair must beat the standard pick on cost and score,
         # unless the standard pairs cannot give a step up the stage asked for:
         # the next model up at low thinking beats more thinking on a smaller one.

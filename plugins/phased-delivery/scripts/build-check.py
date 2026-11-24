@@ -398,6 +398,9 @@ def cmd_finish(a):
         last = next(h for h in log if any(c.startswith(h) or h.startswith(c) for c in ours))
         save(os.path.join(pdir, "phase.json"), with_record(pj, built=last))
         plan_check.render_plan(plan_dir)
+    if subprocess.run(["git", "-C", top, "check-ignore", "-q", rel(top, plan_dir)]).returncode == 0:
+        print("not committed: git ignores the plan directory")  # a plan kept out of the repository
+        return 0
     subject = f"Phase {os.path.basename(pdir)[:2]} {'stopped' if a.stopped else 'built'}: status and notes"
     print(git_commit(top, [rel(top, plan_dir)], subject, [f"Phase: {rel(top, pdir)}"] + a.extra_trailer))
     return 0

@@ -39,7 +39,8 @@ def test_any_age_and_check(tmp_path):
     assert f"Profiles: {fingerprint} (data checked 2020-01-01); {REPORT['attribution']}" in text
     tiers = [line.split(" | ")[:3] for line in text.splitlines() if line.startswith("| ")][2:]
     assert tiers == [["| small", "haiku", "high"], ["| middle", "opus", "medium"],
-                     ["| middle+", "opus", "high"], ["| top", "opus", "high"]]
+                     ["| middle+", "opus", "high"], ["| top", "opus", "high"],
+                     ["| top+", "opus", "high"]]
 
     assert run("check", models_md, "--profiles", profiles).returncode == 0
     repriced = copy.deepcopy(REPORT)
@@ -93,20 +94,24 @@ def test_route_stage_signals(offered, tmp_path):
     assert claude["cap_usd"] == 0.25  # MIN_CAP_USD: at Haiku's input price it would be $0.01
     # F2 caps at high: small would be luna xhigh.
     assert pair(route(offered, "J0F2R0C0K0P0V0S0")) == ("terra", "low")
-    # F2 prefers the faster close pair: top is astra high, sol high is faster.
-    assert pair(route(offered, "J1F2R1C1K0P2V2S0")) == ("sol", "high")
-    # J2 on a top stage (total 9) moves up the model before the thinking level: nova low costs 1.33x astra high.
-    assert pair(route(offered, "J2F1R1C2K0P2V1S0")) == ("nova", "low")
+    # A top stage that is not among the hardest gets the pair one below top+ (astra high).
+    assert pair(route(offered, "J1F2R1C1K0P2V2S0")) == ("sol", "medium")
+    # F2 prefers the faster close pair: top+ (total 13) is astra high, sol high is faster.
+    assert pair(route(offered, "J1F2R2C1K2P2V1S1")) == ("sol", "high")
+    # J2 on a top+ stage moves up the model before the thinking level: nova low costs 1.33x astra high.
+    assert pair(route(offered, "J2F1R1C2K2P2V1S0")) == ("nova", "low")
     # Risk moves one frontier pair up from the middle pick, terra high.
     assert pair(route(offered, "J1F1R0C0K1P0V0S0")) == ("sol", "low")
-    # The J2 preference never undoes the risk step: without astra and sol high,
-    # J2 alone picks nova low, and with K1 the step up to nova medium holds.
+    # On a top stage, K1 does not step up to top+ (only K2 makes a stage top+).
+    assert pair(route(offered, "J2F1R1C2K1P2V0S0")) == ("sol", "medium")
+    # Without astra and sol high, J2 on top+ picks nova low, and a --up retry
+    # after a failure moves on to nova medium.
     narrow = tmp_path / "narrow.json"
     narrow.write_text(json.dumps({**OFFERED, "models": [
         m if m["id"] != "gpt-9-sol" else {**m, "efforts": ["low", "medium"]}
         for m in OFFERED["models"] if m["id"] != "gpt-9-astra"]}))
-    assert pair(route(narrow, "J2F1R1C2K0P2V1S0")) == ("nova", "low")
-    assert pair(route(narrow, "J2F1R1C2K1P2V0S0")) == ("nova", "medium")
+    assert pair(route(narrow, "J2F1R1C2K2P2V1S0")) == ("nova", "low")
+    assert pair(route(narrow, "J2F1R1C2K2P2V1S0", "--up", "1")) == ("nova", "medium")
 
 
 def edited_profiles(tmp_path, changes):
@@ -171,21 +176,23 @@ def test_route_fable_limits(tmp_path):
 def test_route_speed_gain(offered, tmp_path):
     # sol high at 45 is only 1.125x astra high's 40: under SPEED_GAIN, so F2 keeps astra.
     slow = edited_profiles(tmp_path, {("GPT-9 Sol", "high"): {"speed": 45}})
-    assert pair(route(offered, "J1F2R1C1K0P2V2S0", profiles=slow)) == ("astra", "high")
+    assert pair(route(offered, "J1F2R2C1K2P2V1S1", profiles=slow)) == ("astra", "high")
 
 
 def test_route_limits(offered):
     # One step below terra high: luna max is beaten by terra low, terra medium is low gain.
     down = route(offered, "J1F1R0C0K0P0V0S0", "--down", "1")
     assert pair(down) == ("terra", "low") and "--down 1" in down["why"]
-    top_build = "J1F1R1C1K0P2V2S1"
-    assert route(offered, top_build)["premium"]
+    top_build = "J1F1R1C1K2P2V2S1"  # K2: top+
+    assert route(offered, top_build)["premium"] and route(offered, top_build)["tier"] == "top+"
     over = route(offered, top_build, "--premium-spent", "10")
     assert pair(over) == ("sol", "high") and not over["premium"] and "budget" in over["why"]
+    # a review runs on top, or on top+ when its scores are a top+ stage's; premium spend never limits it
     review = route(offered, "J1F1R0C0K0P0V0S0", "--review", "--premium-spent", "10")
-    assert (pair(review), review["tier"], review["premium"], review["cap_usd"]) == (
-        ("astra", "high"), "top", True, 10.0)
-    # a review ignores the stage's scores: no caps or preferences shape it
-    assert pair(route(offered, "J0F2R2C0K2P0V0S2", "--review")) == ("astra", "high")
+    assert (pair(review), review["tier"]) == (("sol", "medium"), "top")
+    hard = route(offered, top_build, "--review", "--premium-spent", "10")
+    assert (pair(hard), hard["tier"], hard["premium"], hard["cap_usd"]) == (("astra", "high"), "top+", True, 10.0)
+    # no caps or preferences shape a review: S2 and F2 do not move it, K2 below top does not make it top+
+    assert pair(route(offered, "J0F2R2C0K2P0V0S2", "--review")) == ("sol", "medium")
     assert run("route", offered, "--scores", "J1F1R0C0K0P0V0S0", "--profiles", PROFILES,
                "--down", "-1").returncode == 2

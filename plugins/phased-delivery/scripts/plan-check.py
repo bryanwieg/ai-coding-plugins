@@ -124,6 +124,12 @@ def tier(mb):
     return total, t, why
 
 
+def hardest(mb):
+    """A top stage of the most extreme complexity (a total of 12 or more, or risk K2): the one routed to top+."""
+    total, t, _ = tier(mb)
+    return t == "top" and (total >= 12 or mb["K"] == 2)
+
+
 def strings(x, path=""):
     if isinstance(x, str):
         yield path, x
