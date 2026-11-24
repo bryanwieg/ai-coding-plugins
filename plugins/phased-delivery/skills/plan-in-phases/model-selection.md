@@ -272,7 +272,8 @@ dispatch.
   neighboring entry the brief names, and add one test: J0 F1 R0 C0 K0 P0 V0
   S0 = 1 -> `small`.
 - Change a function, run its tests, expect one named test to fail, then
-  update that test: J0 F1 R0 C0 K0 P0 V0 S2 = 3 -> override 1 -> `middle`.
+  update that test: J0 F1 R0 C0 K0 P0 V0 S2 = 3 -> override 1 -> `middle`
+  -> override 2 -> `middle+`.
 - Fill in the body of a planned parser function against a defined signature,
   reading a config file another tool writes, with tests: J1 F1 R1 C1 K1 P1 V0
   S0 = 6 -> `middle`.

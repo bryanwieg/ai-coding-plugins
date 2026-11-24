@@ -4,7 +4,9 @@ Agreed with the user on 2026-11-24.
 
 ## Problem
 
-Across the 38 stages scored in this repository's plans and eval tasks, `route`
+Across the 38 stages scored in this repository's plans and eval tasks (main's
+29 plus the 9 in `docs/plans/implement-structured/` on the `implement-structured`
+branch), `route`
 sends 15 (39%) to Fable high and 10 more to Fable low. Ten of the fifteen
 `top` stages reach it only through K = 2, with totals of 5 to 7. Fable at
 medium thinking or above should be for the top 10% most complex tasks; picking

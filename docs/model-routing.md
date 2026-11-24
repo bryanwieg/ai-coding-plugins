@@ -125,7 +125,9 @@ How it works now:
     at a lower thinking level. It waits for a larger model.
 - **Fable limits, 2026-11-24:** Fable at medium thinking or above should be
   for the top 10% most complex stages. On the 38 stages scored in this
-  repository's plans and eval tasks, `route` sent 15 (39%) to Fable high
+  repository's plans and eval tasks (main's 29 plus the 9 in
+  `docs/plans/implement-structured/` on the `implement-structured`
+  branch), `route` sent 15 (39%) to Fable high
   and 10 to Fable low; 10 of the 15 `top` stages got there only through
   K = 2, at totals of 5 to 7. Two changes: `top` comes only from a total of
   9 or more (the "J, C or K = 2" override is gone), and the premium step-up

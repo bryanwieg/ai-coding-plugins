@@ -90,7 +90,9 @@ a dollar cap: 150k tokens for `small`, 400k for `middle`, 1M for `top`, at
 the pair's input price. A stage stopped at its cap is retried one step down
 the frontier; one that fails its checks, one step up. Premium models
 (output price of $30 or more per million tokens) are used below `top` only
-when cheaper than the standard pick and as good, and get $10 per phase; past
+when cheaper than the standard pick and as good, or as the step up past the
+last standard pick while their score per unit of cost is within 5% of it;
+`top` comes only from a total score of 9 or more. They get $10 per phase; past
 that, builds use none. Reviews always run on `top`, and their cost counts
 against that budget. The builder may edit files and runs only the commands
 your project's permission rules allow; set
