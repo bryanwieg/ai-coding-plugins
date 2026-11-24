@@ -136,6 +136,9 @@ def test_builds_phase(repo):
     assert any(s.startswith("01.2 Write two") for s in subjects(repo))
     assert git(repo, "status", "--porcelain") == ""
     assert "Codex: off (driver version 1)" in result.stdout
+    # the live feed of each call, on stderr
+    for line in ("[revise] thinking: fake thinking", "[build-01.1] Bash: true", "result: success, $0.01"):
+        assert line in result.stderr, result.stderr
 
 
 def test_rerun_of_built_phase(repo):

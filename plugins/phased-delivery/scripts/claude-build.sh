@@ -4,8 +4,9 @@
 #
 # PROMPT is a file holding stage-builder.md and its inputs, kept outside
 # REPO; its text is passed as the prompt. Claude works in REPO with the
-# phased-delivery plugin off. OUTDIR receives report.md (the final
-# message), stream.jsonl and stderr.txt.
+# phased-delivery plugin off and thinking summaries on. OUTDIR receives
+# report.md (the final message), stream.jsonl (written as the call runs)
+# and stderr.txt.
 #
 # CLAUDE_BUILD_PERMISSIONS sets the permission mode (default acceptEdits:
 # file edits work and commands follow the project's allow rules). A session
@@ -22,7 +23,7 @@
 # seconds without output); 8 the budget was reached; other non-zero: the
 # claude exit status. Never commits; the orchestrator does.
 set -u
-[ $# -eq 6 ] || { sed -n '2,23p' "$0" >&2; exit 2; }
+[ $# -eq 6 ] || { sed -n '2,24p' "$0" >&2; exit 2; }
 REPO=$1; PROMPT=$2; MODEL=$3; EFFORT=$4; BUDGET=$5; OUT=$6
 MODE=${CLAUDE_BUILD_PERMISSIONS:-acceptEdits}
 case "$MODE" in
@@ -37,7 +38,7 @@ mkdir -p "$OUT"
 TEXT=$(cat "$PROMPT") || exit 2
 (cd "$REPO" && exec claude -p "$TEXT" --model "$MODEL" --effort "$EFFORT" \
   --max-budget-usd "$BUDGET" \
-  --settings '{"enabledPlugins":{"phased-delivery@ai-coding-plugins":false}}' \
+  --settings '{"enabledPlugins":{"phased-delivery@ai-coding-plugins":false},"showThinkingSummaries":true}' \
   --permission-mode "$MODE" --no-session-persistence \
   --output-format stream-json --verbose) \
   < /dev/null > "$OUT/stream.jsonl" 2> "$OUT/stderr.txt" &

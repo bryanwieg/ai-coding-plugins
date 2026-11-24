@@ -12,7 +12,8 @@
 #    "exit":   N,                       the exit status (default 0)
 #    "cost":   USD}                     total_cost_usd (default 0.01)
 # Paths are relative to the directory claude runs in, the repository. It
-# prints the result event claude-build.sh parses. A call past the last step
+# prints one assistant event (a thinking summary and a tool call, for the
+# driver's live feed) and the result event claude-build.sh parses. A call past the last step
 # exits 1 with a message on stderr and nothing printed.
 exec python3 - "$@" <<'PY'
 import json, os, sys, time
@@ -38,6 +39,9 @@ for path, fields in step.get("brief", {}).items():
 time.sleep(step.get("sleep", 0))
 usage = {"input_tokens": 100, "output_tokens": 5, "cache_read_input_tokens": 1000,
          "cache_creation_input_tokens": 20}
+print(json.dumps({"type": "assistant", "message": {"content": [
+    {"type": "thinking", "thinking": "fake thinking"},
+    {"type": "tool_use", "name": "Bash", "input": {"command": "true"}}]}}))
 print(json.dumps({"type": "result", "subtype": "success", "result": step.get("report", ""), "usage": usage,
                   "total_cost_usd": step.get("cost", 0.01)}))
 sys.exit(step.get("exit", 0))

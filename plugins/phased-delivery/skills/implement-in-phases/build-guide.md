@@ -16,7 +16,10 @@ in `record.halt` of the phase's `phase.json`. Exit 2: bad usage. Each run
 prints a report: every stage and its status, the review findings and their
 outcome, the halt, that Codex is off and, for a built phase,
 `stage-stats.sh`'s table. `--work` keeps each call's prompt, output and
-`report.md` in a numbered folder (a temporary directory otherwise).
+`report.md` in a numbered folder (a temporary directory otherwise). While a
+call runs, the driver prints its feed to stderr, each line tagged with the
+call (`[build-01.2]`): its thinking summaries, messages, tool calls, failed
+tool results and result.
 
 ## The parts
 

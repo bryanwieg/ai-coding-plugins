@@ -27,6 +27,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from types import SimpleNamespace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -106,6 +108,57 @@ def py(script, *args):
     return sh(sys.executable, os.path.join(HERE, script), *args)
 
 
+def feed(label, event):
+    """The live lines for one stream event: thinking, text, tool calls, failed tool results, the result."""
+    def short(text, n=300):
+        text = " ".join(str(text).split())
+        return text if len(text) <= n else text[:n] + "…"
+    kind, msg = event.get("type"), event.get("message") or {}
+    blocks = msg.get("content") if isinstance(msg.get("content"), list) else []
+    lines = []
+    for b in blocks:
+        if not isinstance(b, dict):
+            continue
+        if kind == "assistant" and b.get("type") == "thinking" and b.get("thinking"):
+            lines.append(f"thinking: {short(b['thinking'])}")
+        elif kind == "assistant" and b.get("type") == "text" and b.get("text", "").strip():
+            lines.append(f"says: {short(b['text'])}")
+        elif kind == "assistant" and b.get("type") == "tool_use":
+            args = b.get("input") or {}
+            what = next((args[k] for k in ("command", "file_path", "pattern", "description", "prompt") if k in args), "")
+            lines.append(f"{b.get('name')}: {short(what, 160)}")
+        elif kind == "user" and b.get("type") == "tool_result" and b.get("is_error"):
+            lines.append(f"tool error: {short(b.get('content'), 160)}")
+    if kind == "result":
+        cost = event.get("total_cost_usd")
+        lines.append(f"result: {event.get('subtype')}" + (f", ${cost:.2f}" if isinstance(cost, (int, float)) else ""))
+    return [f"[{label}] {x}" for x in lines]
+
+
+def follow(label, path, done):
+    """Print the call's stream to stderr as it is written, until done is set and the file is read to its end."""
+    while not os.path.exists(path):
+        if done.wait(0.5) and not os.path.exists(path):
+            return
+    with open(path, "rb") as f:
+        pending = b""
+        while True:
+            chunk = f.read()
+            if not chunk:
+                if done.is_set():
+                    return
+                time.sleep(0.5)
+                continue
+            *lines, pending = (pending + chunk).split(b"\n")
+            for line in lines:
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                for x in feed(label, event) if isinstance(event, dict) else []:
+                    print(x, file=sys.stderr, flush=True)
+
+
 def last(text):
     lines = [x for x in text.splitlines() if x.strip()]
     return lines[-1].strip() if lines else ""
@@ -183,8 +236,15 @@ def call(c, label, guide, inputs, pair, keep_briefs):
     before = plan_docs(c.plan_dir)
     present = plan_files(c.plan_dir)
     for _ in range(2):  # a stalled call is undone and run once more
+        print(f"[{label}] {pair['model']} {pair['effort']}, cap ${pair['cap_usd']}; stream: {out}/stream.jsonl",
+              file=sys.stderr, flush=True)
+        done = threading.Event()
+        watcher = threading.Thread(target=follow, args=(label, os.path.join(out, "stream.jsonl"), done), daemon=True)
+        watcher.start()
         r = sh("sh", os.path.join(HERE, "claude-build.sh"), c.top, prompt, pair["model"], pair["effort"],
                pair["cap_usd"], out)
+        done.set()
+        watcher.join()
         if r.returncode != 7:
             break
         for p, doc in before.items():
