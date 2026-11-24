@@ -16,7 +16,8 @@
 # sandbox image does).
 # CLAUDE_BUILD_STALL (seconds, default 900) stops the call when stream.jsonl
 # gains no line for that long: a hung call, not a slow one (the longest
-# silence in 39 recorded runs was 130 s).
+# silence in 39 recorded runs was 130 s). Claude runs in its own process
+# group (with setsid), so whatever it started is stopped with it, stalled or not.
 # Prints "Tokens: N" (input, output, cache read and cache creation, from
 # modelUsage, else usage) and
 # "Cost: X.XX" (USD), or unknown, for the stage commit.
@@ -25,7 +26,7 @@
 # seconds without output); 8 the budget was reached; other non-zero: the
 # claude exit status. Never commits; the orchestrator does.
 set -u
-[ $# -eq 6 ] || { sed -n '2,26p' "$0" >&2; exit 2; }
+[ $# -eq 6 ] || { sed -n '2,27p' "$0" >&2; exit 2; }
 REPO=$1; PROMPT=$2; MODEL=$3; EFFORT=$4; BUDGET=$5; OUT=$6
 MODE=${CLAUDE_BUILD_PERMISSIONS:-acceptEdits}
 case "$MODE" in
@@ -42,7 +43,10 @@ TEXT=$(cat "$PROMPT") || exit 2
 # this claude knows it (it then rejects the invalid value here, naming the option; otherwise --version runs)
 THINK=
 claude --thinking-display check --version < /dev/null 2>&1 | grep -q -- --thinking-display && THINK=summarized
-(cd "$REPO" && exec claude -p "$TEXT" --model "$MODEL" --effort "$EFFORT" \
+# its own process group (setsid, where there is one), so the processes it starts are stopped with it
+GROUP=
+command -v setsid > /dev/null && GROUP="setsid -w"
+(cd "$REPO" && exec $GROUP claude -p "$TEXT" --model "$MODEL" --effort "$EFFORT" \
   --max-budget-usd "$BUDGET" \
   --settings '{"enabledPlugins":{"phased-delivery@ai-coding-plugins":false}}' \
   ${THINK:+--thinking-display "$THINK"} \
@@ -56,12 +60,13 @@ rm -f "$OUT/stalled"
  while sleep 1; do
    now=$(wc -c < "$OUT/stream.jsonl")
    if [ "$now" = "$size" ]; then quiet=$((quiet + 1)); else size=$now; quiet=0; fi
-   [ $quiet -lt "$STALL" ] || { : > "$OUT/stalled"; kill $pid; exit; }
+   [ $quiet -lt "$STALL" ] || { : > "$OUT/stalled"; kill -TERM "-$pid" 2>/dev/null || kill $pid; exit; }
  done) > /dev/null 2>&1 &
 watch=$!
 wait $pid
 status=$?
 kill $watch 2>/dev/null
+[ -z "$GROUP" ] || kill -TERM "-$pid" 2>/dev/null  # what the call left running
 if [ -e "$OUT/stalled" ]; then
   : > "$OUT/report.md"
   printf 'Tokens: unknown\nCost: unknown\n'

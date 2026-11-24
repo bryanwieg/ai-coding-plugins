@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import time
 
 import pytest
 
@@ -20,10 +21,11 @@ CAPPED = {"type": "result", "subtype": "error_max_budget_usd", "total_cost_usd":
                                               "cacheCreationInputTokens": 9070}}}
 
 
-def run(tmp_path, events, code=0, permissions=None, pause=0, stall=None, thinking=True):
+def run(tmp_path, events, code=0, permissions=None, pause=0, stall=None, thinking=True, child=False):
     """Run the script with a stub `claude` that records its arguments and prints EVENTS.
 
-    THINKING: whether the stub knows --thinking-display (claude-build.sh probes it first)."""
+    THINKING: whether the stub knows --thinking-display (claude-build.sh probes it first).
+    CHILD: the stub leaves a process running, its pid in child.pid."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (tmp_path / "events.jsonl").write_text("not json\n" + "".join(json.dumps(e) + "\n" for e in events))
@@ -33,7 +35,8 @@ def run(tmp_path, events, code=0, permissions=None, pause=0, stall=None, thinkin
              if thinking else "echo 2.1.330; exit 0")
     stub.write_text(f'#!/bin/sh\ncase " $* " in *" --version "*) {probe};; esac\n'
                     f'printf "%s\\n" "$@" > "{tmp_path / "args.txt"}"\n'
-                    f'echo "claude failed" >&2\ncat "{tmp_path / "events.jsonl"}"\nsleep {pause}\nexit {code}\n')
+                    + (f'sleep 300 > /dev/null 2>&1 & echo $! > "{tmp_path / "child.pid"}"\n' if child else "")
+                    + f'echo "claude failed" >&2\ncat "{tmp_path / "events.jsonl"}"\nsleep {pause}\nexit {code}\n')
     stub.chmod(0o755)
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
     env.pop("CLAUDE_BUILD_PERMISSIONS", None)
@@ -91,6 +94,16 @@ def test_stall_stops_the_call(tmp_path):
     other = tmp_path / "other"
     other.mkdir()
     assert run(other, [BUILT], stall="soon").returncode == 2
+
+
+@pytest.mark.parametrize("pause, stall, code", [(30, "2", 7), (0, None, 0)])
+def test_processes_left_by_the_call_are_stopped(tmp_path, pause, stall, code):
+    # stalled or finished, nothing the call started outlives it
+    assert run(tmp_path, [BUILT], pause=pause, stall=stall, child=True).returncode == code
+    pid = int((tmp_path / "child.pid").read_text())
+    time.sleep(0.3)
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
 
 
 def test_thinking_display_left_out_when_unknown(tmp_path):
