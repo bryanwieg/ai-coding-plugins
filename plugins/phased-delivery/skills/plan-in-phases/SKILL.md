@@ -152,8 +152,9 @@ plugin, two directories above this skill's directory) checks it and renders
    following it: the outcomes from the grill, the decisions that span
    phases, the existing interfaces the stages rely on, and the phase list.
    Read [phase-guide.md](phase-guide.md) and write one stage file,
-   `NN-name/NN.n.json`, for every stage, with its outline fields: title,
-   order, files, and the contracts it provides and uses. Run
+   `NN-name/NN.n.json`, for every stage, with its seven outline fields:
+   revision, title, order, lines, files, and the contracts it provides
+   and uses. Run
    `python3 scripts/plan-check.py <plan dir> --outline --repo <repo>
    --spec <spec> --design <design>` and fix every error it reports before
    going on; judge each warning.
