@@ -51,7 +51,7 @@ judgment.
 
 | Type | Report it when | Not this |
 | --- | --- | --- |
-| `untraced-change` | a changed line maps to no stage brief, including a change in the plan directory other than the phase file's status, stage table and Notes and the `.build` files | a line the brief's goal plainly needs |
+| `untraced-change` | a changed line maps to no stage brief, including a change in the plan directory that the phase's Notes do not record (revisions, re-scores and regenerated model files are recorded there; status, stage table, `.build` files and `work-report.md` need no note) | a line the brief's goal plainly needs |
 | `internal-check` | a validation or error check on data this code produced or received through a settled contract | a check at an external input a brief lists |
 | `bug` | the code does something a brief's goal, contract or behaviour rule says it must not, or breaks a caller or another stage's contract; shown by a run or a cited line | behaviour the brief leaves to the builder |
 | `not-done` | a "Done when" item or the phase's "After" does not hold | an item you could only check by reading and have no reason to doubt |
