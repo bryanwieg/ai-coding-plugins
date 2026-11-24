@@ -91,14 +91,14 @@ Context:
 Contracts:
 - format `revision JSON` (uses; 01.1): as 01.1 defines it; read from `<plan>/.build/NN-revision.json`
 - format `review JSON` (uses; 01.1): as 01.1 defines it; read from `<plan>/.build/NN-review.json`
-- format `ledger JSON` (provides; 02.1, 02.2, disk): `<plan>/.build/NN-ledger.json`: {start_commit, preexisting: [path], attempts: [{stage (id or review), n, fix, tool, model, effort, exit, tokens, cost, cap, tool_calls, premium, result: accepted|failed|stopped|error|rejected, why, commit}]}
+- format `ledger JSON` (provides; 02.1, 02.2, disk): `<plan>/.build/NN-ledger.json`: {start_commit, preexisting: [path], attempts: [{stage (id or review), n, fix, tool, model, effort, exit, tokens, cost, cap, tool_calls, premium, result: accepted|failed|stopped|error|rejected|review, why, commit}]}
 - cli `build-check.py start` (provides; 03.1, user): start PHASE_FILE [--repo DIR]: validates the revision; writes the ledger with HEAD and paths modified now, or keeps an existing one. Exit 0; 1 invalid revision or a stage file already modified, one JSON line each; 2 usage.
 - cli `build-check.py can-try` (provides; 03.1, user): can-try PHASE_FILE STAGE MODEL EFFORT: exit 1, printing it, when the stage has a failed, stopped, rejected or accepted attempt on the pair; else 0. `error` attempts do not count.
 - cli `build-check.py record` (provides; 03.1, user): record PHASE_FILE STAGE|review --tool T --model M --effort E --exit N --tokens X --cost Y [--cap USD] [--tool-calls N] [--premium] [--fix]: logs an attempt and gates it. Exit 0 accepted; 1 failed; 3 budget stop; 4 error.
 - cli `build-check.py reject` (provides; 03.1, user): reject PHASE_FILE STAGE WHY: marks the stage's accepted, uncommitted attempt rejected with WHY. Exit 0; 1 no such attempt.
 - cli `build-check.py commit` (provides; 03.1, user): commit PHASE_FILE STAGE [--subject-suffix TEXT] [--extra-trailer LINE]...: commits only the stage's changed files with the stage trailers, then marks the row done in the working tree. Prints the hash. Exit 0; 1 nothing accepted.
 - cli `build-check.py spend` (provides; 03.1, user): spend PHASE_FILE: prints a bare number, two decimals: the cost of every attempt recorded with --premium (builds and reviews), its cap when the cost is unknown. Exit 0.
-- cli `build-check.py finish` (provides; 03.1, user): finish PHASE_FILE [--stopped]: validates the review JSON; sets `Status: built <last stage commit>`; commits the phase file's directory with `Phase: <phase file>`. --stopped skips review and status. Exit 0; 1 invalid review or stage uncommitted; 2 usage.
+- cli `build-check.py finish` (provides; 03.1, user): finish PHASE_FILE [--stopped] [--extra-trailer LINE]...: validates the review JSON; sets `Status: built <last stage commit>`; commits the phase file's directory with `Phase: <phase file>`. --stopped skips review and status. Exit 0; 1 invalid review or stage uncommitted; 2 usage.
 
 Files:
 - `plugins/phased-delivery/scripts/build-check.py` (create): holds every build-check.py subcommand, the ledger format and the usage docstring

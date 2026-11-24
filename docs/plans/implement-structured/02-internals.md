@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: planned
+Status: built 1e03273
 Before: build-check.py validates the revision and review JSON; every other subcommand returns mock results, and the outcome tests are expected to fail.
 After: build-check.py does the real work: it records attempts, gates each build on scope and check commands, refuses repeated pairs, sums premium spend, and makes the stage, fix and phase commits with stage-stats trailers. Every script outcome test passes with no expected-fail mark.
 
@@ -28,8 +28,8 @@ Budget: Under 10 s for test_build_check.py.
 
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
-| 02.1 | start records the real start state, record gates each attempt on scope and check commands, can-try refuses tried pairs and spend sums premium cost. | top | first | planned |
-| 02.2 | commit, reject and finish make the stage, fix and phase commits with the trailers stage-stats.sh reads, and update the phase file's stage table and status line. | top | after 02.1 | planned |
+| 02.1 | start records the real start state, record gates each attempt on scope and check commands, can-try refuses tried pairs and spend sums premium cost. | top | first | done |
+| 02.2 | commit, reject and finish make the stage, fix and phase commits with the trailers stage-stats.sh reads, and update the phase file's stage table and status line. | top | after 02.1 | done |
 
 ## 02.1 Start, record, can-try and spend
 
@@ -143,3 +143,7 @@ Model basis: J1 F1 R1 C1 K2 P1 V0 S0 = 7 -> top (override: J, C or K = 2)
 - Stage commits hold only the stage's files; the phase file, `.build/` and any regenerated plan files are updated in the working tree and committed by `finish` (with `--stopped` at a routing stop, which skips the review and completeness checks and leaves the status in progress). Reason: Keeps the design's 'staging only the stage's files'; resume reads the working tree.
 - A review is recorded as stage `review`; `spend` counts only attempts recorded with `--premium`, which the build guide sets for premium-pair builds and for every review run by claude-build.sh, never for Codex. Reason: Matches model-selection.md's premium budget rules.
 - commit takes `--subject-suffix TEXT` for subject annotations such as `[skip ci]` and `--extra-trailer LINE` for added trailers such as `Co-Authored-By`. Reason: Project rules may require both; today the orchestrator adds them by hand.
+- 2026-11-24: stages built directly by the orchestrator, as in phase 01.
+- 2026-11-24: review of phases 01 and 02 together (fable high, in-session subagent): ready, 0 blocking, 12 should-fix. Fixed in 4312f37 (02.1: rename sources count as changed, attempt numbers skip committed tries, real paths and a root-level plan directory, script errors exit 2) and 1e03273 (02.2: reasons folded to one line in trailers, fix commits leave the status line alone, finish marks rows done and names the last stage commit by git order). Added tests for renames and for reject, budget stop and retry.
+- 2026-11-24: contract additions from the review: the ledger's result may be `review`; finish takes `--extra-trailer LINE` like commit.
+- 2026-11-24: open: check commands run with no timeout; kept until 03.4 shows whether long checks matter.
