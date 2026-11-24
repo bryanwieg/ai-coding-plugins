@@ -115,7 +115,7 @@ def repo_files(repo):
 def texts(repo, skip=None):
     """Text files of the repository, except the input file and plan folders (phase files and
     their model tables mention every name and are not users of it)."""
-    out, plan_dirs = [], set()
+    out, plan_dirs, plan_trees = [], set(), set()
     for f in repo_files(repo):
         p = os.path.join(repo, f)
         if skip and os.path.abspath(p) == skip:
@@ -131,9 +131,13 @@ def texts(repo, skip=None):
             continue
         text = data.decode("utf-8", "replace")
         if text.startswith("# Phase ") and PHASE_MARK in text[:500]:
-            plan_dirs.add(os.path.dirname(f))
+            if os.path.basename(f) == "phase.md":  # new layout <plan>/NN-name/phase.md: drop all of <plan>/
+                plan_trees.add(os.path.dirname(os.path.dirname(f)) + "/")
+            else:
+                plan_dirs.add(os.path.dirname(f))
         out.append((f, text))
-    return [(f, t) for f, t in out if os.path.dirname(f) not in plan_dirs]
+    return [(f, t) for f, t in out
+            if os.path.dirname(f) not in plan_dirs and not any(f.startswith(d) for d in plan_trees)]
 
 
 def mentions(corpus, needle, ignore_case):

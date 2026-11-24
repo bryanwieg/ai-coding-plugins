@@ -136,6 +136,17 @@ def test_rescore_kinds_and_reach(tmp_path):
     assert s["mode"] == "quick" and s["total"] == 1 + 6 + 3
 
 
+def test_rescore_skips_other_new_layout_plans(tmp_path):
+    other = tmp_path / "docs" / "other"
+    (other / "01-x").mkdir(parents=True)
+    (other / "01-x" / "phase.md").write_text("# Phase 01: x\n\nImplement with the implement-in-phases skill\n")
+    (other / "plan.md").write_text("check_rate\n")
+    (other / "plan.json").write_text('{"note": "check_rate"}\n')
+    code, s = plan(tmp_path, [st(1, [("app/ratelimit.py", "edit")])],
+                   [{"kind": "function", "name": "check_rate", "shape": "check_rate(addr)", "path": "app/ratelimit.py"}])
+    assert code == 0 and s["parts"][0]["reach_files"] == ["app/views.py", "docs.md"]
+
+
 def test_rescore_structure_forces_full(tmp_path):
     stages = [st(i, [(f"app/f{i}.py", "create")], lines="under 30") for i in range(1, 5)]
     assert plan(tmp_path, stages, [])[1]["mode"] == "full"
