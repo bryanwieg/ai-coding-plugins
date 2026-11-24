@@ -90,7 +90,7 @@ def repo(tmp_path):
     return r
 
 
-def drive(repo, steps):
+def drive(repo, steps, stall=None):
     """Run the driver on the phase with a fake claude that takes STEPS in order (a new list per run)."""
     tmp = repo.parent
     bin_dir = tmp / "bin"
@@ -102,6 +102,8 @@ def drive(repo, steps):
     plan.write_text(json.dumps(steps))
     Path(f"{plan}.calls").unlink(missing_ok=True)
     env = {**os.environ, **GIT_ENV, "PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_CLAUDE_PLAN": str(plan)}
+    if stall:
+        env["CLAUDE_BUILD_STALL"] = str(stall)
     return subprocess.run([sys.executable, SCRIPTS / "run-phase.py", PHASE, "--profiles", PROFILES,
                            "--work", tmp / "work"], cwd=repo, env=env, capture_output=True, text=True)
 
@@ -198,3 +200,19 @@ def test_build_adding_plan_file_is_undone(repo):
     assert halt(repo) == ("revise-capped", "01.1")  # the retry's only pair is used up, so it revises
     attempt = read(repo, "01.1.json")["record"]["attempts"][-1]
     assert (attempt["result"], attempt["why"]) == ("rejected", "edited the plan")
+
+
+def test_stalled_call_is_undone_and_run_again(repo):
+    result = drive(repo, [REVISED_NOTHING, {**BUILD_ONE, "sleep": 6}, BUILD_ONE, BUILD_TWO, REVIEW], stall=2)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(repo) == 5
+    assert len(read(repo, "01.1.json")["record"]["attempts"]) == 1  # the stall is not a try of the pair
+
+
+def test_second_stall_halts(repo):
+    stalled = {**BUILD_ONE, "sleep": 6}
+    result = drive(repo, [REVISED_NOTHING, stalled, stalled], stall=2)
+    assert result.returncode == 10, result.stdout + result.stderr
+    assert halt(repo) == ("stalled", "01.1")
+    assert not (repo / "src/one.txt").exists()
+    assert not read(repo, "01.1.json")["record"].get("attempts")

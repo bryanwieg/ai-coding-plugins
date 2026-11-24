@@ -8,13 +8,14 @@
 #    "brief":  {STAGE_FILE: {FIELD: VALUE}},  fields to set in that stage
 #                                       file's brief; its record is kept
 #    "report": TEXT,                    the final message (report.md)
+#    "sleep":  SECONDS,                 silence after the edits, before the result
 #    "exit":   N,                       the exit status (default 0)
 #    "cost":   USD}                     total_cost_usd (default 0.01)
 # Paths are relative to the directory claude runs in, the repository. It
 # prints the result event claude-build.sh parses. A call past the last step
 # exits 1 with a message on stderr and nothing printed.
 exec python3 - "$@" <<'PY'
-import json, os, sys
+import json, os, sys, time
 
 plan = os.environ["FAKE_CLAUDE_PLAN"]
 steps = json.load(open(plan))
@@ -34,6 +35,7 @@ for path, fields in step.get("brief", {}).items():
     with open(path, "w") as f:
         json.dump({**stage, "brief": {**stage["brief"], **fields}}, f, indent=1)
         f.write("\n")
+time.sleep(step.get("sleep", 0))
 usage = {"input_tokens": 100, "output_tokens": 5, "cache_read_input_tokens": 1000,
          "cache_creation_input_tokens": 20}
 print(json.dumps({"type": "result", "subtype": "success", "result": step.get("report", ""), "usage": usage,

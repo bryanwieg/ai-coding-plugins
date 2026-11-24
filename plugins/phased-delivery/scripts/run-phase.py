@@ -58,6 +58,8 @@ NEXT = {
                     "uncommitted stage files.",
     "build-error": "The build failed for a reason that is not the model's (sign-in, service): clear the "
                    "cause in the detail, then rerun.",
+    "stalled": "A model call gave no output for the stall limit twice and its edits were undone: check "
+               "that the claude service and sign-in work, then rerun.",
     "review-capped": "The review call stopped at its cost cap, so there is no usable review.json: tell the "
                      "user, and rerun when they agree; the review runs again.",
     "review-invalid": "review.json does not match review.schema.json: delete it, then rerun so the phase is "
@@ -180,8 +182,17 @@ def call(c, label, guide, inputs, pair, keep_briefs):
         f.write(g.read() + "\n## Inputs\n\n" + "\n".join(inputs) + "\n")
     before = plan_docs(c.plan_dir)
     present = plan_files(c.plan_dir)
-    r = sh("sh", os.path.join(HERE, "claude-build.sh"), c.top, prompt, pair["model"], pair["effort"],
-           pair["cap_usd"], out)
+    for _ in range(2):  # a stalled call is undone and run once more
+        r = sh("sh", os.path.join(HERE, "claude-build.sh"), c.top, prompt, pair["model"], pair["effort"],
+               pair["cap_usd"], out)
+        if r.returncode != 7:
+            break
+        for p, doc in before.items():
+            build_check.save(p, doc)
+        restore(c, [build_check.rel(c.top, p) for p in sorted(plan_files(c.plan_dir) - present)])
+        restore(c)
+    else:
+        raise Halt("stalled", f"the {label} call stalled twice: {last(r.stderr)}")
     records, briefs = guard(before, keep_briefs)
     added = sorted(plan_files(c.plan_dir) - present) if keep_briefs else []  # the reviser may add stage files
     restore(c, [build_check.rel(c.top, p) for p in added])

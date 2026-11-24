@@ -77,7 +77,8 @@ specification or the design) is settled with the user first.
 | `record-changed` | A model call changed a record; the driver restored it. | Check the directions named in the detail with the user. |
 | `models-stale` | `models.md` no longer matches the model profiles. | Refresh as [model-selection.md](../plan-in-phases/model-selection.md) says ("Handle what the script reports"). |
 | `session-only` | The stage's brief sets `session_only`. | Build, record and commit it yourself ("A session-only stage", below). |
-| `build-error` | A call failed for a reason that is not the model's (sign-in, service, usage limit, a script error). | **Ask the user** unless you can clear the cause in the detail yourself. |
+| `build-error` | A call failed for a reason that is not the model's (sign-in, service, usage limit, a script error). | Clear the cause in the detail yourself; ask the user only when you cannot. |
+| `stalled` | A model call gave no output for `CLAUDE_BUILD_STALL` seconds (default 900), twice; the driver undid its edits each time. | Check that `claude` works (sign-in, service), then rerun. |
 | `review-capped` | The review stopped at its cost cap; there is no review. | Tell the user; rerun when they agree. |
 | `review-invalid` | `review.json` is missing or does not match `review.schema.json`. | Delete `review.json`. |
 | `plan-gap` | A review finding is a gap in the plan. | Revise the stage files to cover it; a built stage whose revision is raised is rebuilt by the driver. |

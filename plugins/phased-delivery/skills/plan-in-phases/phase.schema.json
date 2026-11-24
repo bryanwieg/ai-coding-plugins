@@ -36,7 +36,7 @@
           "properties": {
             "step": {"type": "string"}, "stage": {"type": ["string", "null"]},
             "reason": {"enum": ["revise-failed", "escalated", "revise-capped", "builder-stopped", "brief-changed",
-                                "record-changed", "models-stale", "session-only", "build-error", "review-capped",
+                                "record-changed", "models-stale", "session-only", "build-error", "stalled", "review-capped",
                                 "review-invalid", "plan-gap", "question", "fix-failed"]},
             "detail": {"type": "string"}, "next": {"type": "string"}}},
         "built": {"type": ["string", "null"]}}}

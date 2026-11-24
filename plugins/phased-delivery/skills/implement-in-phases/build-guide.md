@@ -82,7 +82,11 @@ parallel is not built in parallel. For each:
      in its `checks` passed): `build-check.py commit`;
    - failed or budget stop: the paths outside the stage are restored and
      the stage is routed again;
-   - error (a build exit other than 0 and 8; not a try of the pair): halt
+   - stalled (`claude-build.sh` exit 7: no output for `CLAUDE_BUILD_STALL`
+     seconds): the call's edits are undone and it runs once more, not as a
+     try of the pair; a second stall halts `stalled`. This holds for every
+     model call, not only builds;
+   - error (a build exit other than 0, 7 and 8; not a try of the pair): halt
      `build-error`;
    - the builder's report ends `Result: stopped`: the attempt is rejected
      and the stage revised. A builder that edited the plan is rejected and
