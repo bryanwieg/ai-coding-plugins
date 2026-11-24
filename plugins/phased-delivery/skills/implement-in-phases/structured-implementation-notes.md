@@ -72,4 +72,27 @@ the orchestrator LLM only handling halts.
 
 ## Measured
 
-To be filled in by the validation run (stage 03.4 of the plan).
+One validation run, 2026-11-24: a headless Opus session at medium thinking
+(`--max-budget-usd 2.40`, the branch's plugin only, Opus and Haiku offered)
+implemented the builder eval task `p2-multistep` as a one-phase plan in a
+git copy of the eval repository.
+
+- **Result:** the task's files, copied onto a fresh eval repository, pass
+  the hidden check (`RESULT pass`). Cost $0.84: $0.54 for the session (15
+  turns) and $0.30 for the review on Opus high (248k tokens, no findings).
+- **The script path was followed end to end:** the session wrote a
+  revision JSON with five real check commands (the test suite, the
+  behaviour cases, an unchanged selector output, the doc sentence, the new
+  test), ran `start`, `record` (accepted), `commit` (stage trailers),
+  recorded the review with `--premium`, and ran `finish` (`Status: built`)
+  and the work report.
+- **Where it bent the rules:** it built the `small` stage itself instead of
+  dispatching the routed Opus medium build ($1.60 cap), and ran the review
+  with a $1.50 cap instead of route's $4.00, both because its own $2.40
+  session cap could not cover them. Both are recorded in the phase Notes.
+  The lesson is about the run's setup, not the skill: a session capped
+  below the caps it must pay for will economize. Nothing the script gates
+  was skipped.
+- **Not exercised:** a failing build, a retry or a budget stop (the stage
+  passed first time), Codex, and check commands that run long; the open
+  question on check timeouts stays open.
