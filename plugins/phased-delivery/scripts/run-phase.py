@@ -23,7 +23,6 @@ Exit codes: 0 built; 10 halted (the halt is in phase.json's record); 2 usage.
 
 import argparse
 import importlib.util
-import json
 import os
 import sys
 
@@ -31,50 +30,49 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("plan_check", os.path.join(HERE, "plan-check.py"))
 plan_check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(plan_check)
+_spec = importlib.util.spec_from_file_location("build_check", os.path.join(HERE, "build-check.py"))
+build_check = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(build_check)
 
 # What the session does about each halt before rerunning the driver.
 NEXT = {
-    "revise-failed": "Read the reviser's report and plan-check.py's errors, correct the stage files by "
-                     "revising.md until plan-check.py passes, then rerun.",
+    "revise-failed": "Read the detail (the reviser's report and plan-check.py's errors, or build-check.py "
+                     "start's refusal), correct the stage files by revising.md "
+                     "or clean the working tree, then rerun.",
     "escalated": "The reviser says the problem is above this phase: settle it with the user in the spec, the "
                  "design or the plan, revise the stage files to match, then rerun.",
-    "revise-capped": "The stage failed after two revisions: go through its attempts and its brief with the "
-                     "user, revise the brief and raise its revision, then rerun.",
+    "revise-capped": "The stage was revised twice for failures in this run, or the reviser found nothing to "
+                     "change after a used-up ladder: go through its attempts and its brief with the user, revise "
+                     "the brief and raise its revision, then rerun.",
     "builder-stopped": "Read the builder's report: correct the brief it could not build and raise its "
                        "revision, then rerun.",
     "brief-changed": "A brief changed without a higher revision: raise the stage's revision or restore the "
                      "brief, then rerun.",
-    "record-changed": "A model call changed a record, which only the scripts write: restore the record from "
-                      "git, then rerun.",
+    "record-changed": "A model call changed a record, which only the scripts write; the driver has already "
+                      "restored it. Check that step's directions, named in the detail, with the user, then rerun.",
     "models-stale": "Refresh the model profiles as model-selection.md says, then rerun.",
     "session-only": "Build, record and commit the stage in the session before rerunning: a rerun restores "
                     "uncommitted stage files.",
     "build-error": "The build failed for a reason that is not the model's (sign-in, service): clear the "
                    "cause in the detail, then rerun.",
-    "review-capped": "The review still has findings after its last round: decide each with the user, fix or "
-                     "revise, then rerun.",
+    "review-capped": "The review call stopped at its cost cap, so there is no usable review.json: tell the "
+                     "user, and rerun when they agree; the review runs again.",
     "review-invalid": "review.json does not match review.schema.json: delete it, then rerun so the phase is "
                       "reviewed again.",
     "plan-gap": "A review finding is a gap in the plan: revise the stage files by revising.md to cover it, "
                 "then rerun.",
-    "question": "A review finding is a question: answer it with the user and set the finding's status to "
-                "answered in phase.json's record, then rerun.",
-    "fix-failed": "The fix for a review finding failed: fix the finding in the session or revise the stage, "
-                  "then rerun.",
+    "question": "A review finding is a question: answer it with the user, revise the plan by revising.md "
+                "if the answer needs it, then rerun; the driver marks the finding answered.",
+    "fix-failed": "The fix for a review finding failed: revise the stage's brief and raise its revision so "
+                  "the driver rebuilds it, or settle the finding with the user, then rerun.",
 }
-
-
-def save(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=1)
-        f.write("\n")
 
 
 def set_halt(pdir, plan_dir, halt):
     """Write the halt (None clears it) into phase.json's record and re-render the plan."""
     path = os.path.join(pdir, "phase.json")
     pj = plan_check.read_json(path)
-    save(path, {**pj, "record": {**pj["record"], "halt": halt}})
+    build_check.save(path, {**pj, "record": {**pj["record"], "halt": halt}})
     plan_check.render_plan(plan_dir)
 
 

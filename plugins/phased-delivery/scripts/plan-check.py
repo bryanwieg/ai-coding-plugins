@@ -21,8 +21,8 @@ ones; --phase NN limits them to that phase. A brief that changed since an
 attempt built it needs a higher `revision`.
 
 --packet prints the stage packet, the only plan text a builder is given: the
-phase's role, why, how, before and after, then the stage's brief as phase.md
-shows it. It checks and renders nothing; exit 2 for an unknown stage.
+phase's role, why, how, before, after and test budget, then the stage's
+brief as phase.md shows it. It checks and renders nothing; exit 2 for an unknown stage.
 
 --spec and --design default to the paths plan.json names in `docs`, relative
 to --repo, which defaults to the current directory.
@@ -528,7 +528,7 @@ def packet(plan_dir, sid):
             outcomes = {x["id"]: x["observable"] for x in plan["outcomes"]}
             proves = {t["test"]: outcomes.get(t["outcome"], t["outcome"]) for t in phase_rows(found, stages)}
             head = [f"Role: {d['role']}", f"Why: {d['why']}", f"How: {d['how']}",
-                    f"Before: {d['before']}", f"After: {d['after']}"]
+                    f"Before: {d['before']}", f"After: {d['after']}", f"Test budget: {d['test_budget']}"]
             return "\n".join(head + render_stage(sid, found[sid], plan, stages, proves)) + "\n"
     return None
 
