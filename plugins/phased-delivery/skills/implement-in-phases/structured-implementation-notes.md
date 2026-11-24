@@ -93,6 +93,7 @@ git copy of the eval repository.
   The lesson is about the run's setup, not the skill: a session capped
   below the caps it must pay for will economize. Nothing the script gates
   was skipped.
-- **Not exercised:** a failing build, a retry or a budget stop (the stage
-  passed first time), Codex, and check commands that run long; the open
+- **Not exercised:** `can-try` and a headless stage build (the session
+  built the stage itself), a failing build, a retry or a budget stop (the
+  stage passed first time), Codex, and check commands that run long; the open
   question on check timeouts stays open.
