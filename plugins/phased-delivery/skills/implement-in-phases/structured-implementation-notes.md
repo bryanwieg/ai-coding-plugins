@@ -1,8 +1,7 @@
 # Why implementation uses stage files, a script gate and closed review types
 
 Background for maintainers of this skill; the orchestrator and the reviewer
-do not need it. Changed 2026-11-24 (plugin 0.11.0). The plan that built it
-is `docs/plans/implement-structured/`.
+do not need it. Changed 2026-11-24 (plugin 0.11.0).
 
 ## What changed
 
