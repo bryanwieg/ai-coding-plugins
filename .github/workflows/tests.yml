@@ -1,0 +1,25 @@
+name: Tests
+
+# Run the phased-delivery plugin's test suite on every pull request and on
+# pushes to main. The tests use only the Python standard library, git and
+# POSIX sh; external CLIs (claude, codex) are stubbed.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: python -m pip install pytest
+      - run: python -m pytest -q -p no:cacheprovider plugins/phased-delivery/tests

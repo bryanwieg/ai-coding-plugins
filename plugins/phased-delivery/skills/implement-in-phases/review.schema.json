@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["findings", "verdict"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "severity", "stage", "file", "line", "evidence", "action"],
+        "properties": {
+          "type": {"enum": ["untraced-change", "internal-check", "bug", "not-done", "test", "assumption", "rule", "unneeded-code"]},
+          "severity": {"enum": ["blocking", "should-fix"]},
+          "stage": {"type": "string", "pattern": "^(\\d\\d\\.\\d+|phase)$"},
+          "file": {"type": "string"},
+          "line": {"type": "integer", "minimum": 0},
+          "evidence": {"type": "string"},
+          "action": {"enum": ["remove", "fix", "plan-gap", "question"]}
+        }
+      }
+    },
+    "verdict": {"enum": ["ready", "not-ready"]}
+  }
+}
