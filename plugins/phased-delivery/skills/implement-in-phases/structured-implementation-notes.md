@@ -1,7 +1,7 @@
 # Why implementation uses stage files, a script gate and closed review types
 
-Background for maintainers of this skill; the orchestrator and the reviewer
-do not need it. Changed 2026-11-24 (plugin 0.11.0).
+Background for maintainers of this skill; the session and the reviewer
+do not need it. Changed 2026-11-24 (plugin 0.11.0; the driver in 0.13.0, below).
 
 ## What changed
 
@@ -71,7 +71,8 @@ and `build-check.py` takes a phase folder and reads each stage file directly:
   headless reviser follow the same rules.
 
 The sections above and below describe 0.11.0 where they name the revision
-JSON or the ledger.
+JSON or the ledger, and the time before the driver where the orchestrator
+dispatches, records or commits.
 
 ## Decisions worth keeping
 
@@ -85,26 +86,42 @@ JSON or the ledger.
   committed: parallel stages work, and a committed stage cannot change
   unseen.
 
-## Later: a driver script
+## The driver (0.13.0)
 
-Investigate, not built. The `plan-phase-driver` branch holds an unreviewed
-draft plan (2026-11-22) for a Python driver that owns the whole phase loop
-and calls `claude -p` for each step (revise, build, review, triage), with
-the orchestrator LLM only handling halts.
+Built; the plan is `docs/plans/phase-driver/`. Until 0.12.x the session ran
+the phase loop itself from SKILL.md and build-guide.md: revise, route,
+dispatch, gate, commit, review, finish. `scripts/run-phase.py` now owns
+that loop and the session only runs it and answers its halts.
 
-- **What it would add:** rules that hold every time (no step skipped), no
-  orchestrator tokens, clean halts and resume on usage limits, and the
-  whole loop testable offline with a fake `claude`.
-- **What it would cost:** a larger build than this one; the draft predates
-  `claude-build.sh`, `route`, the premium budget and this script, so it
-  needs re-planning on top of `build-check.py`. While both paths exist,
-  the loop's rules live in prose and Python. Codex routing was deferred in
-  the draft, and every case the rules do not cover becomes a halt for the
-  user.
-- **What to measure first:** with this version in use, how often the
-  orchestrator skips or misapplies a step the script does not gate, and
-  how much of a phase's usage the orchestrator itself spends. If both are
-  small, the driver is not worth it.
+- **Every step is a headless `claude`** through `claude-build.sh`: the
+  reviser (revise-guide.md), each builder and fixer (stage-builder.md) and
+  the reviewer (phase-reviewer.md), at the pair and cap `route` prints.
+  The session spends no tokens on the loop, and no step can be skipped.
+- **A halt is data.** When a step cannot go on, the driver writes
+  `{step, stage, reason, detail, next}` into `phase.json`'s record and
+  exits 10. The reasons are a closed list, each with a fixed `next`;
+  SKILL.md's table says what the session does for each and which ones go
+  to the user. A rerun clears the halt and resumes from the records, so a
+  usage limit or a crash loses nothing recorded.
+- **A builder is given only the stage packet** (`plan-check.py --packet`):
+  the phase's role and the stage's brief, nothing of other stages or of any
+  record. A session-only stage is built from the same packet.
+- **Model calls cannot change what is not theirs.** After each call the
+  driver restores every record, and for builders and fixers the briefs
+  too; a changed record is a halt.
+- **Failures revise, twice at most.** A stage whose pairs are used up, or
+  whose builder stopped, goes to the reviser with the failure as the
+  problem; after two such revisions in one run the user is asked.
+- **Review findings are settled by the driver**: `remove` and `fix` get one
+  fix build each; plan gaps and questions halt for the session.
+- **Only a session-only stage is built by the session**, and SKILL.md and
+  build-guide.md give it no other way to dispatch, gate or commit.
+- **The loop is tested offline** with a fake `claude`
+  (`tests/test_run_phase.py`).
+
+Not built: Codex routing. Version 1 builds with Claude only, as if Codex
+were off, and says so in its report; the Codex rules in model-selection.md
+wait for a later plan. Stages marked parallel are built one after another.
 
 ## Measured
 

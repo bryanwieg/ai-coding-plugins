@@ -4,8 +4,8 @@ Give this file, unchanged, to each builder of a stage, followed by the
 inputs below (for a fix of one review finding, the inputs under "Fixing one
 review finding" instead): through `scripts/claude-build.sh` or `scripts/codex-build.sh`,
 at the model and thinking level `select-models.py route` prints (see "Route
-each stage" in [model-selection.md](../plan-in-phases/model-selection.md)). The orchestrator
-follows these rules too when it builds a stage directly.
+each stage" in [model-selection.md](../plan-in-phases/model-selection.md)). The session
+follows these rules too for a `session_only` stage.
 
 Inputs the orchestrator fills in:
 

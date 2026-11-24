@@ -171,14 +171,16 @@ called for.
 
 ## Route each stage
 
-Before every stage build and the phase review, the implementer runs
+The driver, `scripts/run-phase.py`, is the one that routes: before every
+stage build, fix, revision and the phase review it runs
 
 ```
 python3 scripts/select-models.py route <plan>/models-available.json --scores J1F1R1C1K0P0V1S0 [--down N | --up N] [--premium-spent USD] [--review]
 ```
 
-`--scores` is the stage's `Model basis` scores, re-scored at dispatch,
-written without spaces. It prints one JSON line: `model`, `effort`, `tier`,
+`--scores` is the stage's `model_basis` scores as its brief holds them,
+written without spaces. The session routes nothing itself; the driver,
+version 1, routes to Claude only, as if Codex were off. It prints one JSON line: `model`, `effort`, `tier`,
 `premium`, `score`, `cap_tokens`, `cap_usd` and `why` (the rules that
 shaped the pick). Exit codes: 0 printed; 2 bad input (fix it from the
 message); 3 profiles missing; 4 no selectable pair. On 3, or without
@@ -408,10 +410,11 @@ the session cannot continue does sparing its quota outweigh that.
   means "Codex has no room": the failed
   stage is not rebuilt in the session; restore it as above, leave it
   `planned`, stop and report, with the cause.
-- **Session-only stages** (those that must write outside the repository,
-  or whose brief says it is built in the session or by the orchestrator)
-  are built in the session at every level, including level 2; the rule
-  never sends them to Codex.
+- **Session-only stages** (those that must write outside the repository;
+  their brief sets `session_only`) are built in the session at every
+  level, including level 2; the rule never sends them to Codex. The driver
+  halts at one for the session to build, and `build-check.py record`
+  refuses a session build of any other stage.
 - Planning, plan revision, plan-review rounds and the orchestrator's own
   work stay in the session at every level; only stage builds and the phase
   review are routed (`codex-build.sh` can write only the repository and

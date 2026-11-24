@@ -1,6 +1,6 @@
 ---
 name: implement-in-phases
-description: "Build a written phased plan one phase at a time: revise the next phase's stage files against the repository, hand its stage briefs to agents in the planned order, review the actual diff, make one local commit per stage (with model, effort and token trailers), then stop and report. Use whenever the user asks to implement, build, execute, start, continue or resume a phased plan or a numbered phase (\"implement phase 2\", \"build the next phase\", \"continue the plan\", \"start on the plan\"), or when a plan directory of NN-name phase folders (phase.json and stage files) exists and the user wants it built. Requires a complete plan; if phase folders or stage briefs are missing, use plan-in-phases first. Use proactively, without being asked, whenever the work at hand is described by a plan's phase.md files (their header says \"Implement with the implement-in-phases skill\"); never build them without this skill. Never pushes unless asked."
+description: "Build a written phased plan one phase at a time: run the phase driver (run-phase.py), which revises the next phase's stage files against the repository, hands its stage briefs to headless builders, reviews the actual diff and makes one local commit per stage (with model, effort and token trailers); answer each halt it reports, then stop and report. Use whenever the user asks to implement, build, execute, start, continue or resume a phased plan or a numbered phase (\"implement phase 2\", \"build the next phase\", \"continue the plan\", \"start on the plan\"), or when a plan directory of NN-name phase folders (phase.json and stage files) exists and the user wants it built. Requires a complete plan; if phase folders or stage briefs are missing, use plan-in-phases first. Use proactively, without being asked, whenever the work at hand is described by a plan's phase.md files (their header says \"Implement with the implement-in-phases skill\"); never build them without this skill. Never pushes unless asked."
 ---
 
 # Implement in phases
@@ -14,12 +14,14 @@ from them; never edit a rendered file or a `record` by hand. The implementer
 owns how each stage's code works inside its brief. The planner's simplicity
 rules apply unchanged.
 
-Each step below has its own guide; read it when you reach the step.
-`scripts/build-check.py` (in this plugin, two directories above this
-skill's directory) decides what needs no judgment: whether a build stayed
-in its files and passed its checks, which model and thinking level pairs
-were already tried, the premium spend, and every commit with its trailers.
-Do not count, sum or write those by hand. Why it works this way is in
+`scripts/run-phase.py` (the driver, in this plugin, two directories above
+this skill's directory) builds a phase: it revises the phase, routes,
+dispatches, gates and commits every stage, runs the review and its fixes
+and finishes the phase, each model call a headless `claude`. The session
+runs the driver and answers its halts; it does not dispatch, gate or commit
+a stage itself, except a stage whose brief sets `session_only`. What the
+driver does at each step is in [build-guide.md](build-guide.md); why it
+works this way is in
 [structured-implementation-notes.md](structured-implementation-notes.md).
 
 ## Before the first phase
@@ -31,61 +33,90 @@ Do not count, sum or write those by hand. Why it works this way is in
 3. Note the starting git state and any edits already present, so they are not
    mistaken for this work. The commit the plan's work starts from is the
    first phase's `record.start_commit` in its `phase.json`, written by
-   `build-check.py start`; the work report counts from it. On resume, find
-   where the phase left off from `phase.md`'s status line and stage table,
-   which are rendered from the records.
+   the driver; the work report counts from it. On resume, rerun the driver:
+   it finds where the phase left off from the records.
 4. Project rules (testing, size limits, what may be run) apply throughout.
    Writing code gives no permission to run it, and delegating to another agent
    does not lift any rule.
 
 ## Each phase
 
-1. **Revise.** Read [revise-guide.md](revise-guide.md) and follow it with
-   no problem: check the phase's stage files against the repository, edit
-   the stale briefs, raise their revisions and run `plan-check.py` until
-   clean. Then run `build-check.py start <phase dir>` until it exits 0.
-2. **Build.** Read [build-guide.md](build-guide.md) and follow it for every
-   stage: route, `can-try`, dispatch, `record` (the gate), and `commit`.
-   Only a stage `record` accepted may be committed, and only a stage whose
-   brief sets `session_only` may be built by the session itself.
-3. **Review.** Hand the review to a new agent that built none of the phase,
-   with [phase-reviewer.md](phase-reviewer.md) unchanged and its inputs
-   filled in, written to a prompt file outside the repository. Run `route
-   --review` and `scripts/claude-build.sh` with its `model`, `effort` and
-   `cap_usd`, and record the run with `build-check.py record <phase dir>
-   review ... --premium`. A review never drops a step: if it stops at its cap
-   (claude-build.sh exit 8), report that to the user. While Codex is on, check
-   the routing rule first; when it sends the review to Codex, run
-   `scripts/codex-build.sh` with the pair `route --review` prints for
-   `models-available-codex.json`. The reviewer writes
-   `review.json` in the phase folder with only the finding types phase-reviewer.md
-   lists. Read the diff yourself and decide on each finding by its action:
-   - `remove` and `fix`: make the change, `record ... --fix` and `commit`
-     it against the stage it changes (build-guide.md, "Commit each stage");
-   - `plan-gap`: revise the plan before any code changes, following
-     [revise-guide.md](revise-guide.md) with the finding as the problem; a
-     built stage it reopens is rebuilt with `record ... --fix`;
-   - `question`: put it to the user in the report.
-4. **Finish.** Update the phase's `notes` in `phase.json`, then run
-   `build-check.py finish <phase dir>`: it checks `review.json` and that
-   every stage has a commit and none is reopened, records the built commit,
-   re-renders `phase.md` and `plan.md` and commits the plan directory with a
-   `Phase:` trailer. Never push or publish unless asked.
+1. **Run the driver** from the repository, for every phase:
 
-Then stop and report to the user:
+   ```
+   python3 scripts/run-phase.py <phase dir> [--instructions <path>]... \
+     [--subject-suffix "[skip ci]"] [--extra-trailer "Co-Authored-By: ..."]...
+   ```
 
-- each stage: done or not, and where to see it;
-- deviations from the briefs, or "none";
-- what was verified by running something versus only by reading code, and what
-  could not be verified;
+   Pass each project instruction file (CLAUDE.md, AGENTS.md) with
+   `--instructions`, and the project's required commit subject annotation
+   and trailers with the other two options. It prints a report and exits 0
+   (built), 10 (halted) or 2 (bad usage: fix the command).
+2. **On exit 10, answer the halt.** Read `record.halt` in the phase's
+   `phase.json` (the report prints it too): `step`, `stage`, `reason`,
+   `detail` and `next`. Do what `next` says, as the table below expands it,
+   then rerun the same command; the rerun clears the halt and resumes from
+   the records. Repeat until it exits 0. Never edit a `record`, and never
+   build, record or commit a stage that is not `session_only` to get past a
+   halt.
+3. **On exit 0, report** (below). Never push or publish unless asked.
+
+"Revise" below means: follow [revise-guide.md](revise-guide.md) yourself,
+with the halt's detail as the problem; edit the briefs, raise the
+`revision` of each changed brief and run `plan-check.py` until clean. A
+change that guide does not allow (another phase, `plan.json`, the
+specification or the design) is settled with the user first.
+
+| Reason | What happened | What the session does, then reruns |
+| --- | --- | --- |
+| `revise-failed` | The revised plan fails `plan-check.py`, or `build-check.py start` refused (a stage's file was already modified). | Revise to clear the errors in the detail, or clean the working tree. |
+| `escalated` | The reviser says the problem is above this phase. | **Ask the user**; settle it in the specification, the design or the plan, then revise the stage files to match. |
+| `revise-capped` | A stage was revised twice for failures in this run, or its model pairs are used up and the reviser changed nothing. | **Ask the user**: go through the stage's attempts and brief with them, then revise the brief and raise its revision. |
+| `builder-stopped` | The builder reported the brief cannot be built, and the reviser changed nothing. | Read the detail; revise the brief and raise its revision. |
+| `brief-changed` | A brief changed without a higher revision. | Raise the stage's revision, or restore the brief. |
+| `record-changed` | A model call changed a record; the driver restored it. | Check the directions named in the detail with the user. |
+| `models-stale` | `models.md` no longer matches the model profiles. | Refresh as [model-selection.md](../plan-in-phases/model-selection.md) says ("Handle what the script reports"). |
+| `session-only` | The stage's brief sets `session_only`. | Build, record and commit it yourself ("A session-only stage", below). |
+| `build-error` | A call failed for a reason that is not the model's (sign-in, service, usage limit, a script error). | **Ask the user** unless you can clear the cause in the detail yourself. |
+| `review-capped` | The review stopped at its cost cap; there is no review. | Tell the user; rerun when they agree. |
+| `review-invalid` | `review.json` is missing or does not match `review.schema.json`. | Delete `review.json`. |
+| `plan-gap` | A review finding is a gap in the plan. | Revise the stage files to cover it; a built stage whose revision is raised is rebuilt by the driver. |
+| `question` | A review finding is a question. | **Ask the user**; revise if the answer needs it. |
+| `fix-failed` | The fix for a review finding failed. | Revise the stage's brief and raise its revision so the driver rebuilds it, or settle the finding with the user. |
+
+### A session-only stage
+
+The one stage the session builds. On the `session-only` halt, for the stage
+it names:
+
+1. Print its packet: `python3 scripts/plan-check.py <plan dir> --packet
+   <NN.n>`. Build from the packet alone, under
+   [stage-builder.md](stage-builder.md), like a headless builder.
+2. Gate it: `build-check.py record <phase dir> <NN.n> --tool claude-code
+   --model orchestrator --effort default --exit 0 --tokens unknown --cost
+   unknown` (add `--fix` when the stage already has a commit). Exit 1
+   names the files outside the stage or the failing checks: correct the
+   work and record again.
+3. Commit it: `build-check.py commit <phase dir> <NN.n>` with the same
+   subject suffix and trailers as the driver's. Commit before rerunning: a
+   rerun restores uncommitted stage files.
+
+## The phase report
+
+When the driver exits 0, stop and report to the user:
+
+- the driver's report: each stage and where to see it, the review findings
+  and their outcome, and the models' work in this phase (the table from
+  `scripts/stage-stats.sh`);
+- every halt of the phase and how it was answered;
+- what was verified by running something versus only by reading code, and
+  what could not be verified;
 - plan adjustments made, as recorded in the phase's `notes`;
-- the models' work in this phase: the table from
-  `scripts/stage-stats.sh <phase start>..HEAD`;
-- whether Codex was on or off this phase, and why;
+- that Codex was off (the driver, version 1, builds with Claude only);
 - questions, and the next phase.
 
-A routing stop follows build-guide.md, "Stopping mid-phase"; report it the
-same way, adding the stages left and both usage scripts' output lines.
+A phase left halted for the user is reported the same way, with the halt
+and the stages left.
 
 Continue to the next phase only when the user says so; a user stop wins.
 
