@@ -8,15 +8,13 @@ Usage:
 
 PHASE_DIR is a plan's phase folder NN-name, holding phase.json and one stage
 file per stage. The driver prints a report: each stage and its result, the
-review findings, the questions, the halt if any, and that Codex is off.
+review findings and their outcome, the halt if any, that Codex is off and,
+for a finished phase, stage-stats.sh's table.
 
 When a step cannot go on, the driver writes a halt into phase.json's record,
 {step, stage, reason, detail, next}, re-renders the plan and stops. `next`
 says what the session does before rerunning; a rerun clears the halt and
 resumes from the records.
-
-In this version the review is a mock and the phase is not finished: the
-driver revises, starts and builds the stages.
 
 Exit codes: 0 built; 10 halted (the halt is in phase.json's record); 2 usage.
 """
@@ -84,6 +82,7 @@ def set_halt(pdir, plan_dir, halt):
 SKILLS = os.path.join(os.path.dirname(HERE), "skills")
 REVISE_GUIDE = os.path.join(SKILLS, "implement-in-phases", "revise-guide.md")
 STAGE_BUILDER = os.path.join(SKILLS, "implement-in-phases", "stage-builder.md")
+PHASE_REVIEWER = os.path.join(SKILLS, "implement-in-phases", "phase-reviewer.md")
 MAX_REVISIONS = 2  # failure-driven revisions of one stage in a run before the user is asked
 
 
@@ -193,6 +192,32 @@ def record(c, what, pair, res, *flags):
               "--cap", pair["cap_usd"], *(["--premium"] if pair["premium"] else []), *flags, "--repo", c.top)
 
 
+def stage_pair(c, brief, *steps):
+    """The stage's routed pair, from its brief's scores and the premium spend."""
+    spent = must(py("build-check.py", "spend", c.pdir), "spend").stdout.strip()
+    scores = "".join(f"{k}{brief['model_basis'][k]}" for k in "JFRCKPVS")
+    return route(c, "--scores", scores, "--premium-spent", spent, *steps)
+
+
+def set_findings(c, findings):
+    path = os.path.join(c.pdir, "phase.json")
+    build_check.save(path, build_check.with_record(plan_check.read_json(path), findings=findings))
+
+
+def mark(c, indexes, status):
+    """Give the findings at INDEXES a new status in phase.json's record."""
+    old = plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"]["findings"]
+    set_findings(c, [{**x, "status": status} if x["index"] in indexes else x for x in old])
+
+
+def step(name, stage, fn, *args):
+    """Run one step; a halt in it is reported at that step and stage."""
+    try:
+        return fn(*args)
+    except Halt as h:
+        raise Halt(h.reason, h.detail, name, stage) from None
+
+
 # ---- steps. A step that cannot go on raises Halt.
 
 def check_plan(c):
@@ -260,10 +285,7 @@ def build(c, sid, s, times):
     down = sum(x["result"] == "stopped" for x in tried)
     if up and down:
         return failed(c, sid, times, "revise-capped", "its builds both failed and reached their budget")
-    spent = must(py("build-check.py", "spend", c.pdir), "spend").stdout.strip()
-    steps = ["--up", up] if up else ["--down", down] if down else []
-    scores = "".join(f"{k}{brief['model_basis'][k]}" for k in "JFRCKPVS")
-    pair = route(c, "--scores", scores, "--premium-spent", spent, *steps)
+    pair = stage_pair(c, brief, *(["--up", up] if up else ["--down", down] if down else []))
     # a ladder moved fewer steps than asked lands on a pair already tried, so can-try covers that too
     if must(py("build-check.py", "can-try", c.pdir, sid, pair["model"], pair["effort"]), "can-try", (0, 1)).returncode:
         return failed(c, sid, times, "revise-capped",
@@ -285,51 +307,149 @@ def build(c, sid, s, times):
             must(py("build-check.py", "reject", c.pdir, sid, why), "reject")
         return failed(c, sid, times, "builder-stopped", why) if stopped else "retry"
     if accepted:
-        trailers = [x for line in c.a.extra_trailer for x in ("--extra-trailer", line)]
-        must(py("build-check.py", "commit", c.pdir, sid, "--subject-suffix", c.a.subject_suffix, *trailers,
-                "--repo", c.top), "commit")
+        must(commit(c, sid), "commit")
         return "built"
     restore(c, json.loads(last(logged.stdout))["outside"])
     return "retry"
 
 
+def shelve_review(c):
+    """Before a build: put an earlier review aside, so the phase is reviewed again after it."""
+    path = os.path.join(c.pdir, "review.json")
+    if os.path.isfile(path):
+        n = len([x for x in os.listdir(c.pdir) if re.fullmatch(r"review-\d+\.json", x)]) + 1
+        os.rename(path, os.path.join(c.pdir, f"review-{n}.json"))
+        set_findings(c, [])
+
+
 def stage_loop(c):
-    """Build the stages not done, in id order: (the (step, stage, result) of each one built, the Halt or None)."""
-    done, revisions = [], {}
+    """Build the stages not done, in id order."""
+    revisions = {}
     while True:
         stages = read_stages(c.pdir)
         todo = [sid for sid, s in stages.items() if plan_check.stage_status(s) != "done"]
         if not todo:
-            return done, None
+            return
         sid = todo[0]
+        shelve_review(c)
         try:
             result = build(c, sid, stages[sid], revisions.get(sid, 0))
         except Halt as h:
             restore(c)  # a rerun starts from a clean tree
-            return done, Halt(h.reason, h.detail, "build", sid)
-        if result == "built":
-            done = done + [("build", sid, {"result": "built"})]
+            raise Halt(h.reason, h.detail, "build", sid) from None
         if result == "revised":
             revisions = {**revisions, sid: revisions.get(sid, 0) + 1}
 
 
-def review(a, pdir, sid):
-    return {"result": "mock", "findings": [], "questions": []}
+def review(c, stages):
+    """Run the reviewer, which writes review.json."""
+    path = os.path.join(c.pdir, "review.json")
+    rec = plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"]
+    unchecked = [sid for sid, s in stages.items() if not s["brief"]["checks"]]
+    pair = route(c, "--scores", "J0F0R0C0K0P0V0S0", "--review")
+    inputs = [f"- Phase folder: `{c.pdir}`", f"- Diff of the phase: `git diff {rec['start_commit']}`",
+              "- Edits that were present before the phase and are not part of it: "
+              + (", ".join(f"`{p}`" for p in rec["preexisting"]) or "none"),
+              c.instructions, f"- Review file to write: `{path}`",
+              "- Stages with no check commands, which only this review checks: " + (", ".join(unchecked) or "none")]
+    res = call(c, "review", PHASE_REVIEWER, inputs, pair, False)
+    if res["exit"] and os.path.isfile(path):
+        os.remove(path)  # a review cut short is not a review; the rerun reviews again
+    if res["exit"] not in (0, 8):
+        raise Halt("build-error", res["stderr"])
+    must(record(c, "review", pair, res), "record")
+    if res["exit"] == 8:
+        raise Halt("review-capped", "the review call reached its cost cap")
 
 
-def report(name, done, halt):
-    """The report's lines, from the (step, stage, result) of each step that ran."""
+def load_review(c):
+    """review.json's findings, checked against its schema."""
+    path = os.path.join(c.pdir, "review.json")
+    if not os.path.isfile(path):
+        raise Halt("review-invalid", "the review wrote no review.json")
+    doc, problems = build_check.load_checked(path, "review.schema.json", "review")
+    if problems:
+        raise Halt("review-invalid", "; ".join(f"{p['where']}: {p['msg']}" for p in problems))
+    return doc["findings"]
+
+
+def commit(c, sid):
+    return py("build-check.py", "commit", c.pdir, sid, "--subject-suffix", c.a.subject_suffix, *c.trailers,
+              "--repo", c.top)
+
+
+def fix(c, sid, s, f):
+    """One fix build of the stage for the finding, committed; any failure halts fix-failed."""
+    pair = stage_pair(c, s["brief"])
+    inputs = [c.instructions, f"- Finding: `{f['type']}` at `{f['file']}:{f['line']}`",
+              f"  - Evidence: {f['evidence']}", f"  - Action: {f['action']}", "- Stage packet:", "",
+              plan_check.packet(c.plan_dir, sid)]
+    res = call(c, f"fix-{sid}", STAGE_BUILDER, inputs, pair, True)
+    logged = must(record(c, sid, pair, res, "--fix"), "record", (0, 1, 3, 4))
+    stopped = re.match(r"Result: stopped:?\s*(.*)", res["line"])
+    why = ((stopped.group(1) or "the builder stopped") if stopped else "edited the plan" if res["edited"]
+           else "" if logged.returncode == 0 else res["stderr"] if logged.returncode == 4 else last(logged.stdout))
+    if not why and commit(c, sid).returncode:
+        why = "the fix changed none of the stage's files"
+    if why:
+        if logged.returncode == 0:
+            must(py("build-check.py", "reject", c.pdir, sid, why), "reject")
+        raise Halt("fix-failed", why)
+
+
+def describe(f, status):
+    return f"{status}: {f['action']} `{f['type']}` in {f['stage']} at {f['file']}:{f['line']}: {f['evidence']}"
+
+
+def review_and_fix(c):
+    """With every stage committed: review, fix what the review says to fix, ask the rest; returns when all is settled."""
+    stages = read_stages(c.pdir)
+    if not os.path.isfile(os.path.join(c.pdir, "review.json")):
+        step("review", None, review, c, stages)
+    findings = step("review", None, load_review, c)
+    known = {x["index"]: x["status"]
+             for x in plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"].get("findings", [])}
+    # asked on an earlier run: the session has handled them since
+    states = [known.get(i, "open").replace("asked", "answered") for i in range(len(findings))]
+    set_findings(c, [{"index": i, "status": x} for i, x in enumerate(states)])
+    is_fix = lambda f: f["action"] in ("remove", "fix") and f["stage"] in stages
+    for i, f in enumerate(findings):
+        if states[i] == "open" and is_fix(f):
+            try:
+                fix(c, f["stage"], stages[f["stage"]], f)
+            except Halt as h:
+                restore(c)  # a rerun starts from a clean tree
+                raise Halt(h.reason, h.detail, "fix", f["stage"]) from None
+            mark(c, [i], "fixed")
+    ask = [i for i, f in enumerate(findings) if states[i] == "open" and not is_fix(f)]
+    if ask:
+        mark(c, ask, "asked")
+        gap = any(findings[i]["action"] == "plan-gap" for i in ask)
+        raise Halt("plan-gap" if gap else "question", "\n".join(describe(findings[i], "asked") for i in ask), "review")
+
+
+def finish(c):
+    must(py("build-check.py", "finish", c.pdir, *c.trailers, "--repo", c.top), "finish")
+
+
+def report(c, halt):
+    """The report's lines, read from the phase's files."""
     listed = lambda items: [f"- {x}" for x in items] or ["none"]
-    lines = [f"Phase {name}", "Stages:"]
-    lines += listed(f"{sid}: {r['result']}" for step, sid, r in done if step == "build" and "halt" not in r)
-    lines += ["Review findings:"] + listed(x for _, _, r in done for x in r.get("findings", []))
-    lines += ["Questions:"] + listed(x for _, _, r in done for x in r.get("questions", []))
+    rec = plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"]
+    marks = rec.get("findings", [])
+    # the record has findings only for a review.json that passed its schema
+    findings = plan_check.read_json(os.path.join(c.pdir, "review.json"))["findings"] if marks else []
+    lines = [f"Phase {os.path.basename(c.pdir)}", "Stages:"]
+    lines += listed(f"{sid}: {plan_check.stage_status(s)}" for sid, s in read_stages(c.pdir).items())
+    lines += ["Review findings:"] + listed(describe(findings[x["index"]], x["status"]) for x in marks)
     if halt:
         lines += [f"Halt: {halt['reason']} at {halt['step']}" + (f" {halt['stage']}" if halt["stage"] else ""),
                   f"  {halt['detail']}", f"  Next: {halt['next']}"]
     else:
         lines += ["Halt: none"]
-    return lines + ["Codex: off (driver version 1)"]
+    stats = [] if halt else ["", subprocess.run(["sh", os.path.join(HERE, "stage-stats.sh"), f"{rec['start_commit']}..HEAD"],
+                                                cwd=c.top, capture_output=True, text=True).stdout]
+    return lines + ["Codex: off (driver version 1)"] + stats
 
 
 def run(a):
@@ -344,21 +464,19 @@ def run(a):
         a=a, pdir=pdir, plan_dir=plan_dir, top=build_check.toplevel(a.repo), work=work,
         available=os.path.join(plan_dir, "models-available.json"),
         profiles=["--profiles", a.profiles] if a.profiles else [],
+        trailers=[x for line in a.extra_trailer for x in ("--extra-trailer", line)],
         instructions="- Project instructions: "
                      + (", ".join(f"`{os.path.abspath(p)}`" for p in a.instructions) or "none"))
     try:
         pre_phase(c, read_stages(pdir))
-        done, stopped = stage_loop(c)
+        stage_loop(c)
+        review_and_fix(c)
+        step("finish", None, finish, c)
+        halt = None
     except Halt as h:
-        done, stopped = [], h
-    halt = None
-    if stopped:
-        halt = {"step": stopped.step, "stage": stopped.stage, "reason": stopped.reason, "detail": stopped.detail,
-                "next": NEXT[stopped.reason]}
+        halt = {"step": h.step, "stage": h.stage, "reason": h.reason, "detail": h.detail, "next": NEXT[h.reason]}
         set_halt(pdir, plan_dir, halt)
-    else:
-        done = done + [("review", None, review(a, pdir, None))]
-    print("\n".join(report(os.path.basename(pdir), done, halt)))
+    print("\n".join(report(c, halt)))
     return 10 if halt else 0
 
 

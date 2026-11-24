@@ -125,7 +125,6 @@ def subjects(repo):
     return git(repo, "log", "--format=%s").splitlines()
 
 
-@pytest.mark.xfail(strict=True, reason="the driver's steps are mocks until 05.2")
 def test_builds_phase(repo):
     result = drive(repo, [REVISED_NOTHING, BUILD_ONE, BUILD_TWO, REVIEW])
     assert result.returncode == 0, result.stdout + result.stderr
