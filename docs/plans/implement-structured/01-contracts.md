@@ -2,7 +2,7 @@
 
 Implement with the implement-in-phases skill; do not build from this file
 without it. Model tiers map to models in [models.md](models.md).
-Status: planned
+Status: built 4d47781
 Before: implement-in-phases is one prose SKILL.md; the orchestrator writes commit trailers, tracks attempts and sums premium spend by hand. No build-check script or revision and review schemas exist.
 After: `revision.schema.json` and `review.schema.json` exist; `scripts/build-check.py` accepts every subcommand with its arguments and exit codes, validates the revision and review JSON, and returns mock results. `tests/test_build_check.py` holds every outcome test, marked expected-fail.
 
@@ -30,9 +30,9 @@ Budget: Under 10 s for test_build_check.py: each test makes one temporary git re
 
 | Stage | Goal | Tier | Order | Status |
 | --- | --- | --- | --- | --- |
-| 01.1 | The revision and review JSON formats exist as schemas in the implement-in-phases skill directory, in the subset plan-check.py's validate understands. | top | first | planned |
-| 01.2 | `scripts/build-check.py` exists with every subcommand, argument, output line and exit code of its contracts; start and finish validate their JSON for real, the rest return mock results. | top | after 01.1 | planned |
-| 01.3 | `tests/test_build_check.py` holds every outcome test of the plan's script outcomes, each driving build-check.py in a temporary git repository and marked `xfail(strict=True)` against the mocks. | middle | after 01.2 | planned |
+| 01.1 | The revision and review JSON formats exist as schemas in the implement-in-phases skill directory, in the subset plan-check.py's validate understands. | top | first | done |
+| 01.2 | `scripts/build-check.py` exists with every subcommand, argument, output line and exit code of its contracts; start and finish validate their JSON for real, the rest return mock results. | top | after 01.1 | done |
+| 01.3 | `tests/test_build_check.py` holds every outcome test of the plan's script outcomes, each driving build-check.py in a temporary git repository and marked `xfail(strict=True)` against the mocks. | middle | after 01.2 | done |
 
 ## 01.1 Revision and review schemas
 
@@ -184,3 +184,6 @@ Model basis: J1 F0 R1 C1 K0 P1 V0 S0 = 4 -> middle
 - Stage commits hold only the stage's files; the phase file, `.build/` and any regenerated plan files are updated in the working tree and committed by `finish` (with `--stopped` at a routing stop, which skips the review and completeness checks and leaves the status in progress). Reason: Keeps the design's 'staging only the stage's files'; resume reads the working tree.
 - A review is recorded as stage `review`; `spend` counts only attempts recorded with `--premium`, which the build guide sets for premium-pair builds and for every review run by claude-build.sh, never for Codex. Reason: Matches model-selection.md's premium budget rules.
 - commit takes `--subject-suffix TEXT` for subject annotations such as `[skip ci]` and `--extra-trailer LINE` for added trailers such as `Co-Authored-By`. Reason: Project rules may require both; today the orchestrator adds them by hand.
+- Plan start: ae57d33.
+- 2026-11-24: stages built directly by the orchestrator (one script, its schemas and tests; tightly coupled), so commits carry Model: orchestrator and no token counts.
+- 2026-11-24: phase 01's review is folded into phase 02's: 01 holds mock bodies that 02 replaces, so reviewing them alone would cost a review for code about to change.
