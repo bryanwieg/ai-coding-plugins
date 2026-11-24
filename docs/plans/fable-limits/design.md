@@ -22,6 +22,10 @@ it this often means the implementation criteria are not tuned.
   divided by its benchmark run cost is at least the standard pick's; otherwise
   the standard pick stays. A `--up` retry after a failed build still steps up,
   because the standard pick has already failed.
+- Revised the same day: the user is "ok for now with letting fable low win
+  if the cost is within an appropriate margin", since Fable should comprehend
+  better and may need fewer tokens at low thinking. The premium pair's ratio
+  may be up to 10% below the standard pick's (`PREMIUM_RATIO_MARGIN`).
 
 ## Check
 
