@@ -38,11 +38,14 @@ def test_codex_off_line(tmp_path):
 
 def test_lists_phase_folders(tmp_path):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    for name, status in (("01-a", "planned"), ("02-b", "built abc123")):
-        d = tmp_path / "docs" / "plans" / "x" / name
+    (tmp_path / ".gitignore").write_text(".ai-scratchpad/\n")
+    for where, name, status in (("docs/plans", "01-a", "planned"), ("docs/plans", "02-b", "built abc123"),
+                                (".ai-scratchpad/plans", "01-c", "planned")):
+        d = tmp_path / where / "x" / name
         d.mkdir(parents=True)
         (d / "phase.md").write_text(
             f"# Phase\n\nImplement with the implement-in-phases skill; do not build.\nStatus: {status}\n")
     context = hook_context(tmp_path)
     assert "- docs/plans/x/01-a/phase.md (planned)" in context
     assert "02-b" not in context
+    assert "- .ai-scratchpad/plans/x/01-c/phase.md (planned)" in context  # ignored, still listed

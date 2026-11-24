@@ -155,6 +155,30 @@ def test_plan_ignored_by_git(repo):
     assert git(repo, "status", "--porcelain") == ""
 
 
+@pytest.mark.parametrize("basis, pair", [
+    (dict.fromkeys("JFRCKPVS", 0), ["gpt-9-sol", "medium"]),              # no top+ stage: the review is top
+    (dict(zip("JFRCKPVS", (1, 1, 1, 1, 2, 2, 2, 1))), ["gpt-9-astra", "high"]),  # 01.2 is top+: so is the review
+])
+def test_review_routed_by_hardest_stage(repo, basis, pair):
+    plan = repo / PLAN_DIR
+    # the routing tests' full set: with fewer pairs, top can reach top+'s pick (top is never below middle+)
+    (plan / "models-available.json").write_text(json.dumps({**AVAILABLE, "models": [
+        {"id": f"gpt-9-{name}", "efforts": ["low", "medium", "high", "xhigh", "max"]}
+        for name in ("luna", "terra", "sol", "astra", "nova")]}))
+    two = json.loads((plan / "01-demo/01.2.json").read_text())
+    two["brief"]["model_basis"] = basis
+    (plan / "01-demo/01.2.json").write_text(json.dumps(two))
+    for cmd in ([SCRIPTS / "select-models.py", plan / "models-available.json", "--profiles", PROFILES,
+                 "--out", plan / "models.md"], [SCRIPTS / "plan-check.py", plan, "--repo", repo]):
+        subprocess.run([sys.executable, *cmd], check=True, capture_output=True)
+    git(repo, "add", ".")
+    git(repo, "commit", "-q", "-m", "two pairs")
+    result = drive(repo, [REVISED_NOTHING, BUILD_ONE, BUILD_TWO, REVIEW])
+    assert result.returncode == 0, result.stdout + result.stderr
+    review = json.loads((repo.parent / "steps.json.calls").read_text().splitlines()[3])
+    assert [review[review.index("--model") + 1], review[review.index("--effort") + 1]] == pair
+
+
 def test_rerun_of_built_phase(repo):
     drive(repo, [REVISED_NOTHING, BUILD_ONE, BUILD_TWO, REVIEW])
     head = git(repo, "rev-parse", "HEAD")
