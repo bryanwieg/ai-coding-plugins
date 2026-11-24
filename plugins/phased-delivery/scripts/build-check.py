@@ -11,7 +11,8 @@ Usage:
   build-check.py commit PHASE_FILE STAGE [--subject-suffix TEXT]
                  [--extra-trailer LINE]... [--repo DIR]
   build-check.py spend PHASE_FILE
-  build-check.py finish PHASE_FILE [--stopped] [--repo DIR]
+  build-check.py finish PHASE_FILE [--stopped] [--extra-trailer LINE]...
+                 [--repo DIR]
 
 PHASE_FILE is a plan's NN-name.md. The script keeps its files next to it in
 .build/: NN-revision.json (written by the orchestrator, revision.schema.json
@@ -235,14 +236,74 @@ def cmd_record(a):
     return code
 
 
+def open_attempt(ledger, stage):
+    for x in reversed(ledger["attempts"]):
+        if x["stage"] == stage and x["result"] == "accepted" and not x["commit"]:
+            return x
+    return None
+
+
 def cmd_reject(a):
-    paths(a.phase_file)
+    f = paths(a.phase_file)
+    ledger = ledger_of(f)
+    x = open_attempt(ledger, a.stage)
+    if x is None:
+        print(f"no accepted, uncommitted attempt for {a.stage}", file=sys.stderr)
+        return 1
+    x.update(result="rejected", why=a.why)
+    save(f["ledger"], ledger)
     return 0
 
 
+def git_commit(top, files, subject, trailers):
+    git(top, "add", "-A", "--", *files)
+    body = "\n".join(trailers)
+    git(top, "commit", "-q", "-m", subject, "-m", body, "--", *files)
+    return git(top, "rev-parse", "--short", "HEAD").strip()
+
+
+def mark_done(phase_file, done):
+    """Set the done stages' table cells and the Status line in the working tree."""
+    lines = open(phase_file).read().split("\n")
+    for i, line in enumerate(lines):
+        cells = line.split("|")
+        if len(cells) > 6 and cells[1].strip() in done:
+            cells[-2] = " done "
+            lines[i] = "|".join(cells)
+        elif line.startswith("Status:"):
+            lines[i] = f"Status: in progress (stages done: {', '.join(sorted(done))})"
+    open(phase_file, "w").write("\n".join(lines))
+
+
 def cmd_commit(a):
-    paths(a.phase_file)
-    print("0000000")
+    f = paths(a.phase_file)
+    ledger, revision = ledger_of(f), load(f["revision"])
+    x = open_attempt(ledger, a.stage)
+    if x is None:
+        print(f"no accepted, uncommitted attempt for {a.stage}", file=sys.stderr)
+        return 1
+    top = toplevel(a.repo)
+    now = set(changed_paths(top)) - set(ledger["preexisting"])
+    files = [p for p in stage_files(revision, a.stage) if p in now]
+    if not files:
+        print(f"no changed files for {a.stage}", file=sys.stderr)
+        return 1
+    earlier = [y for y in ledger["attempts"] if y["stage"] == a.stage and y["fix"] == x["fix"]
+               and y["result"] in ("failed", "stopped", "rejected") and not y["commit"]]
+    stage = next(s for s in revision["stages"] if s["id"] == a.stage)
+    trailers = [f"{'Fixes-Stage' if x['fix'] else 'Stage'}: {a.stage}",
+                f"Plan: {os.path.relpath(os.path.abspath(a.phase_file), top)}",
+                f"Tier: {stage['tier']}", f"Tool: {x['tool']}", f"Model: {x['model']}",
+                f"Effort: {x['effort']}", f"Attempt: {len(earlier) + 1}", f"Tokens: {count(x['tokens'])}",
+                f"Cost: {amount(x['cost'])}", f"Tool-Calls: {count(x['tool_calls'])}"]
+    trailers += [f"Earlier-Attempt: {y['model']} {y['effort']} {count(y['tokens'])} {y['why']}" for y in earlier]
+    subject = f"{a.stage} {stage['title']}" + (f" {a.subject_suffix}" if a.subject_suffix else "")
+    sha = git_commit(top, files, subject, trailers + a.extra_trailer)
+    for y in earlier + [x]:
+        y["commit"] = sha
+    save(f["ledger"], ledger)
+    mark_done(a.phase_file, committed_stages(ledger))
+    print(sha)
     return 0
 
 
@@ -255,10 +316,22 @@ def cmd_spend(a):
 
 def cmd_finish(a):
     f = paths(a.phase_file)
+    ledger, revision = ledger_of(f), load(f["revision"])
     if not a.stopped:
         _, problems = load_checked(f["review"], "review.schema.json", "review")
+        missing = [s["id"] for s in revision["stages"] if s["id"] not in committed_stages(ledger)]
+        problems += [{"file": "ledger", "where": s, "msg": "stage has no commit"} for s in missing]
         if problems:
             return report(problems)
+        last = [x["commit"] for x in ledger["attempts"] if x["result"] == "accepted" and x["commit"]][-1]
+        text = open(a.phase_file).read().split("\n")
+        text = [f"Status: built {last}" if line.startswith("Status:") else line for line in text]
+        open(a.phase_file, "w").write("\n".join(text))
+    top = toplevel(a.repo)
+    plan_dir = os.path.relpath(os.path.dirname(os.path.abspath(a.phase_file)), top)
+    phase = os.path.relpath(os.path.abspath(a.phase_file), top)
+    subject = f"Phase {os.path.basename(a.phase_file)[:2]} {'stopped' if a.stopped else 'built'}: status and notes"
+    print(git_commit(top, [plan_dir], subject, [f"Phase: {phase}"] + a.extra_trailer))
     return 0
 
 
@@ -308,6 +381,7 @@ def parse_args(argv):
     s = sub.add_parser("finish")
     s.add_argument("phase_file")
     s.add_argument("--stopped", action="store_true")
+    s.add_argument("--extra-trailer", action="append", default=[])
     s.add_argument("--repo", default=".")
     return p.parse_args(argv)
 

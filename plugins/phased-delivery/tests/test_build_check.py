@@ -98,7 +98,6 @@ def stats(repo):
                           capture_output=True, text=True, check=True).stdout
 
 
-@pytest.mark.xfail(strict=True, reason="mock until 02.2")
 def test_accepted_stage_commit(repo):
     assert bc(repo, "start", PHASE).returncode == 0
     build_a(repo)
@@ -132,7 +131,6 @@ def test_outside_change_fails(repo):
     assert json.loads(result.stdout)["outside"] == ["src/other.txt"]
 
 
-@pytest.mark.xfail(strict=True, reason="mock until 02.2")
 def test_failed_check_then_retry(repo):
     bc(repo, "start", PHASE)
     (repo / "src/a.txt").write_text("a2\n")
@@ -168,7 +166,6 @@ def test_premium_spend(repo):
     assert result.stdout.strip() == "4.25"
 
 
-@pytest.mark.xfail(strict=True, reason="mock until 02.2")
 def test_preexisting_edits_left_alone(repo):
     (repo / "src/other.txt").write_text("mine\n")
     bc(repo, "start", PHASE)
@@ -200,7 +197,6 @@ def test_invalid_json_refused(repo):
     assert git(repo, "rev-parse", "HEAD") == head
 
 
-@pytest.mark.xfail(strict=True, reason="mock until 02.2")
 def test_finish_phase(repo):
     bc(repo, "start", PHASE)
     build_a(repo)
@@ -220,7 +216,6 @@ def test_finish_phase(repo):
     assert git(repo, "status", "--porcelain") == ""
 
 
-@pytest.mark.xfail(strict=True, reason="mock until 02.2")
 def test_fix_commit(repo):
     bc(repo, "start", PHASE)
     build_a(repo)
