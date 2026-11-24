@@ -178,3 +178,33 @@ plan-reviewer.md lost these two, since only full plans are reviewed now:
   criterion in plan-in-phases. Report any criterion that fails.
 
 | `size-wrong` | the plan claims to be small and a size criterion fails on re-measuring | |
+
+## The JSON is kept (2026-11-24)
+
+Until now the JSON lived in a `.plan/` folder (`.plan/plan.json` and one
+`.plan/NN.json` per phase) that the planner deleted once the plan was
+reported; the rendered `NN-name.md` files were then the plan, and revising
+edited their text. That left two homes for each fact as soon as a script
+needed one: the build scripts read stage tables and briefs back out of
+Markdown, and a revision could change the prose a person reads without
+changing what a script reads.
+
+Now the JSON is the plan's only source for its whole life: `plan.json`,
+each phase folder's `phase.json` and one stage file per stage.
+`plan-check.py` renders `plan.md` and each `phase.md`, which are never
+edited by hand, and nothing deletes the JSON. Why:
+
+- **One home per fact.** The scripts and the people read the same stage,
+  so a revision cannot leave the two apart. Contracts live with the stage
+  that provides them; the registry and the stage and outcome-test tables
+  are built from the stage files instead of being repeated in `plan.json`.
+- **Two writers never share a part of a file.** A stage file and
+  `phase.json` are `{brief, record}`: planning and revising write `brief`,
+  only the build scripts write `record`.
+- **A changed brief is visible.** `record` keeps a hash of the brief each
+  attempt built, so a brief changed without a higher `revision` is an
+  error, and a built stage is reopened by revising its brief in place
+  instead of adding a cleanup stage.
+
+Plans in the old layout are not converted; the built ones keep their md
+files as history.

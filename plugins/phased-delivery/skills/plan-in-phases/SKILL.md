@@ -1,15 +1,15 @@
 ---
 name: plan-in-phases
-description: "Turn an approved specification and design into a complete phased implementation plan: one self-contained NN-name.md file per phase, each split into stage briefs a fresh agent can build without deciding anything other stages, code or the user see. Planning only; writes no code. Use whenever the user asks to plan, break down, phase, stage or sequence a feature, migration, rewrite or other multi-step change (\"plan this\", \"break this into phases\", \"write the implementation plan\", \"how should we build this in stages\"), or to review, fix or rework an existing phased plan or revise a phase after implementation finds gaps. Use proactively, without being asked, before writing code for any change that may touch several files, a shared contract or the architecture: its first step is a capped estimate (at most 5 files read) that sends small changes straight back to direct work, so starting it costs little. Not for one-file edits that change no contract, and not for building the plan; that is implement-in-phases."
+description: "Turn an approved specification and design into a complete phased implementation plan: JSON checked by a script and rendered to one self-contained phase.md per phase, each split into stage briefs a fresh agent can build without deciding anything other stages, code or the user see. Planning only; writes no code. Use whenever the user asks to plan, break down, phase, stage or sequence a feature, migration, rewrite or other multi-step change (\"plan this\", \"break this into phases\", \"write the implementation plan\", \"how should we build this in stages\"), or to review, fix or rework an existing phased plan or revise a phase after implementation finds gaps. Use proactively, without being asked, before writing code for any change that may touch several files, a shared contract or the architecture: its first step is a capped estimate (at most 5 files read) that sends small changes straight back to direct work, so starting it costs little. Not for one-file edits that change no contract, and not for building the plan; that is implement-in-phases."
 ---
 
 # Plan in phases
 
 Turn the approved specification and design into the complete plan in one pass:
-one file per phase, every stage detailed enough to build. This skill writes
-documents only; [implement-in-phases](../implement-in-phases/SKILL.md) builds them.
+one folder per phase, every stage detailed enough to build. This skill writes
+the plan only; [implement-in-phases](../implement-in-phases/SKILL.md) builds it.
 Anyone implementing the plan, agent or person, must use the
-implement-in-phases skill; every phase file says so in its header.
+implement-in-phases skill; every rendered `phase.md` says so in its header.
 
 The user approves the specification and the design. First estimate how much
 planning the change needs (below); a change that needs no plan leaves this
@@ -34,11 +34,11 @@ prints, unless the user asked for a particular one:
 - **direct:** do not plan. Leave this skill and make the change in context:
   read the code it touches, make it, run the tests. When the work turns
   out bigger, re-score as mode-guide.md says.
-- **quick:** grill, then write `plan.json` and one phase file,
-  `01-short-name.md`, through `plan-check.py` as below, with `size` set to
-  `quick` and the score in its evidence. It need not follow the
+- **quick:** grill, then write `plan.json` and one phase folder,
+  `01-short-name/`, checked and rendered by `plan-check.py` as below, with
+  `size` set to `quick` and the score in its evidence. It need not follow the
   skeleton-to-cutover progression. No review subagent: the script's checks
-  stand in for it. When `plan.json` passes `--outline`, run
+  stand in for it. When `plan.json` and the stage files pass `--outline`, run
   `scripts/plan-mode.py rescore` on the plan (mode-guide.md,
   "Re-scoring"): on full, continue as a full plan; on direct, stop
   planning and make the change.
@@ -104,13 +104,27 @@ assumptions to check, and when it is done.
 Read [test-planning.md](test-planning.md) and follow it before planning any
 phase's tests or writing any stage brief's Tests line.
 
-## Write every phase file
+## Write every phase
 
-Name the files `NN-short-name.md` in the plan directory, numbered in build
-order. There is no separate index: each file stands alone and carries its own
-status. The shared files are `models.md`, the plan's model table, and the
-`models-available.json` it is generated from. Write
-them top-down:
+The plan directory holds `plan.json` and one folder per phase, named
+`NN-short-name` and numbered in build order:
+
+```
+<plan dir>/
+  plan.json            the plan: goal, outcomes, decisions, phase list
+  plan.md              rendered from plan.json
+  models.md, models-available.json
+  NN-short-name/
+    phase.json         the phase: role, before and after, assumptions, notes
+    NN.n.json          one per stage: its brief
+    phase.md           rendered: the phase and every stage brief
+```
+
+The JSON is the plan for its whole life: planning writes it, revising and
+building keep using it, and nothing deletes it. `plan.md` and each
+`phase.md` are rendered from it for people and builders; never edit them by
+hand. The shared files are `models.md`, the plan's model table, and the
+`models-available.json` it is generated from. Write the plan top-down:
 
 1. List the models the running tool offers now in `models-available.json`
    and generate `models.md` with the plugin's `scripts/select-models.py`
@@ -118,7 +132,7 @@ them top-down:
    memory. When the session can also build with Codex, do the same for
    Codex in `models-available-codex.json` and `models-codex.md` (see
    "Builders in another tool" there).
-2. Create all phase files with their role and what exists before and after.
+2. Create every phase with its role and what exists before and after.
 3. Define every stage of every phase by goal, files and contracts.
 4. Fill in each stage brief completely.
 
@@ -130,37 +144,39 @@ into one of them, including callers and consumers in other phases.
 
 ### Write the plan as JSON and let the script check and render it
 
-Steps 2 to 4 are written as JSON in a `.plan/` folder inside the plan
-directory, and `scripts/plan-check.py` (in this plugin, two directories above
-this skill's directory) checks them and renders the phase files. The JSON is
-a planning tool only: once the plan is reported, the rendered `NN-name.md`
-files are the plan.
+Steps 2 to 4 are written as JSON, and `scripts/plan-check.py` (in this
+plugin, two directories above this skill's directory) checks it and renders
+`plan.md` and each `phase.md`.
 
-1. Steps 2 and 3: read [plan-guide.md](plan-guide.md) and write
-   `.plan/plan.json` following it: the outcomes from the grill, the
-   decisions that span phases, the contract registry, the outcome tests,
-   and every phase with its stages, files, contracts and order. Run
+1. Steps 2 and 3: read [plan-guide.md](plan-guide.md) and write `plan.json`
+   following it: the outcomes from the grill, the decisions that span
+   phases, the existing interfaces the stages rely on, and the phase list.
+   Read [phase-guide.md](phase-guide.md) and write one stage file,
+   `NN-name/NN.n.json`, for every stage, with its outline fields: title,
+   order, files, and the contracts it provides and uses. Run
    `python3 scripts/plan-check.py <plan dir> --outline --repo <repo>
    --spec <spec> --design <design>` and fix every error it reports before
    going on; judge each warning.
-2. Step 4: read [phase-guide.md](phase-guide.md) and write
-   `.plan/NN.json` for every phase following it. Run the script without
-   `--outline`; it checks each phase against the guide and `plan.json`,
-   checks every spec and design quote and every code citation, and renders
-   each clean phase to `NN-name.md` in the layout of
+2. Step 4: following [phase-guide.md](phase-guide.md), write each phase's
+   `phase.json` and fill in the rest of every stage file. Write only the
+   `brief` part of each; `record` belongs to the build scripts. Run the
+   script without `--outline`; it checks every file against its schema and
+   the others, checks every spec and design quote and every code citation,
+   and renders `plan.md` and each clean phase's `phase.md` in the layout of
    [phase-file-template.md](phase-file-template.md). Fix every error and
    rerun until it reports none.
-3. Change the plan by editing the JSON and rerunning the script, never the
-   rendered files, until the plan is reported. Then delete `.plan/`.
+3. Change the plan only by editing the JSON and rerunning the script, now
+   and for as long as the plan lives. Never edit `plan.md` or a `phase.md`
+   by hand: the next run overwrites them.
 
-The script decides what can be checked without judgment: that each
-contract is listed by its provider and every user, the build order, that
+The script decides what can be checked without judgment: that every
+contract a stage uses has a provider, the build order, that
 files exist or are created first, outcome coverage, tiers from the scores,
 quotes and citations, and the no-code and length rules. Do not re-check
 those by hand; spend the reading on what needs judgment. If Python is not
-available, write the phase files directly in the layout of
-[phase-file-template.md](phase-file-template.md), follow the two guides for
-each field, and check each item above by reading.
+available, write the JSON all the same, following the two guides for each
+field, check each item above by reading, and tell the user that `plan.md`
+and the `phase.md` files were not rendered.
 
 ## Plan for simple code
 
@@ -184,8 +200,8 @@ each field, and check each item above by reading.
 
 ## Review the written plan
 
-Full plans only; a quick plan has no review subagent. When all files are
-written and the script reports no errors, review the plan, not any implementation. Use a fresh reviewing subagent each round,
+Full plans only; a quick plan has no review subagent. When the whole plan is
+written and the script reports no errors and has rendered every phase, review the plan, not any implementation. Use a fresh reviewing subagent each round,
 since it reads the files as an implementer will, without the planning
 session's context. Give it [plan-reviewer.md](plan-reviewer.md) unchanged,
 with its inputs filled in; that file holds what counts as a finding, where

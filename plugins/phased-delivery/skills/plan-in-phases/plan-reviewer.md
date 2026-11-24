@@ -6,7 +6,8 @@ from the plan's `models.md` (see [model-selection.md](model-selection.md)).
 
 Inputs the orchestrator fills in:
 
-- Plan directory: `<path>`
+- Plan directory: `<path>`, holding the rendered `plan.md` and one
+  `NN-name/phase.md` per phase, beside the JSON they are rendered from
 - Specification and design: `<paths or links>`
 - Project instructions: `<paths, such as CLAUDE.md or AGENTS.md>`
 - Round: `<n>`; for rounds after the first, the previous round's findings and
@@ -24,8 +25,8 @@ need to be perfect. Report only the finding types listed under "What counts
 as a finding", each with evidence; anything else is not a finding, however
 true. Do not report wording or style.
 
-`scripts/plan-check.py` has already checked what needs no judgment: each
-contract is listed by its provider and every user, providers are built
+`scripts/plan-check.py` has already checked what needs no judgment: every
+contract a stage uses has a provider, providers are built
 before users, edited files exist or are created first, parallel stages
 share no file, every outcome has a test written before it must pass, tiers
 follow the scores, spec and design quotes appear in the documents, cited
@@ -36,8 +37,10 @@ there.
 
 ## How to review
 
-1. Read the project instructions, the specification, the design and every
-   phase file in full.
+1. Read the project instructions, the specification, the design, `plan.md`
+   and every `phase.md` in full. They are rendered from the plan's JSON
+   (`plan.json`, each `phase.json` and the stage files) and show all of it
+   that is planned; open the JSON only to name a field in a finding.
 2. Read the code. For every name, signature, path, format and behavior a
    brief takes from existing code, open that code and check it. Do not trust
    the plan's claims, its cited files or your own memory of the codebase.
@@ -118,7 +121,7 @@ Examples (from an unrelated feature, login rate limiting):
 List findings, most serious first. For each:
 
 - **Type:** one of the types above.
-- **Where:** phase file and stage.
+- **Where:** phase folder and stage, or `plan.json`.
 - **Problem:** what is wrong or missing.
 - **Evidence:** the spec or design section with the words quoted, or
   `path:line` in the code, and the plan text that says otherwise.

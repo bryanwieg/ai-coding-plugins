@@ -10,7 +10,7 @@ unrelated web app to show form, not content.
 | Mode | What happens |
 | --- | --- |
 | direct | No plan file. Make the change in context: read the code first, run the tests after. |
-| quick | One phase file, checked by `plan-check.py`; no review subagent. Re-score when it is written (below). |
+| quick | `plan.json` and one phase folder, checked and rendered by `plan-check.py`; no review subagent. Re-score when it is written (below). |
 | full | The full process in SKILL.md. |
 
 ## The steps
@@ -141,10 +141,12 @@ break it?
 ## Re-scoring
 
 The mode holds only while the estimate is true.
-- **Quick plan:** when its `plan.json` passes `plan-check.py --outline`,
+- **Quick plan:** when its `plan.json` and stage files
+  (`<plan dir>/01-name/01.n.json`) pass `plan-check.py --outline`,
   run `plan-mode.py rescore <plan dir> --repo .`. It scores the plan
-  itself, not your form: one part per stage from its files and `lines`,
-  the kind and reach from the contract registry, and full whenever the plan
+  itself, not your form: one part per stage from its stage file's `files`
+  and `lines`, the kind and reach from the contracts the stage provides and
+  `plan.json`'s `existing`, and full whenever the plan
   needs more than one phase or more than 3 stages. If it says full,
   continue as a full plan. If it says direct, stop planning and make the
   change directly.
