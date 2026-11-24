@@ -1,9 +1,10 @@
 # Choosing a model and effort
 
 Used by plan-in-phases, which scores every stage and records a tier and
-effort, and by implement-in-phases, which re-scores each stage and routes
-it to a model and thinking level with `select-models.py route` when it
-dispatches a builder. Score from the brief and the code as read now, not
+effort, and by `run-phase.py`, the driver, which routes each stage to a
+model and thinking level with `select-models.py route` from the scores its
+brief holds when it dispatches a builder. Scores change only when the brief
+is revised (see "Adjust while working"). Score from the brief and the code as read now, not
 from how small the task looks, from memory or from habit.
 
 ## Score the task
@@ -151,17 +152,20 @@ rerun the script.
   what the script printed; if nothing is selectable, use the fallback.
 - **No Python available:** use the fallback.
 
-At the start of each phase, the implementer runs
+At the start of each phase, `run-phase.py` runs
 
 ```
 python3 scripts/select-models.py check <plan>/models.md
 ```
 
-Exit 0: `models.md` is current, reuse it. Exit 1: its Profiles line differs
-or is missing; refresh `models-available.json` from the tool, rerun the
-selector and record the change in the phase's Notes. Do the same when a
-dispatch fails because a model is unavailable. Exit 3: profiles missing,
-use the fallback. A plan built in a different tool from the one it was
+and goes on when `models.md` is current. Otherwise it halts `models-stale`
+with the check's last line. The session then refreshes as this guide says:
+when the Profiles line differs or is missing, refresh
+`models-available.json` from the tool, rerun the selector, record the
+change in the phase's Notes and rerun the driver. Do the same when a
+dispatch fails because a model is unavailable. When the model profiles
+are missing, tell the user: the driver cannot route without profiles, so
+the phase waits until they exist. A plan built in a different tool from the one it was
 planned in is redone the same way; briefs record tiers and scores, so
 nothing else changes.
 
@@ -183,11 +187,10 @@ written without spaces. The session routes nothing itself; the driver,
 version 1, routes to Claude only, as if Codex were off. It prints one JSON line: `model`, `effort`, `tier`,
 `premium`, `score`, `cap_tokens`, `cap_usd` and `why` (the rules that
 shaped the pick). Exit codes: 0 printed; 2 bad input (fix it from the
-message); 3 profiles missing; 4 no selectable pair. On 3, or without
-Python, dispatch the tier's pair from `models.md` (or the fallback) as an
-in-session subagent with no cap, and say so in the phase's Notes. On 4,
-stop and report to the user: falling back would get around the premium
-budget and the cap.
+message); 3 profiles missing; 4 no selectable pair. The driver halts
+`build-error` on any exit but 0, with route's message; it never falls back
+to a pair of its own, which would get around the premium budget and the
+cap.
 
 What `route` does, in this order:
 
@@ -220,9 +223,9 @@ at the top of the script.
   there. A paid calibration run is still to set the caps.
 - **Budget stop:** a build that `claude-build.sh` stops at its cap (exit 8)
   is retried one step down the frontier (see "Adjust while working").
-- **Premium budget, $10 per phase:** the implementer records each
+- **Premium budget, $10 per phase:** the driver records each
   `claude-build.sh` run of a pair `route` printed with `"premium": true`,
-  and every phase review it runs, with `build-check.py record ...
+  and every phase review, with `build-check.py record ...
   --premium`, and passes `build-check.py spend <phase dir>` (the runs'
   `Cost:`, or `cap_usd` when the cost is `unknown`) to `route` as
   `--premium-spent`. Once it reaches $10, builds get no premium pair for
@@ -265,8 +268,8 @@ sets it already). Any other value exits 2.
 
 Write the scores in each stage brief's `Model basis` line, for example
 `J1 F1 R1 C1 K0 P0 V1 S0 = 5 -> middle`, and name any override applied.
-Reviewers check the scores against the code; the implementer re-scores at
-dispatch.
+Reviewers check the scores against the code. Scores change only when the
+brief is revised; the driver routes from them (see "Adjust while working").
 
 ## Examples
 
@@ -377,7 +380,9 @@ the cause, the user runs `codex-usage.py --recheck`.
 
 ### The routing rule
 
-Only while Codex is on. Checked before **every** stage dispatch and before
+Codex is off in driver version 1: `run-phase.py` routes every stage and
+the review to Claude. This rule is kept as reference for when Codex
+returns. Only while Codex is on. Checked before **every** stage dispatch and before
 the phase review. Run `scripts/claude-usage.py` (Claude level) and
 `scripts/codex-usage.py` (exit 0 or 2 means room; exit 1 means no room;
 exit 3, 4 or 5 is handled by the availability table first). No usage data
@@ -388,7 +393,7 @@ hit the limit reports exit 7.
 | --- | --- | --- |
 | on pace (0) or no data (3) | narrow stages (F = 0, R = 0) to Codex | build in session |
 | ahead of pace (1) | stages with F <= 1 and R <= 1 to Codex | build in session |
-| nearly out (2) | every build stage **and** the phase review to Codex | stop and report |
+| nearly out (2) | every build stage **and** the phase review to Codex | decided when Codex returns |
 
 Width caps what goes to Codex until Claude is nearly out, because Codex
 models lose track across many files and large amounts of data; only when
@@ -400,16 +405,6 @@ the session cannot continue does sparing its quota outweigh that.
   `models-available-codex.json`, with no cap; a Codex review uses
   `route --review` on it, through `scripts/codex-build.sh` with
   phase-reviewer.md as the prompt file.
-- **Stop and report:** finish and commit the stage in progress, update the
-  phase status line and Notes, commit them, and stop. Report the stages
-  done and left and both scripts' output lines (usage and reset times).
-  When the stop comes at the check before the phase review, set
-  `Status: in progress (stages done: all; review pending)`; resuming
-  starts with the review, after checking availability and the rule again.
-- At level 2, Codex turning off or failing a build (exit 3, 5, 6 or 7)
-  means "Codex has no room": the failed
-  stage is not rebuilt in the session; restore it as above, leave it
-  `planned`, stop and report, with the cause.
 - **Session-only stages** (those that must write outside the repository;
   their brief sets `session_only`) are built in the session at every
   level, including level 2; the rule never sends them to Codex. The driver
@@ -426,24 +421,26 @@ the session cannot continue does sparing its quota outweigh that.
 
 ## Adjust while working
 
-- At dispatch, re-score against the brief as revised and the code as it now
-  is. If a score changes, update `Model basis` and record why in the Notes;
-  `route` reads the new scores.
-- If `claude-build.sh` stops a build at its cap (exit 8), retry it with
-  `route --down 1`, and one step further on each further stop (`--down 2`,
-  and so on). Each stopped attempt becomes an Earlier-Attempt (`build-check.py`). When
-  `why` says it moved fewer pairs than asked, or `route` prints a pair
-  already tried for this stage, the stage is too big for its cap: revise
-  the plan.
-- If a builder fails its "Done when", stops because the stage was harder
-  than its scores showed, or produces work the review rejects for reasoning
-  errors, rerun it with `route --up 1` instead of retrying the same pair
-  (one step further on each further failure), and note which measure was
-  under-scored. Where the model is inherited, `route` moves only its
-  thinking level. When `why` says it moved fewer pairs than asked, or
-  `route` prints a pair already tried for this stage, the brief or the
-  plan is the problem: go back to planning. A stage that has both hit its
-  cap and failed its checks also goes back to planning; never net `--down`
-  against `--up`, which would re-dispatch a pair already tried.
-- If a builder stops because the brief is wrong, a higher tier is not the
-  fix; revise the plan.
+`run-phase.py` steps the ladder; the session does not re-score or route at
+dispatch.
+
+- The driver routes each stage from its brief's `Model basis`. A score
+  changes only when the brief is revised: the reviser updates `Model basis`
+  and records why in the Notes, and `route` reads the new scores.
+- The driver counts a stage's attempts per revision of its brief. After
+  builds that `claude-build.sh` stopped at their cap (exit 8), it routes
+  the next with `route --down N`, N the stopped attempts. After builds that
+  failed their checks or that the driver rejected (the build edited the
+  plan, or its commit failed), it routes with `route --up N`, N those
+  failures. A review finding does not step the ladder: its fix is built at
+  the stage's routed pair, and a failed fix halts `fix-failed`. Where the
+  model is inherited, `route` moves only its thinking level.
+- The ladder is used up when one revision has both stopped and failed
+  attempts (never net `--down` against `--up`), or when `route` lands on a
+  pair already tried. The driver then calls the reviser, which revises the
+  brief, re-scoring a measure that was under-scored, or leaves it
+  unchanged. A builder that stops because the brief is wrong also goes to
+  the reviser; a higher tier is not the fix.
+- The session answers the halts: `revise-capped` (the reviser left the
+  brief unchanged, or the stage was revised too often in one run) and
+  `builder-stopped`. Revise the plan, then rerun the driver.
