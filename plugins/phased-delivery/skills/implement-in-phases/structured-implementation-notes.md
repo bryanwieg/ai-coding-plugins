@@ -174,3 +174,39 @@ project rules (git state and `plan/` closed to builders).
   failure, a halt and rerun, review findings and fix builds, premium
   routing. The tests cover these with a fake claude; the real-routing run
   is still to come.
+
+### Driver run with the real routing (0.13.0)
+
+One run, 2026-11-24, on real work rather than an eval task: none of the
+eval tasks scores above `small`. The work was a one-stage plan to rewrite
+the parts of `model-selection.md` that still described the session-run
+loop, built in a clone of the branch, with the plan's model list but Fable
+offered at low and medium only (the user's quota limit; with Fable at low
+alone, `middle+` and `top` route to Opus high, which scores within the tie
+margin and costs less, so no premium pair would run).
+
+- **Result:** built after two halts, each answered as SKILL.md says, with
+  exit 0 on the third run. The guide change, with a new guide test, was
+  taken onto the branch. Cost $3.60, of which $2.55 premium (all Fable
+  low; Fable medium never routed).
+- **Run 1 (exit 10, `plan-gap`):** the pre-phase reviser on Fable low
+  ($0.77) raised the brief to revision 2, adding three citations it found
+  in the guide. The stage built on Opus high and passed first time ($0.42).
+  The review on Fable low ($0.94) found a bug, which the driver fixed with
+  a fix build on its own ($0.19, a `Fixes-Stage` commit), and two findings
+  for the session: two more sentences still had the session routing, and a
+  `models-stale` halt with no profiles gave advice that only halts again.
+- **Answer and run 2 (exit 10, `plan-gap`):** the session revised the brief
+  to revision 3, re-citing the guide as built (a reopened stage's
+  citations describe the code its earlier build changed). The driver
+  rebuilt the reopened stage as a fix build ($0.44), archived the old
+  review and reviewed again ($0.84): ready, with one finding, that
+  revision 3 had no line in the phase's Notes.
+- **Answer and run 3 (exit 0):** the session added the note; the driver
+  marked the finding answered and finished the phase.
+- **What it showed:** premium routing and spend, the reviser before a
+  phase, review findings turned into fix builds, two halts and reruns, and
+  a reopened stage rebuilt on a new revision all ran on real models.
+  Every halt's `next` was enough to answer it.
+- **Not exercised:** a failing build and the ladder, a budget stop, and the
+  revise cap.
