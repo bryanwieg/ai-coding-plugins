@@ -15,6 +15,8 @@
 # prints one assistant event (a thinking summary and a tool call, for the
 # driver's live feed) and the result event claude-build.sh parses. A call past the last step
 # exits 1 with a message on stderr and nothing printed.
+# claude-build.sh's probe for --thinking-display: answer as a claude that knows it, without taking a step
+case " $* " in *" --version "*) echo "error: option '--thinking-display <display>' argument is invalid" >&2; exit 1;; esac
 exec python3 - "$@" <<'PY'
 import json, os, sys, time
 

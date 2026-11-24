@@ -5,7 +5,8 @@
 # PROMPT is a file holding stage-builder.md and its inputs, kept outside
 # REPO; its text is passed as the prompt. Claude works in REPO with the
 # phased-delivery plugin off and thinking summarized in the stream (the
-# hidden --thinking-display flag; headless runs otherwise leave it empty).
+# hidden --thinking-display flag, when this claude has it; headless runs
+# otherwise leave it empty).
 # OUTDIR receives report.md (the final message), stream.jsonl (written as
 # the call runs) and stderr.txt.
 #
@@ -24,7 +25,7 @@
 # seconds without output); 8 the budget was reached; other non-zero: the
 # claude exit status. Never commits; the orchestrator does.
 set -u
-[ $# -eq 6 ] || { sed -n '2,25p' "$0" >&2; exit 2; }
+[ $# -eq 6 ] || { sed -n '2,26p' "$0" >&2; exit 2; }
 REPO=$1; PROMPT=$2; MODEL=$3; EFFORT=$4; BUDGET=$5; OUT=$6
 MODE=${CLAUDE_BUILD_PERMISSIONS:-acceptEdits}
 case "$MODE" in
@@ -37,10 +38,14 @@ case "$STALL" in
 esac
 mkdir -p "$OUT"
 TEXT=$(cat "$PROMPT") || exit 2
+# --thinking-display is undocumented, and claude -p fails on an unknown option: pass it only while
+# this claude knows it (it then rejects the invalid value here, naming the option; otherwise --version runs)
+THINK=
+claude --thinking-display check --version < /dev/null 2>&1 | grep -q -- --thinking-display && THINK=summarized
 (cd "$REPO" && exec claude -p "$TEXT" --model "$MODEL" --effort "$EFFORT" \
   --max-budget-usd "$BUDGET" \
   --settings '{"enabledPlugins":{"phased-delivery@ai-coding-plugins":false}}' \
-  --thinking-display summarized \
+  ${THINK:+--thinking-display "$THINK"} \
   --permission-mode "$MODE" --no-session-persistence \
   --output-format stream-json --verbose) \
   < /dev/null > "$OUT/stream.jsonl" 2> "$OUT/stderr.txt" &
