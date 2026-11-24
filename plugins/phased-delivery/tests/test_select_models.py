@@ -153,6 +153,13 @@ def test_route_fable_limits(tmp_path):
     assert pair(held) == ("terra", "high") and "score/cost" in held["why"]
     # A --up retry after a failure still steps up to the premium pair.
     assert pair(route(narrow, "J1F1R0C0K0P2V0S0", "--up", "1")) == ("astra", "high")
+    # The risk step is held the same way, and --up still steps.
+    risk = route(narrow, "J1F1R0C0K1P0V0S0")
+    assert pair(risk) == ("terra", "high") and "score/cost" in risk["why"]
+    assert pair(route(narrow, "J1F1R0C0K1P0V0S0", "--up", "1")) == ("astra", "high")
+    # A --down retry whose step up lands on a standard pair is not held by the ratio.
+    down = route(narrow, "J1F1R0C0K1P2V0S0", "--down", "1")
+    assert pair(down) == ("terra", "high") and "score/cost" not in down["why"]
     # Within PREMIUM_RATIO_MARGIN the premium pair is taken: 58.5 for 108 is
     # 0.54, 4.8% below terra high's 0.57; 58.5 for 120 (0.49, 14% below) is not.
     near = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"run_cost_usd": 108}})
