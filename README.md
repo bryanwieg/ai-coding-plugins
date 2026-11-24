@@ -128,6 +128,19 @@ is reported. The plan reviewer reports only a closed list of finding types.
 It uses only the Python standard library; without Python, the planner writes
 the phase files directly and checks by reading.
 
+### Build checks
+
+implement-in-phases follows the same pattern. Revising a phase ends in
+`.build/NN-revision.json` (each stage's files, check commands and scores),
+and `plugins/phased-delivery/scripts/build-check.py` does the bookkeeping:
+it gates each build (no changed file outside the stage, every check
+passes), refuses a model and thinking level already tried for the stage,
+sums the premium spend for routing, and makes each stage, fix and phase
+commit with its trailers. A ledger in `.build/` keeps every attempt, so a
+resumed session picks up where it stopped. The phase reviewer writes
+`.build/NN-review.json` with a closed list of finding types. SKILL.md is a
+short outline; each step's directions are in its own guide.
+
 Some tools, Codex among them, let subagents use a different model only when the
 user asks. To allow it, add to the project's `AGENTS.md` or `CLAUDE.md`:
 
@@ -194,7 +207,7 @@ start (the ai-coding sandbox already sets it).
 
 ### Tracking which model did what
 
-implement-in-phases commits each stage on its own, with trailers for the
+implement-in-phases commits each stage on its own (`build-check.py commit`), with trailers for the
 stage, plan, tier, model, effort, attempt, token count and cost, and gives later
 fixes to a stage their own commits marked `Fixes-Stage:`. When the plan is
 done, it writes `work-report.md` in the plan directory: per model and
