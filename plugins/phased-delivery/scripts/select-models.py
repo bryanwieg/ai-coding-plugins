@@ -99,6 +99,10 @@ PREFER_COST_RATIO = 1.5
 # A long or wide stage takes a faster pair only at this multiple of the pick's
 # speed: thinking levels of one model differ by a few percent, which is noise.
 SPEED_GAIN = 1.2
+# A premium step-up below top is taken while its score per unit of run cost is
+# no more than this fraction worse than the standard pick's: a near tie goes to
+# the larger model, which may need fewer tokens than the benchmark shows.
+PREMIUM_RATIO_MARGIN = 0.10
 SCORES_FORM = "J F R C K P V S in that order, each followed by 0, 1 or 2, such as J1F1R0C0K0P0V0S0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -618,11 +622,11 @@ def route_main(args):
         other, other_notes, other_short, _ = pick_pair(standard, tier, best, scores, signals, *steps)
         above = next((c for c in front if c["score"] > other["score"]), None) if other else None  # cheapest first
         if other is not None and other_short and above is not None and not options.up \
-                and above["score"] / above["cost"] < other["score"] / other["cost"]:
+                and above["score"] / above["cost"] < (1 - PREMIUM_RATIO_MARGIN) * other["score"] / other["cost"]:
             # A step up the plan asked for (middle+ or risk) takes a premium pair only
-            # when it is worth its price: a score/cost ratio at least the standard pick's.
+            # when it is worth its price: a score/cost ratio within the margin of the standard pick's.
             notes = other_notes + [f"premium {above['label']} left out below top: its score/cost "
-                                   f"is below {other['label']}'s"]
+                                   f"is more than {PREMIUM_RATIO_MARGIN:.0%} below {other['label']}'s"]
             choice = other
         elif other is not None and other_short and choice["score"] > other["score"]:
             choice = above
