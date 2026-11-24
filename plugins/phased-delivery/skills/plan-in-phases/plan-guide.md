@@ -1,18 +1,28 @@
 # plan.json: field guide
 
-The plan's shared layer is written as `<plan>/.plan/plan.json` in
-[plan.schema.json](plan.schema.json): the outcomes from the grill, the
-decisions that span phases, the contract registry, the outcome tests, and
-the phases with their stages. `scripts/plan-check.py` checks it before any
-phase JSON is written (`--outline`), and again with every phase. Examples
-use an unrelated feature (login rate limiting) to show form, not content.
+The plan's shared layer is written as `<plan>/plan.json` in
+[plan.schema.json](plan.schema.json): what the plan is for, the outcomes
+from the grill, the decisions that span phases, the existing interfaces
+the stages rely on, and the list of phases. Everything about a stage is in
+its stage file ([phase-guide.md](phase-guide.md)), nowhere else.
+`scripts/plan-check.py` checks plan.json together with the outline fields
+of the stage files (`--outline`) before the rest is written, and again
+with every phase; it renders `plan.md` from it. The JSON is the plan for
+its whole life: it is kept, and `plan.md` is never edited by hand.
+plan.json has no `record`. Examples use an unrelated feature (login rate
+limiting) to show form, not content.
 
-**The rule behind every field** is the same as for phase files: the plan
-names a thing only if something outside the stage that builds it uses it:
-another stage, existing code, the user, or a file on disk. Those things are
-given exactly. Internals (private functions, branches, statement order)
-appear nowhere. No string holds code; names, signatures, routes, keys and
-literal values in backticks are fine.
+**The rule behind every field** is the same as for the stage files: the
+plan names a thing only if something outside the stage that builds it uses
+it: another stage, existing code, the user, or a file on disk. Those
+things are given exactly. Internals (private functions, branches,
+statement order) appear nowhere. No string holds code; names, signatures,
+routes, keys and literal values in backticks are fine.
+
+## description, goal, why
+`description`: a few words naming the plan; it is `plan.md`'s title.
+`goal`: one or two sentences on what exists when every phase is built.
+`why`: one or two sentences on what the goal is for.
 
 ## size
 `verdict` `quick` or `full`, the mode `scripts/plan-mode.py score`
@@ -20,72 +30,58 @@ printed (see mode-guide.md); `evidence` its total and one line per part
 with its score, and any re-score.
 
 ## outcomes
-The outcomes the grill settled (see grill.md), O1.. in order.
+The outcomes the grill settled (see grill.md), `id` O1.. in order.
+- `title`: a few words naming the outcome.
 - `observable`: what a user can do or see afterwards, through which entry
   point (a command, a route, a page, a file), with the concrete values that
   show it. At most 3 sentences.
 - `how_to_check`: the run that shows it: the command, request or test
   client call and what its result must contain. If you cannot write it,
   the goal is not understood yet: go back to the grill.
-- `sources`: the spec or design lines it comes from: `doc`, `section`, and
-  `quote`, the words copied exactly; the script looks for them.
+- `sources`: the spec or design lines it comes from: `doc` (`spec` or
+  `design`), `section`, and `quote`, the words copied exactly; the script
+  looks for them.
 - Good: observable "six failed logins from one address within 60 s get
   HTTP 429 on the sixth"; how_to_check "test client POSTs /login six times
   with a wrong password from 10.0.0.1; the sixth answer is 429".
 - Bad: "rate limiting works well"; "the limiter uses a deque".
 
+Every outcome needs at least one outcome test. The tests are not listed
+here: the stage that writes one names the outcome in its `tests` (see
+phase-guide.md), and the script builds the outcome-test tables from those.
+
 ## decisions
-Every decision that spans phases, D1.. in order: `text` the decision,
+Every decision that spans phases, `id` D1.. in order: `text` the decision,
 `reason` why, `phases` the phase numbers it affects (or `all`); it is
 added to those phases' Notes when rendered. A departure from the spec or
-design names the words it departs from in `departs_from` and sets
-`user_answer`: `given` when the user agreed in the grill, `assumed` when
-the user could not be asked. A decision that affects one phase only goes in
-that phase's `notes`.
+design names the words it departs from in `departs_from` (`doc`,
+`section`, `quote`, as in an outcome's sources) and sets `user_answer`:
+`given` when the user agreed in the grill, `assumed` when the user could
+not be asked. A decision that affects one phase only goes in that phase's
+`notes`.
 
-## contracts
-The registry: every interface one stage provides and another stage or
-existing code uses, and every existing interface a stage relies on.
-- `id` C1.., `kind` as in [phase-guide.md](phase-guide.md), `name` one
-  contract per name.
-- `shape`: the exact outside view. Limits in characters: function, class,
-  error, test-helper 200; config, event, cli 300; format 400; route 500.
-  A longer shape is describing internals.
-- `provided_by`: the stage id that builds it, or `existing:<path>` for code
-  already in the repository (the path must exist).
-- `used_by`: stage ids, existing non-test files, `user` or `disk`. Tests do
-  not count, except for `test-helper`. Every stage listed here must list
-  the contract in its `uses`, and the other way round; the script checks
-  both directions and the build order (a provider stage comes before every
-  user).
-- Good: `{"id": "C4", "kind": "function", "name": "check_rate", "shape":
-  "check_rate(addr: str, now: float) -> bool; True when allowed",
-  "provided_by": "02.1", "used_by": ["03.1"]}`
-- Bad: a contract for a private helper; `used_by` naming only a test file.
+## existing
+Every interface that is already in the repository and that a stage relies
+on, listed once. Interfaces the plan builds are not listed here: the stage
+that builds one holds it in its `provides`.
+- `kind` as in [phase-guide.md](phase-guide.md), `name` one interface per
+  name; no stage may provide the same name.
+- `shape`: the exact outside view, within the limits phase-guide.md gives
+  per kind.
+- `path`: the file that holds it, optionally `path:line`; it must exist.
+- A stage that relies on it names it in its `uses`.
+- Good: `{"kind": "route", "name": "login", "shape": "POST /login form
+  user, password; 302 to next on success, 401 on a wrong password",
+  "path": "app/views.py:40"}`
+- Bad: an entry for a private helper; an entry no stage uses.
 
-## outcome_tests
-Every outcome with at least one row: `test` as `path::name` (see
-test-planning.md), `written_in` and `passes_from` stage ids. A test is
-written once and made to pass once; `written_in` is not after
-`passes_from`. The rendered phase files list these rows; stage briefs do
-not repeat them.
+## docs
+The paths of the `spec` and the `design`, relative to the repository, when
+they exist. The script checks every quote against them.
 
 ## phases
-In build order, numbered 01.. . `file` `NN-short-name.md`, `kind` per
-phase-kinds.md (`behaviour` for a phase that is one behavior target).
-
-## phases[].stages
-In build order within the phase.
-- `id` NN.n, `title` a few words.
-- `files`: every path the stage may change, with `create`, `edit` or
-  `delete`. Edit and delete paths must exist (or be created by an earlier
-  stage); create paths must not. Stages that run in parallel share no
-  file.
-- `lines`: your estimate of lines added plus removed in the stage's
-  non-test files: `under 30`, `30-150` or `over 150`. A quick plan is
-  re-scored from these (mode-guide.md, "Re-scoring").
-- `provides` / `uses`: contract ids, matching the registry.
-- `order`: `first`, `after NN.n` or `parallel with NN.n`, naming a stage
-  listed before it. Order a stage after the stage it depends on, not after
-  the previous one by habit; the script warns when a stage is ordered
-  after one it uses nothing from.
+In build order: `phase` the number, 01.. ; `dir` the phase's folder,
+`NN-short-name` in lower case, digits and hyphens, starting with that
+number; `name` the phase's title; `kind` per phase-kinds.md (`behaviour`
+for a phase that is one behavior target). Each folder holds the phase's
+`phase.json` and one stage file per stage.

@@ -1,14 +1,18 @@
 ---
 name: implement-in-phases
-description: "Build a written phased plan one phase at a time: revise the next phase file against the repository, hand its stage briefs to agents in the planned order, review the actual diff, make one local commit per stage (with model, effort and token trailers), then stop and report. Use whenever the user asks to implement, build, execute, start, continue or resume a phased plan or a numbered phase (\"implement phase 2\", \"build the next phase\", \"continue the plan\", \"start on the plan\"), or when a plan directory of NN-name.md phase files exists and the user wants it built. Requires a complete plan; if phase files or stage briefs are missing, use plan-in-phases first. Use proactively, without being asked, whenever the work at hand is described by phase files (their header says \"Implement with the implement-in-phases skill\"); never build them without this skill. Never pushes unless asked."
+description: "Build a written phased plan one phase at a time: revise the next phase's stage files against the repository, hand its stage briefs to agents in the planned order, review the actual diff, make one local commit per stage (with model, effort and token trailers), then stop and report. Use whenever the user asks to implement, build, execute, start, continue or resume a phased plan or a numbered phase (\"implement phase 2\", \"build the next phase\", \"continue the plan\", \"start on the plan\"), or when a plan directory of NN-name phase folders (phase.json and stage files) exists and the user wants it built. Requires a complete plan; if phase folders or stage briefs are missing, use plan-in-phases first. Use proactively, without being asked, whenever the work at hand is described by a plan's phase.md files (their header says \"Implement with the implement-in-phases skill\"); never build them without this skill. Never pushes unless asked."
 ---
 
 # Implement in phases
 
-Companion to [plan-in-phases](../plan-in-phases/SKILL.md). The plan's phase
-files hold the structure, contracts and stage briefs; the implementer owns how
-each stage's code works inside its brief. The planner's simplicity rules apply
-unchanged.
+Companion to [plan-in-phases](../plan-in-phases/SKILL.md). The plan is its
+JSON: `plan.json` and, per phase, a folder `NN-name` with `phase.json` and
+one stage file `NN.n.json` per stage. Each has a `brief` (the structure,
+contracts and stage briefs, written by planning and revising) and a `record`
+(written only by the scripts). `plan.md` and each `phase.md` are rendered
+from them; never edit a rendered file or a `record` by hand. The implementer
+owns how each stage's code works inside its brief. The planner's simplicity
+rules apply unchanged.
 
 Each step below has its own guide; read it when you reach the step.
 `scripts/build-check.py` (in this plugin, two directories above this
@@ -20,48 +24,53 @@ Do not count, sum or write those by hand. Why it works this way is in
 
 ## Before the first phase
 
-1. Read the project instructions, specification, design and every phase file.
-2. Check that all phase files exist with complete stage briefs. If not, stop
+1. Read the project instructions, specification, design and every `phase.md`.
+2. Check that all phase folders exist with complete stage briefs. If not, stop
    and complete the plan with plan-in-phases first; implementation never fills
    planning gaps.
 3. Note the starting git state and any edits already present, so they are not
-   mistaken for this work. Record the commit the plan's work starts from in
-   the first phase's Notes as `Plan start: <commit>`; the work report counts
-   from it. On resume, find where the phase left off from its status line,
-   stage table and `.build/NN-ledger.json`.
+   mistaken for this work. The commit the plan's work starts from is the
+   first phase's `record.start_commit` in its `phase.json`, written by
+   `build-check.py start`; the work report counts from it. On resume, find
+   where the phase left off from `phase.md`'s status line and stage table,
+   which are rendered from the records.
 4. Project rules (testing, size limits, what may be run) apply throughout.
    Writing code gives no permission to run it, and delegating to another agent
    does not lift any rule.
 
 ## Each phase
 
-1. **Revise.** Read [revise-guide.md](revise-guide.md) and follow it: check
-   the phase file against the repository, write `.build/NN-revision.json`,
-   and run `build-check.py start <phase file>` until it exits 0.
+1. **Revise.** Read [revise-guide.md](revise-guide.md) and follow it with
+   no problem: check the phase's stage files against the repository, edit
+   the stale briefs, raise their revisions and run `plan-check.py` until
+   clean. Then run `build-check.py start <phase dir>` until it exits 0.
 2. **Build.** Read [build-guide.md](build-guide.md) and follow it for every
    stage: route, `can-try`, dispatch, `record` (the gate), and `commit`.
-   Only a stage `record` accepted may be committed.
+   Only a stage `record` accepted may be committed, and only a stage whose
+   brief sets `session_only` may be built by the session itself.
 3. **Review.** Hand the review to a new agent that built none of the phase,
    with [phase-reviewer.md](phase-reviewer.md) unchanged and its inputs
    filled in, written to a prompt file outside the repository. Run `route
    --review` and `scripts/claude-build.sh` with its `model`, `effort` and
-   `cap_usd`, and record the run with `build-check.py record <phase file>
+   `cap_usd`, and record the run with `build-check.py record <phase dir>
    review ... --premium`. A review never drops a step: if it stops at its cap
    (claude-build.sh exit 8), report that to the user. While Codex is on, check
    the routing rule first; when it sends the review to Codex, run
    `scripts/codex-build.sh` with the pair `route --review` prints for
    `models-available-codex.json`. The reviewer writes
-   `.build/NN-review.json` with only the finding types phase-reviewer.md
+   `review.json` in the phase folder with only the finding types phase-reviewer.md
    lists. Read the diff yourself and decide on each finding by its action:
    - `remove` and `fix`: make the change, `record ... --fix` and `commit`
      it against the stage it changes (build-guide.md, "Commit each stage");
-   - `plan-gap`: revise the plan through plan-in-phases' revision rules
-     ([revising.md](../plan-in-phases/revising.md)) before any code changes;
+   - `plan-gap`: revise the plan before any code changes, following
+     [revise-guide.md](revise-guide.md) with the finding as the problem; a
+     built stage it reopens is rebuilt with `record ... --fix`;
    - `question`: put it to the user in the report.
-4. **Finish.** Update the phase's Notes, then run `build-check.py finish
-   <phase file>`: it checks the review JSON and that every stage has a
-   commit, sets `Status: built <commit>` and commits the plan directory
-   with a `Phase:` trailer. Never push or publish unless asked.
+4. **Finish.** Update the phase's `notes` in `phase.json`, then run
+   `build-check.py finish <phase dir>`: it checks `review.json` and that
+   every stage has a commit and none is reopened, records the built commit,
+   re-renders `phase.md` and `plan.md` and commits the plan directory with a
+   `Phase:` trailer. Never push or publish unless asked.
 
 Then stop and report to the user:
 
@@ -69,7 +78,7 @@ Then stop and report to the user:
 - deviations from the briefs, or "none";
 - what was verified by running something versus only by reading code, and what
   could not be verified;
-- plan adjustments made in the Notes;
+- plan adjustments made, as recorded in the phase's `notes`;
 - the models' work in this phase: the table from
   `scripts/stage-stats.sh <phase start>..HEAD`;
 - whether Codex was on or off this phase, and why;

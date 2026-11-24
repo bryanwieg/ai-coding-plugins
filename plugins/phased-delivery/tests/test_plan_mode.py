@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -101,28 +102,33 @@ def test_existing_data_forces_full(tmp_path):
     assert call(tmp_path, "score", form(kind="data", existing_data=True))[2]["mode"] == "full"
 
 
-def plan(tmp_path, stages, contracts, phases=1):
-    d = repo(tmp_path) / "docs" / "plan" / ".plan"
-    d.mkdir(parents=True, exist_ok=True)
-    ph = [{"phase": f"{i + 1:02}", "stages": stages if i == 0 else stages[:1]} for i in range(phases)]
-    (d / "plan.json").write_text(json.dumps({"contracts": contracts, "phases": ph}))
-    p = subprocess.run([sys.executable, SCRIPT, "rescore", str(d.parent), "--repo", str(tmp_path)],
+def plan(tmp_path, stages, existing, phases=1):
+    d = repo(tmp_path) / "docs" / "plan"
+    shutil.rmtree(d, ignore_errors=True)  # each call writes a fresh plan
+    ph = [{"phase": f"{i + 1:02}", "dir": f"{i + 1:02}-p", "name": "p", "kind": "skeleton"} for i in range(phases)]
+    for i, p in enumerate(ph):
+        (d / p["dir"]).mkdir(parents=True, exist_ok=True)
+        for s in (stages if i == 0 else stages[:1]):
+            (d / p["dir"] / f"{p['phase']}.{s['n']}.json").write_text(json.dumps({"brief": s["brief"], "record": {}}))
+    (d / "plan.json").write_text(json.dumps({"existing": existing, "phases": ph}))
+    p = subprocess.run([sys.executable, SCRIPT, "rescore", str(d), "--repo", str(tmp_path)],
                        capture_output=True, text=True)
     return p.returncode, json.loads(p.stdout)["summary"] if p.stdout else None
 
 
-def st(sid, files, provides=(), lines="30-150"):
-    return {"id": sid, "title": "t", "files": [{"path": f, "action": a} for f, a in files],
-            "lines": lines, "provides": list(provides), "uses": [], "order": "first"}
+def st(n, files, provides=(), lines="30-150"):
+    return {"n": n, "brief": {"revision": 1, "title": "t", "order": "first", "lines": lines,
+                              "files": [{"path": f, "action": a, "role": "r"} for f, a in files],
+                              "provides": list(provides), "uses": []}}
 
 
 def test_rescore_kinds_and_reach(tmp_path):
     code, s = plan(tmp_path, [
-        st("01.1", [("app/new.py", "create")]),
-        st("01.2", [("app/ratelimit.py", "edit")]),
-        st("01.3", [("app/views.py", "edit")], ["C2"], "under 30")],
-        [{"id": "C1", "name": "check_rate", "provided_by": "existing:app/ratelimit.py", "used_by": ["01.3"]},
-         {"id": "C2", "name": "login_page", "provided_by": "01.3", "used_by": ["user"]}])
+        st(1, [("app/new.py", "create")]),
+        st(2, [("app/ratelimit.py", "edit")]),
+        st(3, [("app/views.py", "edit")],
+           [{"kind": "route", "name": "login_page", "shape": "GET /login", "used_by": ["user"]}], "under 30")],
+        [{"kind": "function", "name": "check_rate", "shape": "check_rate(addr)", "path": "app/ratelimit.py"}])
     assert code == 0
     assert [p["kind"] for p in s["parts"]] == ["new", "interface", "interface"]
     assert s["parts"][1]["reach_files"] == ["app/views.py", "docs.md"]
@@ -130,8 +136,19 @@ def test_rescore_kinds_and_reach(tmp_path):
     assert s["mode"] == "quick" and s["total"] == 1 + 6 + 3
 
 
+def test_rescore_skips_other_new_layout_plans(tmp_path):
+    other = tmp_path / "docs" / "other"
+    (other / "01-x").mkdir(parents=True)
+    (other / "01-x" / "phase.md").write_text("# Phase 01: x\n\nImplement with the implement-in-phases skill\n")
+    (other / "plan.md").write_text("check_rate\n")
+    (other / "plan.json").write_text('{"note": "check_rate"}\n')
+    code, s = plan(tmp_path, [st(1, [("app/ratelimit.py", "edit")])],
+                   [{"kind": "function", "name": "check_rate", "shape": "check_rate(addr)", "path": "app/ratelimit.py"}])
+    assert code == 0 and s["parts"][0]["reach_files"] == ["app/views.py", "docs.md"]
+
+
 def test_rescore_structure_forces_full(tmp_path):
-    stages = [st(f"01.{i}", [(f"app/f{i}.py", "create")], lines="under 30") for i in range(1, 5)]
+    stages = [st(i, [(f"app/f{i}.py", "create")], lines="under 30") for i in range(1, 5)]
     assert plan(tmp_path, stages, [])[1]["mode"] == "full"
     assert plan(tmp_path, stages[:1], [], phases=2)[1]["mode"] == "full"
     assert plan(tmp_path, stages[:1], [])[1]["mode"] == "direct"

@@ -36,14 +36,14 @@ searching itself:
    already written is always full; anything the estimate could not find
    (unresolved) makes it at least quick.
 
-`rescore` re-scores a quick plan from PLAN_DIR/.plan/plan.json alone, so the
-planner's own view of the estimate does not decide it: one part per stage,
-with its files and `lines`; a stage providing a contract that existing
-code, the user or disk uses, or editing the file of an existing contract,
-is an interface part; a stage that only creates files is new; others are
-internal. Reach is the contracts' outside users plus a search for their
-names. More than one phase, or more than 3 stages, is full whatever the
-score.
+`rescore` re-scores a quick plan from PLAN_DIR/plan.json and its stage
+files, so the planner's own view of the estimate does not decide it: one
+part per stage, with its files and `lines`; a stage providing a contract
+that existing code, the user or disk uses, or editing the file of an
+existing contract, is an interface part; a stage that only creates files
+is new; others are internal. Reach is the contracts' outside users plus a
+search for their names. More than one phase, or more than 3 stages, is
+full whatever the score.
 
 Output: one JSON line per problem, {"where", "kind", "msg", "level"}, then a
 summary line. level "error" must be fixed; "warning" is for the agent to
@@ -115,7 +115,7 @@ def repo_files(repo):
 def texts(repo, skip=None):
     """Text files of the repository, except the input file and plan folders (phase files and
     their model tables mention every name and are not users of it)."""
-    out, plan_dirs = [], set()
+    out, plan_dirs, plan_trees = [], set(), set()
     for f in repo_files(repo):
         p = os.path.join(repo, f)
         if skip and os.path.abspath(p) == skip:
@@ -131,9 +131,13 @@ def texts(repo, skip=None):
             continue
         text = data.decode("utf-8", "replace")
         if text.startswith("# Phase ") and PHASE_MARK in text[:500]:
-            plan_dirs.add(os.path.dirname(f))
+            if os.path.basename(f) == "phase.md":  # new layout <plan>/NN-name/phase.md: drop all of <plan>/
+                plan_trees.add(os.path.dirname(os.path.dirname(f)) + "/")
+            else:
+                plan_dirs.add(os.path.dirname(f))
         out.append((f, text))
-    return [(f, t) for f, t in out if os.path.dirname(f) not in plan_dirs]
+    return [(f, t) for f, t in out
+            if os.path.dirname(f) not in plan_dirs and not any(f.startswith(d) for d in plan_trees)]
 
 
 def mentions(corpus, needle, ignore_case):
@@ -239,41 +243,32 @@ def bounds(form, parts):
     return {"mode": mode, "low": lo, "high": hi, "parts": rows, "reasons": reasons}
 
 
-def plan_parts(plan):
-    """Parts for rescore: one per stage, kind and names from the contract registry."""
-    contracts = {c["id"]: c for c in plan["contracts"]}
-    stage_ids = {s["id"] for ph in plan["phases"] for s in ph["stages"]}
+def plan_parts(plan, phases):
+    """Parts for rescore: one per stage, kind and names from its provides and the existing interfaces."""
     parts = []
-    for ph in plan["phases"]:
-        for st in ph["stages"]:
-            paths = {f["path"] for f in st["files"]}
-            names, outside = [], set()
-            for cid in st["provides"]:
-                c = contracts.get(cid)
-                users = [u for u in (c["used_by"] if c else []) if u not in stage_ids]
-                if users:
-                    names.append(c["name"])
-                    outside |= set(users)
-            for c in plan["contracts"]:
-                src = c["provided_by"]
-                if src.startswith("existing:") and src[len("existing:"):] in paths:
-                    names.append(c["name"])
-                    outside |= {u for u in c["used_by"] if u not in stage_ids}
+    for stages in phases:
+        for sid, st in stages.items():
+            b = st["brief"]
+            paths = {f["path"] for f in b["files"]}
+            outside = [c for c in b["provides"] if c["used_by"]]
+            names = [c["name"] for c in outside] + [e["name"] for e in plan["existing"] if e["path"] in paths]
+            listed = {u for c in outside for u in c["used_by"]}
             if names:
                 kind = "interface"
-            elif all(f["action"] == "create" for f in st["files"]):
+            elif all(f["action"] == "create" for f in b["files"]):
                 kind = "new"
             else:
                 kind = "internal"
-            parts.append({"title": f"{st['id']} {st['title']}", "kind": kind, "files": st["files"],
-                          "lines": st["lines"], "changes": names, "listed": outside - paths})
+            parts.append({"title": f"{sid} {b['title']}", "kind": kind, "files": b["files"],
+                          "lines": b["lines"], "changes": names, "listed": listed - paths})
     return parts
 
 
 def rescore(plan_dir, repo):
-    with open(os.path.join(plan_dir, ".plan", "plan.json")) as fh:
-        plan = json.load(fh)
-    parts = plan_parts(plan)
+    plan = plan_check.read_json(os.path.join(plan_dir, "plan.json"))
+    dirs = [os.path.join(plan_dir, ph["dir"]) for ph in plan["phases"]]
+    phases = [{n[:-5]: plan_check.read_json(os.path.join(d, n)) for n in plan_check.stage_files(d)} for d in dirs]
+    parts = plan_parts(plan, phases)
     corpus = texts(repo)
     plan_abs = os.path.abspath(plan_dir)
     for p in parts:
@@ -285,9 +280,9 @@ def rescore(plan_dir, repo):
         users = found | p.pop("listed")
         p["reach"], p["reach_files"] = sorted(users), len(users)
     mode, total, rows, reasons = score(parts, [], [])
-    stages = max(len(ph["stages"]) for ph in plan["phases"])
-    if len(plan["phases"]) > 1 or stages > 3:
-        reasons.append(f"{len(plan['phases'])} phases, up to {stages} stages: more than one phase of 3 stages -> full")
+    stages = max(len(ph) for ph in phases)
+    if len(phases) > 1 or stages > 3:
+        reasons.append(f"{len(phases)} phases, up to {stages} stages: more than one phase of 3 stages -> full")
         mode = "full"
     for r, p in zip(rows, parts):
         r["kind"], r["reach_files"] = p["kind"], p["reach"][:MAX_FILES_PER_TERM]

@@ -8,41 +8,42 @@ import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 SCRIPT = SCRIPTS / "build-check.py"
-PHASE = "docs/plan/01-demo.md"
+PLAN_DIR = "docs/plan"
+PHASE = "docs/plan/01-demo"
+PHASE_MD = PHASE + "/phase.md"
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
            "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
 
-PHASE_TEXT = """# Phase 01: Demo
+PLAN = {"description": "Demo", "goal": "a and b exist.", "why": "w",
+        "size": {"verdict": "full", "evidence": ["two stages"]},
+        "outcomes": [{"id": "O1", "title": "a", "observable": "a exists", "how_to_check": "read it",
+                      "sources": [{"doc": "spec", "section": "Goals", "quote": "a and b exist"}]}],
+        "decisions": [], "existing": [],
+        "phases": [{"phase": "01", "dir": "01-demo", "name": "Demo", "kind": "behaviour"}]}
 
-Implement with the implement-in-phases skill; do not build from this file
-without it. Model tiers map to models in [models.md](models.md).
-Status: planned
-Before: nothing.
-After: a and b exist.
+PHASE_JSON = {"brief": {"role": "r", "why": "w", "how": "h", "before": "nothing.", "after": "a and b exist.",
+                        "assumptions": [], "test_budget": "1 s", "notes": []},
+              "record": {}}
 
-## Stages
 
-| Stage | Goal | Tier | Order | Status |
-| --- | --- | --- | --- | --- |
-| 01.1 | Write a | middle | first | planned |
-| 01.2 | Write b | small | after 01.1 | planned |
+def stage(title, order, files, checks, basis, tests=()):
+    return {"brief": {"revision": 1, "title": title, "order": order, "lines": "under 30", "files": files,
+                      "provides": [], "uses": [], "goal": title,
+                      "context": {"builds_on": [], "code_read": [], "design": []},
+                      "behaviour": [], "external_inputs": [], "tests": list(tests), "done_when": ["it exists"],
+                      "checks": checks, "out_of_scope": [],
+                      "model_basis": {**dict.fromkeys("JFRCKPVS", 0), **basis}},
+            "record": {}}
 
-## Notes
-none
-"""
 
-REVISION = {
-    "phase": "01",
-    "stages": [
-        {"id": "01.1", "title": "Write a", "files": [{"path": "src/a.txt", "action": "edit"},
-                                                    {"path": "src/done.txt", "action": "create"}],
-         "checks": ["test -f src/done.txt"], "scores": "J1F1R0C0K0P0V0S0", "tier": "middle"},
-        {"id": "01.2", "title": "Write b", "files": [{"path": "src/b.txt", "action": "edit"}],
-         "checks": [], "scores": "J0F0R0C0K0P0V0S0", "tier": "small"},
-    ],
-    "assumptions": [],
-    "adjustments": [],
+STAGES = {
+    "01.1": stage("Write a", "first", [{"path": "src/a.txt", "action": "edit", "role": "a"},
+                                       {"path": "src/done.txt", "action": "create", "role": "done"}],
+                  ["test -f src/done.txt"], {"J": 1, "F": 1},
+                  [{"test": "src/done.txt", "kind": "outcome", "action": "writes", "proves": "a exists",
+                    "outcome": "O1"}]),
+    "01.2": stage("Write b", "after 01.1", [{"path": "src/b.txt", "action": "edit", "role": "b"}], [], {}),
 }
 
 REVIEW = {"findings": [], "verdict": "ready"}
@@ -53,21 +54,36 @@ def git(repo, *args):
                           capture_output=True, text=True, check=True).stdout
 
 
+def write_json(path, data):
+    path.write_text(json.dumps(data))
+
+
 @pytest.fixture
 def repo(tmp_path):
-    """A git repository with one commit holding a phase file, its revision JSON and two stage files."""
+    """A git repository with one commit holding a plan with one phase folder of two stage files."""
     r = tmp_path / "repo"
     (r / "src").mkdir(parents=True)
-    (r / "docs/plan/.build").mkdir(parents=True)
+    (r / PHASE).mkdir(parents=True)
     (r / "src/a.txt").write_text("a\n")
     (r / "src/b.txt").write_text("b\n")
     (r / "src/other.txt").write_text("other\n")
-    (r / PHASE).write_text(PHASE_TEXT)
-    (r / "docs/plan/.build/01-revision.json").write_text(json.dumps(REVISION))
+    write_json(r / PLAN_DIR / "plan.json", PLAN)
+    write_json(r / PHASE / "phase.json", PHASE_JSON)
+    for sid, s in STAGES.items():
+        write_json(r / PHASE / f"{sid}.json", s)
     git(r, "init", "-q")
     git(r, "add", ".")
     git(r, "commit", "-q", "-m", "base")
     return r
+
+
+def stage_file(repo, sid):
+    return json.loads((repo / PHASE / f"{sid}.json").read_text())
+
+
+def edit_brief(repo, sid, **fields):
+    s = stage_file(repo, sid)
+    write_json(repo / PHASE / f"{sid}.json", {**s, "brief": {**s["brief"], **fields}})
 
 
 def bc(repo, *args):
@@ -98,12 +114,17 @@ def stats(repo):
                           capture_output=True, text=True, check=True).stdout
 
 
+def phase_md(repo):
+    return (repo / PHASE_MD).read_text()
+
+
 def test_accepted_stage_commit(repo):
     assert bc(repo, "start", PHASE).returncode == 0
     build_a(repo)
     result = record(repo, "01.1", "opus", "high", 0, "1200", "0.40", "--tool-calls", "7")
     assert result.returncode == 0, result.stdout + result.stderr
     assert json.loads(result.stdout)["result"] == "accepted"
+    assert [x["result"] for x in stage_file(repo, "01.1")["record"]["attempts"]] == ["accepted"]
     done = bc(repo, "commit", PHASE, "01.1", "--extra-trailer", "Co-Authored-By: x <x@example.invalid>")
     assert done.returncode == 0, done.stderr
     assert sorted(changed(repo)) == ["src/a.txt", "src/done.txt"]
@@ -114,7 +135,7 @@ def test_accepted_stage_commit(repo):
                  "Co-Authored-By: x <x@example.invalid>"):
         assert line in msg
     assert "| opus | high | claude-code | 1 | 1/1 |" in stats(repo)
-    text = (repo / PHASE).read_text()
+    text = phase_md(repo)
     assert "| 01.1 | Write a | middle | first | done |" in text
     assert "Status: in progress (stages done: 01.1)" in text
 
@@ -177,20 +198,20 @@ def test_preexisting_edits_left_alone(repo):
 
 
 def test_invalid_json_refused(repo):
-    bad = json.loads(json.dumps(REVISION))
-    del bad["stages"][0]["checks"]
-    (repo / "docs/plan/.build/01-revision.json").write_text(json.dumps(bad))
+    bad = stage_file(repo, "01.1")
+    del bad["brief"]["checks"]
+    write_json(repo / PHASE / "01.1.json", bad)
     result = bc(repo, "start", PHASE)
     assert result.returncode == 1
     assert "checks" in result.stdout
-    assert not (repo / "docs/plan/.build/01-ledger.json").exists()
+    assert json.loads((repo / PHASE / "phase.json").read_text())["record"] == {}
 
-    (repo / "docs/plan/.build/01-revision.json").write_text(json.dumps(REVISION))
+    write_json(repo / PHASE / "01.1.json", STAGES["01.1"])
     assert bc(repo, "start", PHASE).returncode == 0
     head = git(repo, "rev-parse", "HEAD")
     review = {"findings": [{"type": "style", "severity": "blocking", "stage": "01.1", "file": "src/a.txt",
                             "line": 1, "evidence": "x", "action": "fix"}], "verdict": "not-ready"}
-    (repo / "docs/plan/.build/01-review.json").write_text(json.dumps(review))
+    write_json(repo / PHASE / "review.json", review)
     result = bc(repo, "finish", PHASE)
     assert result.returncode == 1
     assert "type" in result.stdout
@@ -202,7 +223,7 @@ def test_finish_phase(repo):
     build_a(repo)
     record(repo, "01.1")
     bc(repo, "commit", PHASE, "01.1")
-    (repo / "docs/plan/.build/01-review.json").write_text(json.dumps(REVIEW))
+    write_json(repo / PHASE / "review.json", REVIEW)
     assert bc(repo, "finish", PHASE).returncode == 1  # 01.2 has no commit
     (repo / "src/b.txt").write_text("b2\n")
     record(repo, "01.2", "haiku", "high")
@@ -210,11 +231,12 @@ def test_finish_phase(repo):
     stage_commit = git(repo, "rev-parse", "--short", "HEAD").strip()
     result = bc(repo, "finish", PHASE)
     assert result.returncode == 0, result.stdout + result.stderr
-    text = (repo / PHASE).read_text()
+    text = phase_md(repo)
     assert f"Status: built {stage_commit}" in text
     assert "| 01.1 | Write a | middle | first | done |" in text and "| 01.2 | Write b | small | after 01.1 | done |" in text
     assert f"Phase: {PHASE}" in message(repo)
-    assert set(changed(repo)) >= {PHASE, "docs/plan/.build/01-ledger.json", "docs/plan/.build/01-review.json"}
+    assert set(changed(repo)) >= {PHASE_MD, f"{PHASE}/phase.json", f"{PHASE}/01.1.json", f"{PHASE}/review.json",
+                                   f"{PLAN_DIR}/plan.md"}
     assert git(repo, "status", "--porcelain") == ""
 
 
@@ -229,6 +251,16 @@ def test_fix_commit(repo):
     msg = message(repo)
     assert "Fixes-Stage: 01.1" in msg and "Stage: 01.1\n" not in msg.replace("Fixes-Stage", "")
     assert "| opus | high | claude-code | 1 | 1/1 | 0/1 | 0 | 1 |" in stats(repo)
+    # a raised revision reopens the stage; its rebuild is a fix, with a changed file and then with none
+    for revision, content in ((2, "a4\n"), (3, None)):
+        edit_brief(repo, "01.1", revision=revision, goal=f"Write a, revision {revision}")
+        if content:
+            (repo / "src/a.txt").write_text(content)
+        assert record(repo, "01.1", "sonnet", "medium", 0, "300", "0.05", "--fix").returncode == 0
+        assert bc(repo, "commit", PHASE, "01.1").returncode == 0
+        assert "Fixes-Stage: 01.1" in message(repo)
+        assert changed(repo) == (["src/a.txt"] if content else [])
+        assert f"| 01.1 | Write a, revision {revision} | middle | first | done |" in phase_md(repo)
 
 
 def test_rename_from_outside_fails(repo):
@@ -258,3 +290,74 @@ def test_reject_budget_stop_then_retry(repo):
     assert "Earlier-Attempt: haiku high 400 budget reached" in msg
     assert "Earlier-Attempt: sonnet high 1200 tests check nothing see diff" in msg
     assert "1 accepted stages" in stats(repo)
+
+
+def test_revision_resets_ladder(repo):
+    def plan_check():
+        result = subprocess.run(["python3", str(SCRIPTS / "plan-check.py"), PLAN_DIR], cwd=repo,
+                                capture_output=True, text=True)
+        rows = [json.loads(x) for x in result.stdout.splitlines()[:-1]]
+        return result.returncode, [x["kind"] for x in rows if x["level"] == "error"]
+
+    bc(repo, "start", PHASE)
+    (repo / "src/a.txt").write_text("a2\n")
+    assert record(repo, "01.1", "opus", "high").returncode == 1
+    assert bc(repo, "can-try", PHASE, "01.1", "opus", "high").returncode == 1
+    assert plan_check() == (0, [])
+    edit_brief(repo, "01.1", goal="Write a, edited")
+    assert plan_check() == (1, ["revision"])
+    attempts = stage_file(repo, "01.1")["record"]["attempts"]
+    assert record(repo, "01.1", "sonnet", "high").returncode == 5
+    assert stage_file(repo, "01.1")["record"]["attempts"] == attempts
+    edit_brief(repo, "01.1", revision=2)
+    assert plan_check() == (0, [])
+    assert bc(repo, "can-try", PHASE, "01.1", "opus", "high").returncode == 0
+
+
+def test_orchestrator_needs_session_only(repo):
+    bc(repo, "start", PHASE)
+    (repo / "src/b.txt").write_text("b2\n")
+    refused = record(repo, "01.2", "orchestrator", "high")
+    assert refused.returncode == 2 and "session_only" in refused.stderr
+    assert "attempts" not in stage_file(repo, "01.2")["record"]
+    edit_brief(repo, "01.2", session_only=True)
+    accepted = record(repo, "01.2", "orchestrator", "high")
+    assert accepted.returncode == 0, accepted.stdout + accepted.stderr
+    assert [x["model"] for x in stage_file(repo, "01.2")["record"]["attempts"]] == ["orchestrator"]
+
+
+def test_rebuild_needs_fix(repo):
+    bc(repo, "start", PHASE)
+    build_a(repo)
+    record(repo, "01.1")
+    bc(repo, "commit", PHASE, "01.1")
+    (repo / "src/a.txt").write_text("a3\n")
+    attempts = stage_file(repo, "01.1")["record"]["attempts"]
+    refused = record(repo, "01.1", "sonnet", "medium")
+    assert refused.returncode == 2 and "--fix" in refused.stderr
+    assert stage_file(repo, "01.1")["record"]["attempts"] == attempts
+    assert record(repo, "01.1", "sonnet", "medium", 0, "300", "0.05", "--fix").returncode == 0
+
+
+def test_invalid_stage_file_after_start(repo):
+    bc(repo, "start", PHASE)
+    assert bc(repo, "can-try", PHASE, "01.1", "opus", "high").returncode == 0
+    broken = stage_file(repo, "01.2")
+    write_json(repo / PHASE / "01.2.json", {"brief": broken["brief"]})
+    result = bc(repo, "can-try", PHASE, "01.1", "opus", "high")
+    assert result.returncode == 2 and "Traceback" not in result.stderr
+    assert any("record" in json.loads(x)["msg"] for x in result.stdout.splitlines())
+    write_json(repo / PHASE / "01.2.json", broken)
+    edit_brief(repo, "01.1", goal="Write a, edited")
+    assert bc(repo, "can-try", PHASE, "01.1", "opus", "high").returncode == 5
+
+
+def test_commit_staged_deletion(repo):
+    edit_brief(repo, "01.2", files=[{"path": "src/b.txt", "action": "delete", "role": "b"}])
+    bc(repo, "start", PHASE)
+    git(repo, "rm", "-q", "src/b.txt")
+    assert record(repo, "01.2", "haiku", "high").returncode == 0
+    done = bc(repo, "commit", PHASE, "01.2")
+    assert done.returncode == 0, done.stderr
+    assert changed(repo) == ["src/b.txt"]
+    assert "src/b.txt" not in git(repo, "ls-files")
