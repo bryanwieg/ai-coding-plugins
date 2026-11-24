@@ -1,6 +1,7 @@
 #!/bin/sh
 # SessionStart: tell the agent when to use the phased-delivery skills, and
-# list unfinished phase files written by plan-in-phases in this repository.
+# list unfinished phase files written by plan-in-phases in this repository
+# (and in its ignored .ai-scratchpad/plans).
 # Phase files are found by the header line plan-in-phases puts in each one.
 
 marker='Implement with the implement-in-phases skill'
@@ -11,7 +12,10 @@ json_escape() {
 
 unfinished=""
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  unfinished=$(git grep -l --untracked -F "$marker" -- '*.md' 2>/dev/null |
+  # plans kept out of the repository in .ai-scratchpad/plans (git grep skips ignored files)
+  plans="$(git rev-parse --show-cdup).ai-scratchpad/plans"
+  unfinished=$({ git grep -l --untracked -F "$marker" -- '*.md' 2>/dev/null
+      [ -d "$plans" ] && grep -rlF --include='*.md' "$marker" "$plans" 2>/dev/null; } |
     grep -E '(^|/)[0-9][0-9]-[^/]*(/phase)?\.md$' | head -50 |
     while IFS= read -r f; do
       status=$(grep -m1 '^Status:' "$f" | sed 's/^Status:[[:space:]]*//')
