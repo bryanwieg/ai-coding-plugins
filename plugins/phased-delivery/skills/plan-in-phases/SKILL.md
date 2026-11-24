@@ -207,7 +207,8 @@ since it reads the files as an implementer will, without the planning
 session's context. Give it [plan-reviewer.md](plan-reviewer.md) unchanged,
 with its inputs filled in; that file holds what counts as a finding, where
 to look and the report format. Use the `top` candidate from the plan's
-`models.md`.
+`models.md`, or `top+` when the plan holds a `top+` stage (a `top` stage
+with a total of 12 or more, or K = 2).
 
 The reviewer reports only the finding types plan-reviewer.md lists, each
 with evidence, and may recommend going back to change earlier phases, even

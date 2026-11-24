@@ -86,15 +86,18 @@ cost, lower thinking for mechanical stages, a larger model at lower
 thinking for design work, faster models for long or wide work and one step
 up for risk. Claude stages and phase reviews are then built headless by
 `plugins/phased-delivery/scripts/claude-build.sh` (`claude -p`), stopped at
-a dollar cap: 150k tokens for `small`, 400k for `middle`, 1M for `top`, at
+a dollar cap: 150k tokens for `small`, 400k for `middle`, 1M for `top` and `top+`, at
 the pair's input price. A stage stopped at its cap is retried one step down
 the frontier; one that fails its checks, one step up. Premium models
 (output price of $30 or more per million tokens) are used below `top` only
 when cheaper than the standard pick and as good, or as the step up past the
 last standard pick while their score per unit of cost is within 5% of it;
-`top` comes only from a total score of 9 or more. They get $10 per phase; past
-that, builds use none. Reviews always run on `top`, and their cost counts
-against that budget. The builder may edit files and runs only the commands
+`top` comes only from a total score of 9 or more. The most capable pair is
+kept for `top+`: a `top` stage with a total of 12 or more or the highest
+risk (K2); other `top` stages get the pair one below it, and step up only
+when a build fails. They get $10 per phase; past that, builds use none.
+Reviews run on `top`, or on `top+` for a phase with a `top+` stage, and
+their cost counts against that budget. The builder may edit files and runs only the commands
 your project's permission rules allow; set
 `CLAUDE_BUILD_PERMISSIONS=bypassPermissions` only when Claude Code already
 runs in a sandbox container (the ai-coding sandbox image sets it). Every cap is at least $0.25, since a cheap

@@ -214,8 +214,11 @@ def record(c, what, pair, res, *flags):
 def stage_pair(c, brief, *steps):
     """The stage's routed pair, from its brief's scores and the premium spend."""
     spent = must(py("build-check.py", "spend", c.pdir), "spend").stdout.strip()
-    scores = "".join(f"{k}{brief['model_basis'][k]}" for k in "JFRCKPVS")
-    return route(c, "--scores", scores, "--premium-spent", spent, *steps)
+    return route(c, "--scores", scores_of(brief), "--premium-spent", spent, *steps)
+
+
+def scores_of(brief):
+    return "".join(f"{k}{brief['model_basis'][k]}" for k in "JFRCKPVS")
 
 
 def set_findings(c, findings):
@@ -369,7 +372,10 @@ def review(c, stages):
     path = os.path.join(c.pdir, "review.json")
     rec = plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"]
     unchecked = [sid for sid, s in stages.items() if not s["brief"]["checks"]]
-    pair = route(c, "--scores", "J0F0R0C0K0P0V0S0", "--review")
+    # the phase's hardest stage decides between top and top+
+    hardest = max((s["brief"]["model_basis"] for s in stages.values()),
+                  key=lambda mb: (plan_check.hardest(mb), plan_check.tier(mb)[0]))
+    pair = route(c, "--scores", scores_of({"model_basis": hardest}), "--review")
     inputs = [f"- Phase folder: `{c.pdir}`", f"- Diff of the phase: `git diff {rec['start_commit']}`",
               "- Edits that were present before the phase and are not part of it: "
               + (", ".join(f"`{p}`" for p in rec["preexisting"]) or "none"),

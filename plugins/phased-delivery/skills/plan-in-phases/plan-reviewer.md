@@ -2,7 +2,8 @@
 
 Give this file, unchanged, to each plan-review subagent, followed by the
 inputs below. Use a new subagent every round, on the `top` candidate
-from the plan's `models.md` (see [model-selection.md](model-selection.md)).
+from the plan's `models.md`, or `top+` when the plan holds a `top+` stage
+(see [model-selection.md](model-selection.md)).
 
 Inputs the orchestrator fills in:
 
