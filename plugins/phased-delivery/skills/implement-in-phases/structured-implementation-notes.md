@@ -150,3 +150,27 @@ git copy of the eval repository.
   built the stage itself), a failing build, a retry or a budget stop (the
   stage passed first time), Codex, and check commands that run long; the open
   question on check timeouts stays open.
+
+### Driver run on lower models (0.13.0)
+
+One run, 2026-11-24: `run-phase.py` on the same task, `p2-multistep`,
+written as a one-phase, one-stage plan in the new layout in a git copy of
+the eval repository, with only Opus and Haiku offered and the eval's
+project rules (git state and `plan/` closed to builders).
+
+- **Result:** the driver exited 0 on its first run with no halt; the
+  task's files, copied onto a fresh eval repository, pass the hidden check
+  (`RESULT pass`). Cost $0.70: revise on Opus high $0.38 (285k tokens,
+  `Result: unchanged`), the stage on Haiku high $0.01 as claude reported
+  (188k tokens, accepted on the first try), the review on Opus high $0.31
+  (300k tokens, no findings).
+- **What it showed:** the session ran one command and wrote nothing. The
+  driver routed, built from the stage packet, gated, committed with the
+  usual trailers (`Stage`, `Plan`, `Tier`, `Model`, `Effort`, `Attempt`,
+  `Tokens`, `Cost`) and finished the phase (`Phase:` commit); the
+  stage-stats table came out of the report. Unlike the 0.11.0 run, nothing
+  was built or capped by the orchestrator.
+- **Not exercised:** a failing build, the ladder, the reviser after a
+  failure, a halt and rerun, review findings and fix builds, premium
+  routing. The tests cover these with a fake claude; the real-routing run
+  is still to come.
