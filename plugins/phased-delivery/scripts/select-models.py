@@ -99,6 +99,10 @@ PREFER_COST_RATIO = 1.5
 # A long or wide stage takes a faster pair only at this multiple of the pick's
 # speed: thinking levels of one model differ by a few percent, which is noise.
 SPEED_GAIN = 1.2
+# A premium step-up below top is taken while its score per unit of run cost is
+# no more than this fraction worse than the standard pick's: a near tie goes to
+# the larger model, which may need fewer tokens than the benchmark shows.
+PREMIUM_RATIO_MARGIN = 0.05
 SCORES_FORM = "J F R C K P V S in that order, each followed by 0, 1 or 2, such as J1F1R0C0K0P0V0S0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -617,9 +621,19 @@ def route_main(args):
         # the next model up at low thinking beats more thinking on a smaller one.
         other, other_notes, other_short, _ = pick_pair(standard, tier, best, scores, signals, *steps)
         if other is not None and other_short and choice["score"] > other["score"]:
-            choice = next(c for c in front if c["score"] > other["score"])  # front is cheapest first
-            notes = other_notes + [f"no standard pair above {other['label']} for the step up: "
-                                   f"{choice['label']}, the cheapest pair above it"]
+            above = next(c for c in front if c["score"] > other["score"])  # front is cheapest first
+            # A step up the plan asked for (middle+ or risk) takes a premium pair only while
+            # its score/cost ratio is within the margin of the standard pick's; a --up retry
+            # after a failure takes it regardless. Cross-multiplied: costs may be 0.
+            if above["row"]["premium"] and not options.up and above["score"] * other["cost"] \
+                    < (1 - PREMIUM_RATIO_MARGIN) * other["score"] * above["cost"]:
+                choice = other
+                notes = other_notes + [f"premium {above['label']} left out below top: its score/cost "
+                                       f"is more than {PREMIUM_RATIO_MARGIN:.0%} below {other['label']}'s"]
+            else:
+                choice = above
+                notes = other_notes + [f"no standard pair above {other['label']} for the step up: "
+                                       f"{choice['label']}, the cheapest pair above it"]
         elif other is not None and (choice["cost"] > other["cost"] or choice["score"] < other["score"]):
             notes = other_notes + [f"premium {choice['label']} left out below top: "
                                    f"{other['label']} costs less or scores at least as well"]

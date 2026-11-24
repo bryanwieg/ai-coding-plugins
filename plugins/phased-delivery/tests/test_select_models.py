@@ -95,8 +95,8 @@ def test_route_stage_signals(offered, tmp_path):
     assert pair(route(offered, "J0F2R0C0K0P0V0S0")) == ("terra", "low")
     # F2 prefers the faster close pair: top is astra high, sol high is faster.
     assert pair(route(offered, "J1F2R1C1K0P2V2S0")) == ("sol", "high")
-    # J2 moves up the model before the thinking level: nova low costs 1.33x astra high.
-    assert pair(route(offered, "J2F1R0C0K0P0V0S0")) == ("nova", "low")
+    # J2 on a top stage (total 9) moves up the model before the thinking level: nova low costs 1.33x astra high.
+    assert pair(route(offered, "J2F1R1C2K0P2V1S0")) == ("nova", "low")
     # Risk moves one frontier pair up from the middle pick, terra high.
     assert pair(route(offered, "J1F1R0C0K1P0V0S0")) == ("sol", "low")
     # The J2 preference never undoes the risk step: without astra and sol high,
@@ -105,8 +105,8 @@ def test_route_stage_signals(offered, tmp_path):
     narrow.write_text(json.dumps({**OFFERED, "models": [
         m if m["id"] != "gpt-9-sol" else {**m, "efforts": ["low", "medium"]}
         for m in OFFERED["models"] if m["id"] != "gpt-9-astra"]}))
-    assert pair(route(narrow, "J2F1R0C0K0P0V0S0")) == ("nova", "low")
-    assert pair(route(narrow, "J2F1R0C0K1P0V0S0")) == ("nova", "medium")
+    assert pair(route(narrow, "J2F1R1C2K0P2V1S0")) == ("nova", "low")
+    assert pair(route(narrow, "J2F1R1C2K1P2V0S0")) == ("nova", "medium")
 
 
 def edited_profiles(tmp_path, changes):
@@ -134,6 +134,38 @@ def test_route_premium_below_top(offered, tmp_path):
     # sol high, the last standard pair, and gets nova low, the next pair up.
     short = route(offered, "J1F1R0C0K0P2V0S0", "--up", "5")
     assert pair(short) == ("nova", "low") and "step up" in short["why"]
+
+
+def test_route_fable_limits(tmp_path):
+    # A single 2 no longer makes a stage top: K2 at total 7 is middle+; a total of 9 is top.
+    offered_path = tmp_path / "offered.json"
+    offered_path.write_text(json.dumps(OFFERED))
+    assert route(offered_path, "J1F1R1C1K2P1V0S0")["tier"] == "middle+"
+    assert route(offered_path, "J2F1R1C2K0P2V1S0")["tier"] == "top"
+    # Without sol and terra xhigh, the standard pairs end at the middle pick, terra
+    # high (51.2 for 90, 0.57 per unit), so the middle+ step reaches astra high
+    # (58.5 for 300, 0.20): a worse score/cost ratio, so terra high stays.
+    narrow = tmp_path / "narrow.json"
+    narrow.write_text(json.dumps({**OFFERED, "models": [
+        m if m["id"] != "gpt-9-terra" else {**m, "efforts": ["low", "medium", "high"]}
+        for m in OFFERED["models"] if m["id"] != "gpt-9-sol"]}))
+    held = route(narrow, "J1F1R0C0K0P2V0S0")
+    assert pair(held) == ("terra", "high") and "score/cost" in held["why"]
+    # A --up retry after a failure still steps up to the premium pair.
+    assert pair(route(narrow, "J1F1R0C0K0P2V0S0", "--up", "1")) == ("astra", "high")
+    # The risk step is held the same way, and --up still steps.
+    risk = route(narrow, "J1F1R0C0K1P0V0S0")
+    assert pair(risk) == ("terra", "high") and "score/cost" in risk["why"]
+    assert pair(route(narrow, "J1F1R0C0K1P0V0S0", "--up", "1")) == ("astra", "high")
+    # A --down retry whose step up lands on a standard pair is not held by the ratio.
+    down = route(narrow, "J1F1R0C0K1P2V0S0", "--down", "1")
+    assert pair(down) == ("terra", "high") and "score/cost" not in down["why"]
+    # Within PREMIUM_RATIO_MARGIN the premium pair is taken: 58.5 for 108 is
+    # 0.54, 4.8% below terra high's 0.57; 58.5 for 120 (0.49, 14% below) is not.
+    near = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"run_cost_usd": 108}})
+    assert pair(route(narrow, "J1F1R0C0K0P2V0S0", profiles=near)) == ("astra", "high")
+    far = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"run_cost_usd": 120}})
+    assert pair(route(narrow, "J1F1R0C0K0P2V0S0", profiles=far)) == ("terra", "high")
 
 
 def test_route_speed_gain(offered, tmp_path):

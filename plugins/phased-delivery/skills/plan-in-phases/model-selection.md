@@ -41,11 +41,14 @@ stage's pair from its eight scores (see "Route each stage").
 | 4–8 | `middle` |
 | 9–16 | `top` |
 
+A single measure at 2 does not make a stage `top`: only a total of 9 or
+more does. (Changed 2026-11-24: the old override, any of J, C or K at 2
+means `top`, sent 39% of stages to the most expensive pair.) A measure at 2
+raises `middle` to `middle+` (override 2).
+
 Overrides, which always win over the total:
 
-1. **J = 2, C = 2 or K = 2: use `top`.** Open-ended design, shared
-   contracts and stacked risk are where weaker models fail quietly.
-2. **`small` only for mechanical stages:** J, C, K and S all 0, P = 0 (the
+1. **`small` only for mechanical stages:** J, C, K and S all 0, P = 0 (the
    brief names a near-identical example) and V = 0 (every "Done when" item
    is a command). Otherwise use at least `middle`, whatever the total. The
    cheapest candidates do well at writing out a precise change and poorly
@@ -53,7 +56,7 @@ Overrides, which always win over the total:
    accounting accurately for their own actions; `small` work must need none
    of those, and its builder's report is never taken as evidence (see
    implement-in-phases).
-3. **`middle` with any measure at 2: use `middle+`**, the next more capable
+2. **`middle` with any measure at 2: use `middle+`**, the next more capable
    candidate above the `middle` pick in `models.md`.
 
 ## Choose the model and thinking level: the plan's model table
@@ -197,7 +200,7 @@ What `route` does, in this order:
 | Risk (K of 1 or more) | One frontier pair up. |
 | Design or contract (J = 2 or C = 2) | Among pairs meeting the floor that score at least the pick and cost at most 1.5 times it, the lowest thinking level: a larger model at lower thinking. |
 | Long or wide (S, R or F = 2) | Among pairs meeting the floor within 3 points of the pick (with K of 1 or more, at least the risk step's score) and costing at most 1.5 times it, the fastest, if at least 1.2 times the pick's speed (thinking levels of one model differ by a few percent). |
-| Premium below `top` | A premium pick below `top` is routed again without premium pairs; the premium pair stays only if it costs no more than that standard pick and scores at least as well. When the standard pairs run out before a step up the stage asked for (`middle+`, risk, `--up`), the cheapest pair scoring above the standard pick is taken instead: the next model up at low thinking, not more thinking on a smaller model. |
+| Premium below `top` | A premium pick below `top` is routed again without premium pairs; the premium pair stays only if it costs no more than that standard pick and scores at least as well. When the standard pairs run out before a step up the stage asked for (`middle+`, risk, `--up`), the cheapest pair scoring above the standard pick is taken instead (the next model up at low thinking, not more thinking on a smaller model), but only when its score divided by its benchmark run cost is no more than 5% below the standard pick's (`PREMIUM_RATIO_MARGIN`); otherwise the standard pick stays. A `--up` retry after a failed build takes it regardless. |
 | `--down N`, `--up N` | Move N frontier pairs cheaper or dearer from the pick, stopping at either end. N is 0 or more; not both at once. |
 | `--review` | `top`, ignoring premium spend and the stage's scores (no caps, risk step or preferences). |
 
@@ -269,14 +272,15 @@ dispatch.
   neighboring entry the brief names, and add one test: J0 F1 R0 C0 K0 P0 V0
   S0 = 1 -> `small`.
 - Change a function, run its tests, expect one named test to fail, then
-  update that test: J0 F1 R0 C0 K0 P0 V0 S2 = 3 -> override 2 -> `middle`.
+  update that test: J0 F1 R0 C0 K0 P0 V0 S2 = 3 -> override 1 -> `middle`
+  -> override 2 -> `middle+`.
 - Fill in the body of a planned parser function against a defined signature,
   reading a config file another tool writes, with tests: J1 F1 R1 C1 K1 P1 V0
   S0 = 6 -> `middle`.
 - Same parser, but the input format must be inferred from samples and the
-  brief leaves the error-handling approach open: J2 ... -> override 1 ->
-  `top`. Better still, the planner should settle the approach and
-  re-score.
+  brief leaves the error-handling approach open: J2 F1 R1 C1 K1 P1 V0 S0
+  = 7 -> override 2 -> `middle+`. Better still, the planner should settle
+  the approach and re-score.
 - Replace the session store with a new one, migrating stored sessions and
   retiring the old path: J1 F2 R2 C2 K2 P2 V1 S1 = 13 -> `top`.
 
