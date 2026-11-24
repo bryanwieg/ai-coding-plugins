@@ -94,8 +94,6 @@ def quote_found(q, text):
 
 def tier(mb):
     total = sum(mb[m] for m in MEASURES)
-    if mb["J"] == 2 or mb["C"] == 2 or mb["K"] == 2:
-        return total, "top", "J, C or K = 2"
     t, why = ("small" if total <= 3 else "middle" if total <= 8 else "top"), ""
     if t == "small" and not (all(mb[m] == 0 for m in "JCKS") and mb["P"] == 0 and mb["V"] == 0):
         t, why = "middle", "small only for mechanical stages"

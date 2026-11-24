@@ -616,8 +616,16 @@ def route_main(args):
         # unless the standard pairs cannot give a step up the stage asked for:
         # the next model up at low thinking beats more thinking on a smaller one.
         other, other_notes, other_short, _ = pick_pair(standard, tier, best, scores, signals, *steps)
-        if other is not None and other_short and choice["score"] > other["score"]:
-            choice = next(c for c in front if c["score"] > other["score"])  # front is cheapest first
+        above = next((c for c in front if c["score"] > other["score"]), None) if other else None  # cheapest first
+        if other is not None and other_short and above is not None and not options.up \
+                and above["score"] / above["cost"] < other["score"] / other["cost"]:
+            # A step up the plan asked for (middle+ or risk) takes a premium pair only
+            # when it is worth its price: a score/cost ratio at least the standard pick's.
+            notes = other_notes + [f"premium {above['label']} left out below top: its score/cost "
+                                   f"is below {other['label']}'s"]
+            choice = other
+        elif other is not None and other_short and choice["score"] > other["score"]:
+            choice = above
             notes = other_notes + [f"no standard pair above {other['label']} for the step up: "
                                    f"{choice['label']}, the cheapest pair above it"]
         elif other is not None and (choice["cost"] > other["cost"] or choice["score"] < other["score"]):
