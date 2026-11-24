@@ -54,7 +54,7 @@ Do not count, sum or write those by hand. Why it works this way is in
    `.build/NN-review.json` with only the finding types phase-reviewer.md
    lists. Read the diff yourself and decide on each finding by its action:
    - `remove` and `fix`: make the change, `record ... --fix` and `commit`
-     it (build-guide.md, "Commit each stage");
+     it against the stage it changes (build-guide.md, "Commit each stage");
    - `plan-gap`: revise the plan through plan-in-phases' revision rules
      ([revising.md](../plan-in-phases/revising.md)) before any code changes;
    - `question`: put it to the user in the report.
