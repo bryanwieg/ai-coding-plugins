@@ -145,8 +145,22 @@ premium spend for routing, and makes each stage, fix and phase commit with
 its trailers. Every attempt goes into the stage file's `record`, and
 `phase.md`'s status is rendered from the records, so a resumed session
 picks up where it stopped. The phase reviewer writes `review.json` in the
-phase folder with a closed list of finding types. SKILL.md is a
-short outline; each step's directions are in its own guide.
+phase folder with a closed list of finding types.
+
+### The phase driver
+
+implement-in-phases does not run the phase loop itself: for every phase it
+runs `plugins/phased-delivery/scripts/run-phase.py <phase dir>`, which
+revises the phase, routes, builds, gates and commits each stage, runs the
+review and its fixes and finishes the phase. Every step is a headless
+`claude` at the model, thinking level and cost cap the routing gives, and a
+builder sees only its own stage's packet. When a step cannot go on (a brief
+that cannot be built, a review question, a sign-in or service failure) the
+driver writes a halt into `phase.json` and exits 10; the session does what
+the halt's `next` says, asking you where the skill says to, and reruns it,
+which resumes from the records. The session itself builds only a stage
+marked `session_only`. Version 1 builds with Claude only: Codex routing
+(below) is not used by the driver yet.
 
 Some tools, Codex among them, let subagents use a different model only when the
 user asks. To allow it, add to the project's `AGENTS.md` or `CLAUDE.md`:

@@ -3,6 +3,7 @@
 
 Usage:
   plan-check.py PLAN_DIR [--repo DIR] [--spec FILE] [--design FILE] [--outline] [--phase NN]
+  plan-check.py PLAN_DIR --packet NN.n
 
 The plan is PLAN_DIR/plan.json (plan.schema.json: outcomes, cross-phase
 decisions, existing interfaces, phases) and, per phase, a folder NN-name
@@ -18,6 +19,10 @@ The checks that compare a brief with the repository apply to stages still to
 build: file actions to stages with no commit, code citations also to reopened
 ones; --phase NN limits them to that phase. A brief that changed since an
 attempt built it needs a higher `revision`.
+
+--packet prints the stage packet, the only plan text a builder is given: the
+phase's role, why, how, before, after and test budget, then the stage's
+brief as phase.md shows it. It checks and renders nothing; exit 2 for an unknown stage.
 
 --spec and --design default to the paths plan.json names in `docs`, relative
 to --repo, which defaults to the current directory.
@@ -51,20 +56,26 @@ WARNINGS = {"code", "length", "other", "order-hint"}
 
 # ---- a small JSON Schema subset (the plugin's scripts use the standard library only)
 
+TYPES = {"object": dict, "array": list, "string": str, "boolean": bool, "null": type(None),
+         "integer": int, "number": (int, float)}
+
+
+def is_type(data, name):
+    # a bool is an int in Python, not in JSON
+    return isinstance(data, TYPES[name]) and (name == "boolean" or not isinstance(data, bool))
+
+
 def validate(data, schema, root=None, path=""):
     root = root or schema
     if "$ref" in schema:
         schema = root["definitions"][schema["$ref"].split("/")[-1]]
     out = []
     t = schema.get("type")
-    types = {"object": dict, "array": list, "string": str, "boolean": bool}
-    if t == "integer":
-        if not isinstance(data, int) or isinstance(data, bool):
-            return [(path, f"must be an integer, got {type(data).__name__}")]
-        if data < schema.get("minimum", data) or data > schema.get("maximum", data):
-            out.append((path, f"{data} is outside {schema.get('minimum')}..{schema.get('maximum')}"))
-    elif t and not isinstance(data, types[t]):
-        return [(path, f"must be {t}, got {type(data).__name__}")]
+    if t and not any(is_type(data, name) for name in ([t] if isinstance(t, str) else t)):
+        wanted = "an integer" if t == "integer" else t if isinstance(t, str) else " or ".join(t)
+        return [(path, f"must be {wanted}, got {type(data).__name__}")]
+    if is_type(data, "number") and (data < schema.get("minimum", data) or data > schema.get("maximum", data)):
+        out.append((path, f"{data} is outside {schema.get('minimum')}..{schema.get('maximum')}"))
     if "enum" in schema and data not in schema["enum"]:
         out.append((path, f"{data!r} is not one of {schema['enum']}"))
     if "pattern" in schema and isinstance(data, str) and not re.search(schema["pattern"], data):
@@ -74,11 +85,14 @@ def validate(data, schema, root=None, path=""):
         for k in schema.get("required", []):
             if k not in data:
                 out.append((path, f"missing {k!r}"))
+        extra = schema.get("additionalProperties")
         for k, v in data.items():
             if k in props:
                 out += validate(v, props[k], root, f"{path}/{k}")
-            elif schema.get("additionalProperties") is False:
+            elif extra is False:
                 out.append((path, f"unknown field {k!r}"))
+            elif isinstance(extra, dict):
+                out += validate(v, extra, root, f"{path}/{k}")
     if isinstance(data, list):
         if len(data) < schema.get("minItems", 0):
             out.append((path, f"needs at least {schema['minItems']} items"))
@@ -399,11 +413,42 @@ def contract_lines(sid, brief, contracts, existing):
     return mine + used or ["none"]
 
 
+def phase_rows(found, stages):
+    return [t for t in outcome_rows(stages) if t["written_in"] in found or t["passes_from"] in found]
+
+
+def render_stage(sid, s, plan, stages, proves):
+    # the stage's section of phase.md, also the body of its packet
+    b = s["brief"]
+    c = b["context"]
+    L = ["", f"## {sid} {b['title']}".rstrip(), "", f"Goal: {b['goal']}", "", "Context:"]
+    ctx = [f"- Builds on {x['source']}: {x['what']}" for x in c["builds_on"]]
+    ctx += [f"- `{x['where']}`: {x['fact']}" for x in c["code_read"]]
+    ctx += [f"- {x['doc'].capitalize()}, {x['section']}: \"{x['quote']}\"" for x in c["design"]]
+    L += ctx or ["none"]
+    L += ["", "Contracts:"] + contract_lines(sid, b, registry(stages), plan["existing"])
+    L += ["", "Files:"] + bullets(b["files"], lambda x: f"`{x['path']}` ({x['action']}): {x['role']}")
+    L += ["", "Behaviour:"] + bullets(b["behaviour"], lambda x:
+          f"Given {x['given']}, when {x['when']}, then {x['then'].rstrip('.')}.")
+    L += ["", "External inputs:"] + bullets(b["external_inputs"], lambda x:
+          f"{x['source']}: {x['check']}; on failure, {x['on_failure']}")
+    L += ["", "Tests:"] + bullets(b["tests"], lambda x:
+          f"{x['action']} `{x['test'].strip('`')}` ({x['kind']}): "
+          + (proves.get(x["test"].strip("`"), x["proves"]) if x["kind"] == "outcome" else x["proves"])
+          + (f" (unit because: {x['why_unit']})" if x.get("why_unit") else ""))
+    L += ["", "Done when:"] + bullets(b["done_when"], str)
+    L += ["", "Checks:"] + bullets(b["checks"], lambda x: f"`{x}`")
+    L += ["", "Out of scope:"] + bullets(b["out_of_scope"], str)
+    total, t, why = tier(b["model_basis"])
+    L += ["", "Model basis: " + " ".join(f"{m}{b['model_basis'][m]}" for m in MEASURES)
+          + f" = {total} -> {t}" + (f" (override: {why})" if why else "")]
+    return L
+
+
 def render_phase(ph, pj, found, plan, stages):
     num, d = ph["phase"], pj["brief"]
     outcomes = {x["id"]: x["observable"] for x in plan["outcomes"]}
-    contracts = registry(stages)
-    rows = [t for t in outcome_rows(stages) if t["written_in"] in found or t["passes_from"] in found]
+    rows = phase_rows(found, stages)
     proves = {t["test"]: outcomes.get(t["outcome"], t["outcome"]) for t in rows}
     L = [f"# Phase {num}: {ph['name']}", "",
          "Implement with the implement-in-phases skill; do not build from this file",
@@ -420,29 +465,7 @@ def render_phase(ph, pj, found, plan, stages):
     L += [f"| {sid} | {s['brief']['goal']} | {tier(s['brief']['model_basis'])[1]} | {s['brief']['order']} | "
           f"{stage_status(s)} |" for sid, s in found.items()]
     for sid, s in found.items():
-        b = s["brief"]
-        c = b["context"]
-        L += ["", f"## {sid} {b['title']}".rstrip(), "", f"Goal: {b['goal']}", "", "Context:"]
-        ctx = [f"- Builds on {x['source']}: {x['what']}" for x in c["builds_on"]]
-        ctx += [f"- `{x['where']}`: {x['fact']}" for x in c["code_read"]]
-        ctx += [f"- {x['doc'].capitalize()}, {x['section']}: \"{x['quote']}\"" for x in c["design"]]
-        L += ctx or ["none"]
-        L += ["", "Contracts:"] + contract_lines(sid, b, contracts, plan["existing"])
-        L += ["", "Files:"] + bullets(b["files"], lambda x: f"`{x['path']}` ({x['action']}): {x['role']}")
-        L += ["", "Behaviour:"] + bullets(b["behaviour"], lambda x:
-              f"Given {x['given']}, when {x['when']}, then {x['then'].rstrip('.')}.")
-        L += ["", "External inputs:"] + bullets(b["external_inputs"], lambda x:
-              f"{x['source']}: {x['check']}; on failure, {x['on_failure']}")
-        L += ["", "Tests:"] + bullets(b["tests"], lambda x:
-              f"{x['action']} `{x['test'].strip('`')}` ({x['kind']}): "
-              + (proves.get(x["test"].strip("`"), x["proves"]) if x["kind"] == "outcome" else x["proves"])
-              + (f" (unit because: {x['why_unit']})" if x.get("why_unit") else ""))
-        L += ["", "Done when:"] + bullets(b["done_when"], str)
-        L += ["", "Checks:"] + bullets(b["checks"], lambda x: f"`{x}`")
-        L += ["", "Out of scope:"] + bullets(b["out_of_scope"], str)
-        total, t, why = tier(b["model_basis"])
-        L += ["", "Model basis: " + " ".join(f"{m}{b['model_basis'][m]}" for m in MEASURES)
-              + f" = {total} -> {t}" + (f" (override: {why})" if why else "")]
+        L += render_stage(sid, s, plan, stages, proves)
     notes = list(d["notes"])
     for x in plan["decisions"]:
         if "all" in x["phases"] or num in x["phases"]:
@@ -487,12 +510,32 @@ def write(plan_dir, plan, phases, nums):
     return list(texts)
 
 
+def read_plan(plan_dir):
+    # (plan.json, [(its phase entry, phase.json, {stage id: stage file})]) as they are, without checks
+    plan = read_json(os.path.join(plan_dir, "plan.json"))
+    return plan, [(ph, read_json(os.path.join(plan_dir, ph["dir"], "phase.json")),
+                   {n[:-5]: read_json(os.path.join(plan_dir, ph["dir"], n))
+                    for n in stage_files(os.path.join(plan_dir, ph["dir"]))}) for ph in plan["phases"]]
+
+
+def packet(plan_dir, sid):
+    """The stage packet, the only plan text a builder is given, or None for an unknown stage."""
+    plan, phases = read_plan(plan_dir)
+    stages = flatten(phases)
+    for _, pj, found in phases:
+        if sid in found:
+            d = pj["brief"]
+            outcomes = {x["id"]: x["observable"] for x in plan["outcomes"]}
+            proves = {t["test"]: outcomes.get(t["outcome"], t["outcome"]) for t in phase_rows(found, stages)}
+            head = [f"Role: {d['role']}", f"Why: {d['why']}", f"How: {d['how']}",
+                    f"Before: {d['before']}", f"After: {d['after']}", f"Test budget: {d['test_budget']}"]
+            return "\n".join(head + render_stage(sid, found[sid], plan, stages, proves)) + "\n"
+    return None
+
+
 def render_plan(plan_dir):
     """Re-render plan.md and every phase.md from the JSON as it is, without checks; returns the paths written."""
-    plan = read_json(os.path.join(plan_dir, "plan.json"))
-    phases = [(ph, read_json(os.path.join(plan_dir, ph["dir"], "phase.json")),
-               {n[:-5]: read_json(os.path.join(plan_dir, ph["dir"], n))
-                for n in stage_files(os.path.join(plan_dir, ph["dir"]))}) for ph in plan["phases"]]
+    plan, phases = read_plan(plan_dir)
     return [os.path.join(plan_dir, n) for n in write(plan_dir, plan, phases, [ph["phase"] for ph in plan["phases"]])]
 
 
@@ -546,7 +589,7 @@ def load_phase(plan_dir, ph, outline, stage_schema, r):
 
 
 def main(argv):
-    args, opts = [], {"--repo": ".", "--spec": None, "--design": None, "--phase": None}
+    args, opts = [], {"--repo": ".", "--spec": None, "--design": None, "--phase": None, "--packet": None}
     outline, i = False, 0
     while i < len(argv):
         if argv[i] in opts and i + 1 < len(argv):
@@ -561,6 +604,17 @@ def main(argv):
         print(__doc__, file=sys.stderr)
         return 2
     plan_dir, repo, scope = args[0], opts["--repo"], opts["--phase"]
+    if opts["--packet"] is not None:
+        try:
+            text = packet(plan_dir, opts["--packet"])
+        except (OSError, ValueError) as e:
+            print(e, file=sys.stderr)
+            return 2
+        if text is None:
+            print(f"--packet {opts['--packet']} is not a stage of the plan", file=sys.stderr)
+            return 2
+        print(text, end="")
+        return 0
     r = Report()
     plan_path = os.path.join(plan_dir, "plan.json")
     if not os.path.exists(plan_path):

@@ -11,19 +11,27 @@
 # file edits work and commands follow the project's allow rules). A session
 # already in a sandbox container sets it to bypassPermissions (the ai-coding
 # sandbox image does).
+# CLAUDE_BUILD_STALL (seconds, default 900) stops the call when stream.jsonl
+# gains no line for that long: a hung call, not a slow one (the longest
+# silence in 39 recorded runs was 130 s).
 # Prints "Tokens: N" (input, output, cache read and cache creation, from
 # modelUsage, else usage) and
 # "Cost: X.XX" (USD), or unknown, for the stage commit.
 #
-# Exit: 0 built; 2 usage; 8 the budget was reached; other non-zero: the
+# Exit: 0 built; 2 usage; 7 stalled (stopped after CLAUDE_BUILD_STALL
+# seconds without output); 8 the budget was reached; other non-zero: the
 # claude exit status. Never commits; the orchestrator does.
 set -u
-[ $# -eq 6 ] || { sed -n '2,17p' "$0" >&2; exit 2; }
+[ $# -eq 6 ] || { sed -n '2,23p' "$0" >&2; exit 2; }
 REPO=$1; PROMPT=$2; MODEL=$3; EFFORT=$4; BUDGET=$5; OUT=$6
 MODE=${CLAUDE_BUILD_PERMISSIONS:-acceptEdits}
 case "$MODE" in
   acceptEdits|bypassPermissions) ;;
   *) echo "CLAUDE_BUILD_PERMISSIONS must be unset or bypassPermissions, not '$MODE'" >&2; exit 2 ;;
+esac
+STALL=${CLAUDE_BUILD_STALL:-900}
+case "$STALL" in
+  ''|*[!0-9]*|0) echo "CLAUDE_BUILD_STALL must be a whole number of seconds, not '$STALL'" >&2; exit 2 ;;
 esac
 mkdir -p "$OUT"
 TEXT=$(cat "$PROMPT") || exit 2
@@ -32,8 +40,26 @@ TEXT=$(cat "$PROMPT") || exit 2
   --settings '{"enabledPlugins":{"phased-delivery@ai-coding-plugins":false}}' \
   --permission-mode "$MODE" --no-session-persistence \
   --output-format stream-json --verbose) \
-  < /dev/null > "$OUT/stream.jsonl" 2> "$OUT/stderr.txt"
+  < /dev/null > "$OUT/stream.jsonl" 2> "$OUT/stderr.txt" &
+pid=$!
+rm -f "$OUT/stalled"
+# the watchdog: stops claude after STALL seconds without a new stream line
+(size=-1; quiet=0
+ while sleep 1; do
+   now=$(wc -c < "$OUT/stream.jsonl")
+   if [ "$now" = "$size" ]; then quiet=$((quiet + 1)); else size=$now; quiet=0; fi
+   [ $quiet -lt "$STALL" ] || { : > "$OUT/stalled"; kill $pid; exit; }
+ done) > /dev/null 2>&1 &
+watch=$!
+wait $pid
 status=$?
+kill $watch 2>/dev/null
+if [ -e "$OUT/stalled" ]; then
+  : > "$OUT/report.md"
+  printf 'Tokens: unknown\nCost: unknown\n'
+  echo "No output for $STALL s; the call was stopped as stalled" >&2
+  exit 7
+fi
 # Exits 0 for a successful result, 8 when the budget was reached, 9 for another
 # error result, 1 without one.
 python3 - "$OUT/stream.jsonl" "$OUT/report.md" <<'PY'

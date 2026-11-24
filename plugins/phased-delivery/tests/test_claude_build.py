@@ -20,7 +20,7 @@ CAPPED = {"type": "result", "subtype": "error_max_budget_usd", "total_cost_usd":
                                               "cacheCreationInputTokens": 9070}}}
 
 
-def run(tmp_path, events, code=0, permissions=None):
+def run(tmp_path, events, code=0, permissions=None, pause=0, stall=None):
     """Run the script with a stub `claude` that records its arguments and prints EVENTS."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -28,12 +28,14 @@ def run(tmp_path, events, code=0, permissions=None):
     (tmp_path / "prompt.md").write_text("Build stage 03.1.")
     stub = bin_dir / "claude"
     stub.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" > "{tmp_path / "args.txt"}"\n'
-                    f'echo "claude failed" >&2\ncat "{tmp_path / "events.jsonl"}"\nexit {code}\n')
+                    f'echo "claude failed" >&2\ncat "{tmp_path / "events.jsonl"}"\nsleep {pause}\nexit {code}\n')
     stub.chmod(0o755)
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
     env.pop("CLAUDE_BUILD_PERMISSIONS", None)
     if permissions:
         env["CLAUDE_BUILD_PERMISSIONS"] = permissions
+    if stall:
+        env["CLAUDE_BUILD_STALL"] = stall
     return subprocess.run(
         ["sh", SCRIPT, str(tmp_path), str(tmp_path / "prompt.md"), "opus", "high", "2.5", str(tmp_path / "out")],
         env=env, capture_output=True, text=True,
@@ -74,3 +76,12 @@ def test_permissions_setting(tmp_path):
     other.mkdir()
     assert run(other, [BUILT], permissions="default").returncode == 2
     assert not (other / "args.txt").exists()  # refused before running claude
+
+
+def test_stall_stops_the_call(tmp_path):
+    result = run(tmp_path, [{"type": "system"}], pause=30, stall="2")
+    assert result.returncode == 7
+    assert "Tokens: unknown" in result.stdout and "stalled" in result.stderr
+    other = tmp_path / "other"
+    other.mkdir()
+    assert run(other, [BUILT], stall="soon").returncode == 2

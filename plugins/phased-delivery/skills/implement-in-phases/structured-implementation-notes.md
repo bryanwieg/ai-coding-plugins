@@ -1,7 +1,7 @@
 # Why implementation uses stage files, a script gate and closed review types
 
-Background for maintainers of this skill; the orchestrator and the reviewer
-do not need it. Changed 2026-11-24 (plugin 0.11.0).
+Background for maintainers of this skill; the session and the reviewer
+do not need it. Changed 2026-11-24 (plugin 0.11.0; the driver in 0.13.0, below).
 
 ## What changed
 
@@ -71,7 +71,8 @@ and `build-check.py` takes a phase folder and reads each stage file directly:
   headless reviser follow the same rules.
 
 The sections above and below describe 0.11.0 where they name the revision
-JSON or the ledger.
+JSON or the ledger, and the time before the driver where the orchestrator
+dispatches, records or commits.
 
 ## Decisions worth keeping
 
@@ -85,26 +86,42 @@ JSON or the ledger.
   committed: parallel stages work, and a committed stage cannot change
   unseen.
 
-## Later: a driver script
+## The driver (0.13.0)
 
-Investigate, not built. The `plan-phase-driver` branch holds an unreviewed
-draft plan (2026-11-22) for a Python driver that owns the whole phase loop
-and calls `claude -p` for each step (revise, build, review, triage), with
-the orchestrator LLM only handling halts.
+Built. Until 0.12.x the session ran
+the phase loop itself from SKILL.md and build-guide.md: revise, route,
+dispatch, gate, commit, review, finish. `scripts/run-phase.py` now owns
+that loop and the session only runs it and answers its halts.
 
-- **What it would add:** rules that hold every time (no step skipped), no
-  orchestrator tokens, clean halts and resume on usage limits, and the
-  whole loop testable offline with a fake `claude`.
-- **What it would cost:** a larger build than this one; the draft predates
-  `claude-build.sh`, `route`, the premium budget and this script, so it
-  needs re-planning on top of `build-check.py`. While both paths exist,
-  the loop's rules live in prose and Python. Codex routing was deferred in
-  the draft, and every case the rules do not cover becomes a halt for the
-  user.
-- **What to measure first:** with this version in use, how often the
-  orchestrator skips or misapplies a step the script does not gate, and
-  how much of a phase's usage the orchestrator itself spends. If both are
-  small, the driver is not worth it.
+- **Every step is a headless `claude`** through `claude-build.sh`: the
+  reviser (revise-guide.md), each builder and fixer (stage-builder.md) and
+  the reviewer (phase-reviewer.md), at the pair and cap `route` prints.
+  The session spends no tokens on the loop, and no step can be skipped.
+- **A halt is data.** When a step cannot go on, the driver writes
+  `{step, stage, reason, detail, next}` into `phase.json`'s record and
+  exits 10. The reasons are a closed list, each with a fixed `next`;
+  SKILL.md's table says what the session does for each and which ones go
+  to the user. A rerun clears the halt and resumes from the records, so a
+  usage limit or a crash loses nothing recorded.
+- **A builder is given only the stage packet** (`plan-check.py --packet`):
+  the phase's role and the stage's brief, nothing of other stages or of any
+  record. A session-only stage is built from the same packet.
+- **Model calls cannot change what is not theirs.** After each call the
+  driver restores every record, and for builders and fixers the briefs
+  too; a changed record is a halt.
+- **Failures revise, twice at most.** A stage whose pairs are used up, or
+  whose builder stopped, goes to the reviser with the failure as the
+  problem; after two such revisions in one run the user is asked.
+- **Review findings are settled by the driver**: `remove` and `fix` get one
+  fix build each; plan gaps and questions halt for the session.
+- **Only a session-only stage is built by the session**, and SKILL.md and
+  build-guide.md give it no other way to dispatch, gate or commit.
+- **The loop is tested offline** with a fake `claude`
+  (`tests/test_run_phase.py`).
+
+Not built: Codex routing. Version 1 builds with Claude only, as if Codex
+were off, and says so in its report; the Codex rules in model-selection.md
+wait for a later plan. Stages marked parallel are built one after another.
 
 ## Measured
 
@@ -133,3 +150,63 @@ git copy of the eval repository.
   built the stage itself), a failing build, a retry or a budget stop (the
   stage passed first time), Codex, and check commands that run long; the open
   question on check timeouts stays open.
+
+### Driver run on lower models (0.13.0)
+
+One run, 2026-11-24: `run-phase.py` on the same task, `p2-multistep`,
+written as a one-phase, one-stage plan in the new layout in a git copy of
+the eval repository, with only Opus and Haiku offered and the eval's
+project rules (git state and `plan/` closed to builders).
+
+- **Result:** the driver exited 0 on its first run with no halt; the
+  task's files, copied onto a fresh eval repository, pass the hidden check
+  (`RESULT pass`). Cost $0.70: revise on Opus high $0.38 (285k tokens,
+  `Result: unchanged`), the stage on Haiku high $0.01 as claude reported
+  (188k tokens, accepted on the first try), the review on Opus high $0.31
+  (300k tokens, no findings).
+- **What it showed:** the session ran one command and wrote nothing. The
+  driver routed, built from the stage packet, gated, committed with the
+  usual trailers (`Stage`, `Plan`, `Tier`, `Model`, `Effort`, `Attempt`,
+  `Tokens`, `Cost`) and finished the phase (`Phase:` commit); the
+  stage-stats table came out of the report. Unlike the 0.11.0 run, nothing
+  was built or capped by the orchestrator.
+- **Not exercised:** a failing build, the ladder, the reviser after a
+  failure, a halt and rerun, review findings and fix builds, premium
+  routing. The tests cover these with a fake claude; the real-routing run
+  is still to come.
+
+### Driver run with the real routing (0.13.0)
+
+One run, 2026-11-24, on real work rather than an eval task: none of the
+eval tasks scores above `small`. The work was a one-stage plan to rewrite
+the parts of `model-selection.md` that still described the session-run
+loop, built in a clone of the branch, with the plan's model list but Fable
+offered at low and medium only (the user's quota limit; with Fable at low
+alone, `middle+` and `top` route to Opus high, which scores within the tie
+margin and costs less, so no premium pair would run).
+
+- **Result:** built after two halts, each answered as SKILL.md says, with
+  exit 0 on the third run. The guide change, with a new guide test, was
+  taken onto the branch. Cost $3.60, of which $2.55 premium (all Fable
+  low; Fable medium never routed).
+- **Run 1 (exit 10, `plan-gap`):** the pre-phase reviser on Fable low
+  ($0.77) raised the brief to revision 2, adding three citations it found
+  in the guide. The stage built on Opus high and passed first time ($0.42).
+  The review on Fable low ($0.94) found a bug, which the driver fixed with
+  a fix build on its own ($0.19, a `Fixes-Stage` commit), and two findings
+  for the session: two more sentences still had the session routing, and a
+  `models-stale` halt with no profiles gave advice that only halts again.
+- **Answer and run 2 (exit 10, `plan-gap`):** the session revised the brief
+  to revision 3, re-citing the guide as built (a reopened stage's
+  citations describe the code its earlier build changed). The driver
+  rebuilt the reopened stage as a fix build ($0.44), archived the old
+  review and reviewed again ($0.84): ready, with one finding, that
+  revision 3 had no line in the phase's Notes.
+- **Answer and run 3 (exit 0):** the session added the note; the driver
+  marked the finding answered and finished the phase.
+- **What it showed:** premium routing and spend, the reviser before a
+  phase, review findings turned into fix builds, two halts and reruns, and
+  a reopened stage rebuilt on a new revision all ran on real models.
+  Every halt's `next` was enough to answer it.
+- **Not exercised:** a failing build and the ladder, a budget stop, and the
+  revise cap.
