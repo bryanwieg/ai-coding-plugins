@@ -141,6 +141,11 @@ def plan_docs(plan_dir):
             for d in dirs for n in ["phase.json"] + plan_check.stage_files(d)}
 
 
+def plan_files(plan_dir):
+    """Every file under the plan folder."""
+    return {os.path.join(d, n) for d, _, names in os.walk(plan_dir) for n in names}
+
+
 def guard(before, keep_briefs):
     """Undo what a model call may not change in the plan: (a record changed, a brief changed and was restored)."""
     def now(path):
@@ -174,16 +179,19 @@ def call(c, label, guide, inputs, pair, keep_briefs):
     with open(guide) as g, open(prompt, "w") as f:
         f.write(g.read() + "\n## Inputs\n\n" + "\n".join(inputs) + "\n")
     before = plan_docs(c.plan_dir)
+    present = plan_files(c.plan_dir)
     r = sh("sh", os.path.join(HERE, "claude-build.sh"), c.top, prompt, pair["model"], pair["effort"],
            pair["cap_usd"], out)
     records, briefs = guard(before, keep_briefs)
+    added = sorted(plan_files(c.plan_dir) - present) if keep_briefs else []  # the reviser may add stage files
+    restore(c, [build_check.rel(c.top, p) for p in added])
     if records:
         raise Halt("record-changed", f"the {label} call changed a record; its directions: {guide}")
     printed = dict(re.findall(r"^(Tokens|Cost): (\S+)$", r.stdout, re.MULTILINE))
     report_path = os.path.join(out, "report.md")
     text = open(report_path).read() if os.path.isfile(report_path) else ""
     return {"exit": r.returncode, "tokens": printed.get("Tokens", "unknown"), "cost": printed.get("Cost", "unknown"),
-            "line": last(text), "stderr": last(r.stderr), "edited": briefs}
+            "line": last(text), "stderr": last(r.stderr), "edited": briefs or bool(added)}
 
 
 def record(c, what, pair, res, *flags):
@@ -307,7 +315,11 @@ def build(c, sid, s, times):
             must(py("build-check.py", "reject", c.pdir, sid, why), "reject")
         return failed(c, sid, times, "builder-stopped", why) if stopped else "retry"
     if accepted:
-        must(commit(c, sid), "commit")
+        done = commit(c, sid)
+        if done.returncode:  # reject it first, so a rerun builds the stage again
+            must(py("build-check.py", "reject", c.pdir, sid, f"commit: {last(done.stderr) or last(done.stdout)}"),
+                 "reject")
+        must(done, "commit")
         return "built"
     restore(c, json.loads(last(logged.stdout))["outside"])
     return "retry"

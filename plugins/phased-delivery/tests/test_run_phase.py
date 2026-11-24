@@ -162,3 +162,28 @@ def test_resume_after_halt(repo):
     assert halt(repo) == ("build-error", "01.2")
     assert read(repo, "01.1.json")["record"]["commit"]
     assert not read(repo, "01.2.json")["record"].get("commit")
+
+
+def test_refused_commit_rejects_attempt(repo):
+    # 01.1 edits a committed one.txt to what it already holds, so the commit finds no changed files
+    (repo / "src/one.txt").write_text("one\n")
+    one = read(repo, "01.1.json")
+    one["brief"]["files"][0]["action"] = "edit"
+    (repo / PHASE / "01.1.json").write_text(json.dumps(one))
+    git(repo, "add", ".")
+    git(repo, "commit", "-q", "-m", "one")
+    result = drive(repo, [REVISED_NOTHING, BUILD_ONE])
+    assert result.returncode == 10, result.stdout + result.stderr
+    assert halt(repo) == ("build-error", "01.1")
+    attempt = read(repo, "01.1.json")["record"]["attempts"][-1]
+    assert attempt["result"] == "rejected" and "no changed files" in attempt["why"]
+
+
+def test_build_adding_plan_file_is_undone(repo):
+    added = {**BUILD_ONE["files"], PHASE + "/01.3.json": "{}"}
+    result = drive(repo, [REVISED_NOTHING, {**BUILD_ONE, "files": added}, REVISED_NOTHING])
+    assert result.returncode == 10, result.stdout + result.stderr
+    assert not (repo / PHASE / "01.3.json").exists()
+    assert halt(repo) == ("revise-capped", "01.1")  # the retry's only pair is used up, so it revises
+    attempt = read(repo, "01.1.json")["record"]["attempts"][-1]
+    assert (attempt["result"], attempt["why"]) == ("rejected", "edited the plan")
