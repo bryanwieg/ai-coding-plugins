@@ -120,7 +120,6 @@ def test_accepted_stage_commit(repo):
     assert "Status: in progress (stages done: 01.1)" in text
 
 
-@pytest.mark.xfail(strict=True, reason="mock until 02.1")
 def test_outside_change_fails(repo):
     bc(repo, "start", PHASE)
     build_a(repo)
@@ -149,7 +148,6 @@ def test_failed_check_then_retry(repo):
     assert "Earlier-Attempt: haiku high 500 check failed" in msg
 
 
-@pytest.mark.xfail(strict=True, reason="mock until 02.1")
 def test_can_try_refuses_repeat(repo):
     bc(repo, "start", PHASE)
     (repo / "src/a.txt").write_text("a2\n")
@@ -160,7 +158,6 @@ def test_can_try_refuses_repeat(repo):
     assert bc(repo, "can-try", PHASE, "01.1", "fable", "low").returncode == 0
 
 
-@pytest.mark.xfail(strict=True, reason="mock until 02.1")
 def test_premium_spend(repo):
     bc(repo, "start", PHASE)
     build_a(repo)

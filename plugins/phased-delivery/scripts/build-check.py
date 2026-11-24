@@ -46,6 +46,7 @@ import argparse
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -88,28 +89,150 @@ def report(problems):
     return 1 if problems else 0
 
 
-# ---- subcommands (mock bodies until phase 02)
+# ---- repository and ledger
+
+def git(repo, *args, check=True):
+    r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
+    if check and r.returncode:
+        raise Usage(f"git {' '.join(args)}: {r.stderr.strip()}")
+    return r.stdout
+
+
+def toplevel(repo):
+    return git(repo, "rev-parse", "--show-toplevel").strip()
+
+
+def changed_paths(top):
+    """Uncommitted paths against HEAD, untracked included and ignored files left out."""
+    out = git(top, "status", "--porcelain", "-z", "--untracked-files=all").split("\0")
+    found, i = [], 0
+    while i < len(out):
+        entry = out[i]
+        i += 1
+        if not entry:
+            continue
+        found.append(entry[3:])
+        if entry[0] in "RC":
+            i += 1  # the rename's source path follows
+    return found
+
+
+def is_cache(path):
+    parts = path.split("/")
+    return "__pycache__" in parts or ".pytest_cache" in parts or path.endswith(".pyc")
+
+
+def load(path):
+    return json.load(open(path))
+
+
+def save(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f, indent=1)
+        f.write("\n")
+
+
+def stage_files(revision, stage):
+    for s in revision["stages"]:
+        if s["id"] == stage:
+            return [f["path"] for f in s["files"]]
+    raise Usage(f"stage {stage} is not in the revision")
+
+
+def committed_stages(ledger):
+    return {a["stage"] for a in ledger["attempts"] if a["result"] == "accepted" and a["commit"] and not a["fix"]}
+
+
+def outside_paths(top, phase_file, revision, ledger, stage):
+    plan_dir = os.path.relpath(os.path.dirname(os.path.abspath(phase_file)), top)
+    done = committed_stages(ledger)
+    allowed = set(stage_files(revision, stage)) | set(ledger["preexisting"])
+    for s in revision["stages"]:
+        if s["id"] not in done:
+            allowed |= {f["path"] for f in s["files"]}
+    return [p for p in changed_paths(top)
+            if p not in allowed and not is_cache(p) and not (p + "/").startswith(plan_dir + "/")]
+
+
+def run_checks(top, commands):
+    return [{"cmd": c, "exit": subprocess.run(["sh", "-c", c], cwd=top, capture_output=True).returncode}
+            for c in commands]
+
+
+def amount(x):
+    return "unknown" if x is None else f"{x:.2f}"
+
+
+def count(x):
+    return "unknown" if x is None else str(int(x))
+
+
+# ---- subcommands
 
 def cmd_start(a):
     f = paths(a.phase_file)
-    _, problems = load_checked(f["revision"], "revision.schema.json", "revision")
+    revision, problems = load_checked(f["revision"], "revision.schema.json", "revision")
     if problems:
         return report(problems)
-    os.makedirs(os.path.dirname(f["ledger"]), exist_ok=True)
-    if not os.path.exists(f["ledger"]):
-        json.dump({"start_commit": "", "preexisting": [], "attempts": []}, open(f["ledger"], "w"), indent=1)
+    if os.path.exists(f["ledger"]):
+        return 0
+    top = toplevel(a.repo)
+    now = changed_paths(top)
+    dirty = [{"file": "revision", "where": s["id"], "msg": f"stage file already modified: {p}"}
+             for s in revision["stages"] for p in stage_files(revision, s["id"]) if p in now]
+    if dirty:
+        return report(dirty)
+    save(f["ledger"], {"start_commit": git(top, "rev-parse", "HEAD").strip(), "preexisting": now, "attempts": []})
     return 0
 
 
+def ledger_of(f):
+    if not os.path.exists(f["ledger"]):
+        raise Usage(f"missing {f['ledger']}: run start first")
+    return load(f["ledger"])
+
+
 def cmd_can_try(a):
-    paths(a.phase_file)
+    ledger = ledger_of(paths(a.phase_file))
+    for x in ledger["attempts"]:
+        if (x["stage"], x["model"], x["effort"]) == (a.stage, a.model, a.effort) and x["result"] not in ("error", "review"):
+            print(json.dumps(x))
+            return 1
     return 0
 
 
 def cmd_record(a):
-    paths(a.phase_file)
-    print(json.dumps({"stage": a.stage, "attempt": 1, "result": "accepted", "outside": [], "checks": []}))
-    return 0
+    f = paths(a.phase_file)
+    ledger = ledger_of(f)
+    attempt = {"stage": a.stage, "n": 0, "fix": a.fix, "tool": a.tool, "model": a.model, "effort": a.effort,
+               "exit": a.exit_code, "tokens": a.tokens, "cost": a.cost, "cap": a.cap,
+               "tool_calls": a.tool_calls, "premium": a.premium, "result": "review", "why": "", "commit": ""}
+    outside, checks, code = [], [], 0
+    if a.stage != "review":
+        revision = load(f["revision"])
+        top = toplevel(a.repo)
+        same = [x for x in ledger["attempts"] if x["stage"] == a.stage and x["fix"] == a.fix and x["result"] != "error"]
+        attempt["n"] = len(same) + 1
+        outside = outside_paths(top, a.phase_file, revision, ledger, a.stage)
+        if a.exit_code == 8:
+            attempt.update(result="stopped", why="budget reached")
+            code = 3
+        elif a.exit_code != 0:
+            attempt.update(result="error", why=f"build exit {a.exit_code}", n=0)
+            code = 4
+        elif outside:
+            attempt.update(result="failed", why="changed files outside the stage")
+            code = 1
+        else:
+            checks = run_checks(top, next(s["checks"] for s in revision["stages"] if s["id"] == a.stage))
+            failed = any(c["exit"] for c in checks)
+            attempt.update(result="failed" if failed else "accepted", why="check failed" if failed else "")
+            code = 1 if failed else 0
+    ledger["attempts"].append(attempt)
+    save(f["ledger"], ledger)
+    print(json.dumps({"stage": a.stage, "attempt": attempt["n"], "result": attempt["result"],
+                      "outside": outside, "checks": checks}))
+    return code
 
 
 def cmd_reject(a):
@@ -124,8 +247,9 @@ def cmd_commit(a):
 
 
 def cmd_spend(a):
-    paths(a.phase_file)
-    print("0.00")
+    ledger = ledger_of(paths(a.phase_file))
+    total = sum((x["cost"] if x["cost"] is not None else x["cap"] or 0) for x in ledger["attempts"] if x["premium"])
+    print(f"{total:.2f}")
     return 0
 
 
