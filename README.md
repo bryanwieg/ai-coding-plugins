@@ -89,13 +89,13 @@ up for risk. Claude stages and phase reviews are then built headless by
 a dollar cap: 150k tokens for `small`, 400k for `middle`, 1M for `top` and `top+`, at
 the pair's input price. A stage stopped at its cap is retried one step down
 the frontier; one that fails its checks, one step up. Premium models
-(output price of $30 or more per million tokens) are used below `top` only
-when cheaper than the standard pick and as good, or as the step up past the
-last standard pick while their score per unit of cost is within 5% of it;
-`top` comes only from a total score of 9 or more. The most capable pair is
+(output price of $30 or more per million tokens) are never used below
+`top`, except as a retry after a failed build once the standard pairs run
+out; `top` comes only from a total score of 9 or more. Fable is picked at
+medium thinking at most. The most capable pair is
 kept for `top+`: a `top` stage with a total of 12 or more or the highest
-risk (K2); other `top` stages get the pair one below it, and step up only
-when a build fails. They get $10 per phase; past that, builds use none.
+risk (K2); other `top` stages get the pair one below it, never premium
+while a standard pair is that good, and step up only when a build fails. They get $10 per phase; past that, builds use none.
 Reviews run on `top`, or on `top+` for a phase with a `top+` stage, and
 their cost counts against that budget. The builder may edit files and runs only the commands
 your project's permission rules allow; set
