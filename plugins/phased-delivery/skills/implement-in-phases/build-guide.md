@@ -45,20 +45,24 @@ sets it already).
 
 ## Revise and start
 
-On a phase with no revise run recorded, the driver:
+Every run starts with `build-check.py start`, which validates the phase.
+The first time it writes `start_commit` and the paths already modified
+(`preexisting`); on a rerun it adds the paths modified since, other than
+stage files and the plan's, so files the user added or edited between runs
+are never restored. A brief changed without a higher revision halts
+`brief-changed`; any other refusal halts `revise-failed`.
 
-1. runs `build-check.py start`, which validates the phase and writes
-   `start_commit` and the paths already modified (`preexisting`); a refusal
-   halts `revise-failed`;
-2. runs `select-models.py check <plan>/models.md`; a stale table halts
+On a phase with no revise run recorded, the driver then:
+
+1. runs `select-models.py check <plan>/models.md`; a stale table halts
    `models-stale`;
-3. gives [revise-guide.md](revise-guide.md) to a headless reviser at the
+2. gives [revise-guide.md](revise-guide.md) to a headless reviser at the
    review pair (`route --review`), with "none" as the problem, and records
    the run. A report without `Result: revised` or `Result: unchanged` halts
    `escalated`; a revised plan that fails `plan-check.py` halts
    `revise-failed`.
 
-On a rerun before any stage has an attempt it only runs `plan-check.py`.
+On a rerun before any stage has an attempt it then only runs `plan-check.py`.
 
 ## Build each stage
 

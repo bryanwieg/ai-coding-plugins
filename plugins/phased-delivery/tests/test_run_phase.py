@@ -209,6 +209,10 @@ def test_resume_after_halt(repo):
     assert first.returncode == 10, first.stdout + first.stderr
     assert halt(repo) == ("build-error", "01.1")
     assert not (repo / "src/one.txt").exists()  # restored, so the rerun starts from a clean tree
+    # files the user adds or edits between runs are theirs: no restore may delete or revert them
+    (repo / "notes/mine.txt").parent.mkdir()
+    (repo / "notes/mine.txt").write_text("mine\n")
+    (repo / "src/base.txt").write_text("edited\n")
     # the rerun does not revise again, builds 01.1 and halts at 01.2, before any review
     second = drive(repo, [BUILD_ONE, {**BUILD_TWO, "exit": 3}])
     assert second.returncode == 10, second.stdout + second.stderr
@@ -216,6 +220,9 @@ def test_resume_after_halt(repo):
     assert halt(repo) == ("build-error", "01.2")
     assert read(repo, "01.1.json")["record"]["commit"]
     assert not read(repo, "01.2.json")["record"].get("commit")
+    assert (repo / "notes/mine.txt").read_text() == "mine\n"
+    assert (repo / "src/base.txt").read_text() == "edited\n"
+    assert git(repo, "show", "--name-only", "--format=", "HEAD").split() == ["src/one.txt"]
 
 
 def test_refused_commit_rejects_attempt(repo):

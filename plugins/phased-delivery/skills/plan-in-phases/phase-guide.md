@@ -221,9 +221,9 @@ Never written by planning or revising: write `"record": {}` in
 reader of a built plan knows them.
 
 - `phase.json`: `start_commit`, the commit the build started from;
-  `preexisting`, the paths with edits present before the build; `runs`,
-  the revise and review attempts; `findings`, the review's findings by
-  `index` with a `status` (`open`, `fixed`, `asked`, `answered`); `halt`,
+  `preexisting`, the paths with edits present before the build or added
+  between runs; `runs`, the revise and review attempts; `findings`, the
+  review's findings by `index` with a `status` (`open`, `fixed`, `asked`, `answered`); `halt`,
   why the build stopped, or null; `built`, the commit that finished the
   phase, or null.
 - Stage file: `revisions`, the hash of the brief at each revision that was

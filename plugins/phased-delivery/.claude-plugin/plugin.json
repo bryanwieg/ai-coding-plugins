@@ -1,6 +1,6 @@
 {
   "name": "phased-delivery",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "description": "Plan work as self-contained phases, then implement it phase by phase.",
   "author": {
     "name": "Bryan"

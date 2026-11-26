@@ -24,9 +24,12 @@ commit in its stage file. Status is never edited: phase.md and plan.md are
 re-rendered from the records. --repo defaults to the current directory.
 
 start     validates phase.json and the stage files and writes HEAD and the
-          paths already modified into phase.json's record (kept as is when
-          set: resume). Exit 1 on invalid JSON or a stage's file already
-          modified.
+          paths already modified into phase.json's record. On resume (HEAD
+          already set) it adds the paths modified since, other than stage
+          files and the plan's, so the driver never restores them. Exit 5
+          when the only problem is a brief changed without a higher
+          revision; exit 1 on other invalid JSON or, on the first start, a
+          stage's file already modified.
 can-try   exit 1 when the stage already has a non-error attempt on the pair
           at the brief's current revision.
 record    logs an attempt and gates a build: no uncommitted path outside the
@@ -236,15 +239,21 @@ def count(x):
 # ---- subcommands
 
 def cmd_start(a):
-    pdir, _ = phase_paths(a.phase_dir)
+    pdir, plan_dir = phase_paths(a.phase_dir)
     name = os.path.basename(pdir)
     pj, stages, problems = checked_phase(pdir)
     if problems:
-        return report(problems)
-    if pj["record"].get("start_commit"):
-        return 0
+        return 5 if report(problems) and all(p["kind"] == "revision" for p in problems) else 1
     top = toplevel(a.repo)
     now = changed_paths(top)
+    if pj["record"].get("start_commit"):
+        # resume: keep paths changed since the last run, so a restore never deletes or reverts them
+        known = set(pj["record"]["preexisting"]) | {p for s in stages.values() for p in brief_files(s)}
+        new = [p for p in now if p not in known and not is_cache(p) and not in_dir(p, rel(top, plan_dir))]
+        if new:
+            save(os.path.join(pdir, "phase.json"),
+                 with_record(pj, preexisting=pj["record"]["preexisting"] + new))
+        return 0
     dirty = [{"file": f"{name}/{sid}.json", "where": sid, "msg": f"stage file already modified: {p}"}
              for sid, s in stages.items() for p in brief_files(s) if p in now]
     if dirty:

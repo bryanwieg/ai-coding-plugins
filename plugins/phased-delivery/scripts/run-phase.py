@@ -335,11 +335,13 @@ def revise(c, problem):
 
 def pre_phase(c, stages):
     """Revise and start a phase not yet revised; check the plan while no stage has an attempt."""
+    started = py("build-check.py", "start", c.pdir, "--repo", c.top)  # every run: a resume adds new user edits
+    if started.returncode == 5:
+        raise Halt("brief-changed", started.stdout.strip())
+    if started.returncode:
+        raise Halt("revise-failed", (started.stdout + started.stderr).strip())
     runs = plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"].get("runs", [])
     if not any(x["stage"] == "revise" and x["exit"] != 7 for x in runs):  # a stalled revise is not one
-        started = py("build-check.py", "start", c.pdir, "--repo", c.top)
-        if started.returncode:
-            raise Halt("revise-failed", (started.stdout + started.stderr).strip())
         current = py("select-models.py", "check", os.path.join(c.plan_dir, "models.md"), *c.profiles)
         if current.returncode:
             raise Halt("models-stale", last(current.stdout + current.stderr))
