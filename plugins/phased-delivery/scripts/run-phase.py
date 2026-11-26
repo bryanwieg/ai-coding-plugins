@@ -108,6 +108,10 @@ def py(script, *args):
     return sh(sys.executable, os.path.join(HERE, script), *args)
 
 
+def say(text):
+    print(f"[driver] {text}", file=sys.stderr, flush=True)
+
+
 def feed(label, event):
     """The live lines for one stream event: thinking, text, tool calls, failed tool results, the result."""
     def short(text, n=300):
@@ -271,9 +275,31 @@ def call(c, label, guide, inputs, pair, keep_briefs, what, *flags):
 
 
 def record(c, what, pair, res, *flags):
-    return py("build-check.py", "record", c.pdir, what, "--tool", "claude-code", "--model", pair["model"],
-              "--effort", pair["effort"], "--exit", res["exit"], "--tokens", res["tokens"], "--cost", res["cost"],
-              "--cap", pair["cap_usd"], *(["--premium"] if pair["premium"] else []), *flags, "--repo", c.top)
+    """build-check.py record --live: its [check-] lines go to stderr as it writes them; the result keeps the rest."""
+    stage = what not in ("review", "revise")
+    if stage and res["exit"] == 0:  # record runs checks only for a build that exited 0
+        say(f"stage {what}: checks")
+    cmd = [sys.executable, os.path.join(HERE, "build-check.py"), "record", c.pdir, what, "--tool", "claude-code",
+           "--model", pair["model"], "--effort", pair["effort"], "--exit", res["exit"], "--tokens", res["tokens"],
+           "--cost", res["cost"], "--cap", pair["cap_usd"], *(["--premium"] if pair["premium"] else []), *flags,
+           "--repo", c.top, "--live"]
+    with subprocess.Popen([str(x) for x in cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as p:
+        kept = []
+        for line in p.stderr:
+            if line.startswith("[check-"):
+                print(line, end="", file=sys.stderr, flush=True)
+            else:
+                kept.append(line)
+        out = p.stdout.read()  # one JSON line, written after the checks
+    if stage and p.returncode in (0, 1, 3, 4):
+        logged = json.loads(last(out))
+        say(f"stage {what}: {logged['result']}" + (f", outside: {', '.join(logged['outside'])}" if logged["outside"] else ""))
+    return subprocess.CompletedProcess(p.args, p.returncode, out, "".join(kept))
+
+
+def reject(c, sid, why):
+    must(py("build-check.py", "reject", c.pdir, sid, why), "reject")
+    say(f"stage {sid}: rejected: {why}")
 
 
 def stage_pair(c, brief, *steps):
@@ -359,6 +385,7 @@ def failed(c, sid, times, unchanged, why):
     restore(c)
     if times >= MAX_REVISIONS:
         raise Halt("revise-capped", f"stage {sid} was revised {times} times for failures in this run; then: {why}")
+    say(f"stage {sid}: revising: {why}")
     if revise(c, f"stage {sid}: {why}") == "unchanged":
         raise Halt(unchanged, why)
     return "revised"
@@ -384,6 +411,7 @@ def build(c, sid, s, times):
                "against the brief in the packet"] if fix else []
     inputs = [c.instructions, "- Anything else the brief links to: none", *earlier, "- Stage packet:", "",
               plan_check.packet(c.plan_dir, sid)]
+    say(f"stage {sid}: build")
     res = call(c, f"build-{sid}", STAGE_BUILDER, inputs, pair, True, sid, *(["--fix"] if fix else []))
     logged = record(c, sid, pair, res, *(["--fix"] if fix else []))
     if logged.returncode == 4:
@@ -393,13 +421,12 @@ def build(c, sid, s, times):
     if stopped or (accepted and res["edited"]):
         why = "edited the plan" if not stopped else stopped.group(1) or "the builder stopped"
         if accepted:
-            must(py("build-check.py", "reject", c.pdir, sid, why), "reject")
+            reject(c, sid, why)
         return failed(c, sid, times, "builder-stopped", why) if stopped else "retry"
     if accepted:
         done = commit(c, sid)
         if done.returncode:  # reject it first, so a rerun builds the stage again
-            must(py("build-check.py", "reject", c.pdir, sid, f"commit: {last(done.stderr) or last(done.stdout)}"),
-                 "reject")
+            reject(c, sid, f"commit: {last(done.stderr) or last(done.stdout)}")
         must(done, "commit")
         return "built"
     restore(c, json.loads(last(logged.stdout))["outside"])
@@ -470,8 +497,11 @@ def load_review(c):
 
 
 def commit(c, sid):
-    return py("build-check.py", "commit", c.pdir, sid, "--subject-suffix", c.a.subject_suffix, *c.trailers,
+    done = py("build-check.py", "commit", c.pdir, sid, "--subject-suffix", c.a.subject_suffix, *c.trailers,
               "--repo", c.top)
+    if done.returncode == 0:
+        say(f"stage {sid}: committed {done.stdout.strip()}")
+    return done
 
 
 def fix(c, sid, s, f):
@@ -489,7 +519,7 @@ def fix(c, sid, s, f):
         why = "the fix changed none of the stage's files"
     if why:
         if logged.returncode == 0:
-            must(py("build-check.py", "reject", c.pdir, sid, why), "reject")
+            reject(c, sid, why)
         raise Halt("fix-failed", why)
 
 
@@ -501,8 +531,10 @@ def review_and_fix(c):
     """With every stage committed: review, fix what the review says to fix, ask the rest; returns when all is settled."""
     stages = read_stages(c.pdir)
     if not os.path.isfile(os.path.join(c.pdir, "review.json")):
+        say("review: start")
         step("review", None, review, c, stages)
     findings = step("review", None, load_review, c)
+    say(f"review: {len(findings)} findings")
     known = {x["index"]: x["status"]
              for x in plan_check.read_json(os.path.join(c.pdir, "phase.json"))["record"].get("findings", [])}
     # asked on an earlier run: the session has handled them since
@@ -511,6 +543,7 @@ def review_and_fix(c):
     is_fix = lambda f: f["action"] in ("remove", "fix") and f["stage"] in stages
     for i, f in enumerate(findings):
         if states[i] == "open" and is_fix(f):
+            say(f"fix {f['stage']}: finding {i}")
             try:
                 fix(c, f["stage"], stages[f["stage"]], f)
             except Halt as h:
@@ -520,6 +553,7 @@ def review_and_fix(c):
     ask = [i for i, f in enumerate(findings) if states[i] == "open" and not is_fix(f)]
     if ask:
         mark(c, ask, "asked")
+        say(f"review: asked {len(ask)} findings")
         gap = any(findings[i]["action"] == "plan-gap" for i in ask)
         raise Halt("plan-gap" if gap else "question", "\n".join(describe(findings[i], "asked") for i in ask), "review")
 
@@ -567,15 +601,18 @@ def run(a):
     if rec.get("built"):  # already built: report it and write nothing
         print("\n".join(report(c, None)))
         return 0
+    say(f"phase {os.path.basename(pdir)}: start")
     try:
         pre_phase(c, read_stages(pdir))
         stage_loop(c)
         review_and_fix(c)
         step("finish", None, finish, c)
+        say("finish: built")
         halt = None
     except Halt as h:
         halt = {"step": h.step, "stage": h.stage, "reason": h.reason, "detail": h.detail, "next": NEXT[h.reason]}
         set_halt(pdir, plan_dir, halt)
+        say(f"halted at {h.step}" + (f" {h.stage}" if h.stage else "") + f": {h.reason}")
     print("\n".join(report(c, halt)))
     return 10 if halt else 0
 

@@ -139,6 +139,15 @@ def test_builds_phase(repo):
     # the live feed of each call, on stderr
     for line in ("[revise] thinking: fake thinking", "[build-01.1] Bash: true", "result: success, $0.01"):
         assert line in result.stderr, result.stderr
+    # the driver's steps and each check's command and exit, in the order they happen
+    lines = result.stderr.splitlines()
+    wanted = ["[driver] phase 01-demo: start", "[driver] stage 01.1: build", "[driver] stage 01.1: checks",
+              "[check-01.1] $ test -f src/one.txt", "[check-01.1] exit 0", "[driver] stage 01.1: accepted",
+              "[driver] review: start", "[driver] review: 0 findings", "[driver] finish: built"]
+    assert all(x in lines for x in wanted), result.stderr
+    assert [lines.index(x) for x in wanted] == sorted(lines.index(x) for x in wanted), result.stderr
+    assert any(x.startswith("[driver] stage 01.1: committed ") for x in lines), result.stderr
+    assert "[check-01.2] $ test -f src/two.txt" in lines, result.stderr
 
 
 def test_plan_ignored_by_git(repo):
@@ -201,6 +210,12 @@ def test_revise_then_halt(repo):
     assert two["brief"]["revision"] == 3 and not two["record"].get("commit")
     assert [x["result"] for x in two["record"]["attempts"]] == ["failed"] * 3
     assert "Halt: revise-capped at build 01.2" in result.stdout
+    lines = result.stderr.splitlines()
+    assert "[driver] stage 01.2: failed" in lines, result.stderr
+    assert "[check-01.2] exit 1" in lines, result.stderr
+    revising = next(i for i, x in enumerate(lines) if x.startswith("[driver] stage 01.2: revising: "))
+    assert lines[revising + 1].startswith("[revise] "), result.stderr
+    assert lines[-1] == "[driver] halted at build 01.2: revise-capped", result.stderr
 
 
 def test_resume_after_halt(repo):
