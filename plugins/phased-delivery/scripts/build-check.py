@@ -38,7 +38,10 @@ record    logs an attempt and gates a build: no uncommitted path outside the
           accepted; 1 failed; 3 budget stop (build exit 8); 4 error (any
           other build exit: not a try of the pair). Exit 2, nothing logged,
           for --model orchestrator on a stage that is not session_only.
-          Stages "review" and "revise" are logged for spend only.
+          Stages "review" and "revise" are logged for spend only. --live
+          streams each check to stderr as it runs: "[check-<stage>] $ <cmd>",
+          each output line (stdout and stderr merged) and "[check-<stage>]
+          exit N".
 reject    marks the stage's accepted, uncommitted attempt rejected.
 commit    commits the stage's changed files with the stage trailers (an
           empty commit for a session-only or reopened stage with none),
@@ -223,8 +226,20 @@ def outside_paths(top, plan_dir, pj, stages, sid):
             if p not in allowed and not is_cache(p) and not in_dir(p, rel(top, plan_dir))]
 
 
-def run_checks(top, commands):
-    return [{"cmd": c, "exit": subprocess.run(["sh", "-c", c], cwd=top, capture_output=True).returncode}
+def run_live(top, stage, cmd):
+    tag = f"[check-{stage}]"
+    print(f"{tag} $ {cmd}", file=sys.stderr, flush=True)
+    with subprocess.Popen(["sh", "-c", cmd], cwd=top, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
+        for raw in p.stdout:
+            line = raw.decode(errors="replace").rstrip("\r\n")
+            print(f"{tag} {line}", file=sys.stderr, flush=True)
+    print(f"{tag} exit {p.returncode}", file=sys.stderr, flush=True)
+    return p.returncode
+
+
+def run_checks(top, commands, live_stage=None):
+    return [{"cmd": c, "exit": run_live(top, live_stage, c) if live_stage
+             else subprocess.run(["sh", "-c", c], cwd=top, capture_output=True).returncode}
             for c in commands]
 
 
@@ -294,7 +309,7 @@ def cmd_record(a):
     top = toplevel(a.repo)
     same = [x for x in attempts_of(s) if x["fix"] == a.fix and x["result"] != "error" and not x["commit"]]
     outside = outside_paths(top, plan_dir, pj, stages, a.stage)
-    checks = [] if a.exit_code or outside else run_checks(top, s["brief"]["checks"])
+    checks = [] if a.exit_code or outside else run_checks(top, s["brief"]["checks"], a.stage if a.live else None)
     if a.exit_code == 8:
         outcome, code = {"result": "stopped", "why": "budget reached"}, 3
     elif a.exit_code != 0:
@@ -446,6 +461,7 @@ def parse_args(argv):
     s.add_argument("--tool-calls", type=number)
     s.add_argument("--premium", action="store_true")
     s.add_argument("--fix", action="store_true")
+    s.add_argument("--live", action="store_true")
     s.add_argument("--repo", default=".")
     s = sub.add_parser("reject")
     for k in ("phase_dir", "stage", "why"):
