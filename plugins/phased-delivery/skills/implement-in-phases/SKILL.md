@@ -54,7 +54,9 @@ works this way is in
    (built), 10 (halted) or 2 (bad usage: fix the command). Run it as a
    background shell: a phase outlasts a foreground command's time limit,
    and the user watches the live feed on its stderr (each call's thinking,
-   messages and tool calls) in the tool's view of that shell. Do not read
+   messages and tool calls, the driver's own steps as `[driver]` lines and
+   each stage check's command, output and exit as `[check-NN.n]` lines) in
+   the tool's view of that shell. Do not read
    the feed into your own context; wait for the exit and read the report.
 2. **On exit 10, answer the halt.** Read `record.halt` in the phase's
    `phase.json` (the report prints it too): `step`, `stage`, `reason`,

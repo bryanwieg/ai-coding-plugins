@@ -19,7 +19,11 @@ outcome, the halt, that Codex is off and, for a built phase,
 `report.md` in a numbered folder (a temporary directory otherwise). While a
 call runs, the driver prints its feed to stderr, each line tagged with the
 call (`[build-01.2]`): its thinking summaries, messages, tool calls, failed
-tool results and result.
+tool results and result. It also prints a `[driver]` line for each step it
+takes (stage build, checks, result, commit, reject, revise, review, fixes,
+finish, halt) and passes through `[check-01.2]` lines for each check's
+command, output and exit code, which it gets from `build-check.py record
+--live`.
 
 ## The parts
 
