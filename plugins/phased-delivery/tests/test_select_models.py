@@ -130,15 +130,16 @@ def test_route_premium_below_top(offered, tmp_path):
     # scores more, so astra is left out below top.
     up = route(offered, "J1F1R0C0K0P2V0S0", "--up", "2")
     assert pair(up) == ("sol", "high") and not up["premium"] and "below top" in up["why"]
-    # A premium pair scoring at least as well for less is kept.
+    # Even a premium pair scoring better for less is left out: benchmark run cost
+    # understates a premium pair's real spend.
     better = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"intelligence": 59}})
-    kept = route(offered, "J1F1R0C0K0P2V0S0", "--up", "2", profiles=better)
-    assert pair(kept) == ("astra", "high") and kept["premium"]
-    # When the standard pairs run out before the step asked for, the cheapest
-    # pair above the standard pick is taken: --up 5 wants nova medium, past
-    # sol high, the last standard pair, and gets nova low, the next pair up.
+    held = route(offered, "J1F1R0C0K0P2V0S0", "--up", "2", profiles=better)
+    assert pair(held) == ("sol", "high") and not held["premium"]
+    # When the standard pairs run out before a --up retry, the cheapest pair above
+    # the standard pick is taken: --up 5 wants nova medium, past sol high, the
+    # last standard pair, and gets nova low, the next pair up.
     short = route(offered, "J1F1R0C0K0P2V0S0", "--up", "5")
-    assert pair(short) == ("nova", "low") and "step up" in short["why"]
+    assert pair(short) == ("nova", "low") and "--up retry" in short["why"]
 
 
 def test_route_fable_limits(tmp_path):
@@ -148,29 +149,43 @@ def test_route_fable_limits(tmp_path):
     assert route(offered_path, "J1F1R1C1K2P1V0S0")["tier"] == "middle+"
     assert route(offered_path, "J2F1R1C2K0P2V1S0")["tier"] == "top"
     # Without sol and terra xhigh, the standard pairs end at the middle pick, terra
-    # high (51.2 for 90, 0.57 per unit), so the middle+ step reaches astra high
-    # (58.5 for 300, 0.20): a worse score/cost ratio, so terra high stays.
+    # high, so the middle+ step would reach astra high, premium: terra high stays.
     narrow = tmp_path / "narrow.json"
     narrow.write_text(json.dumps({**OFFERED, "models": [
         m if m["id"] != "gpt-9-terra" else {**m, "efforts": ["low", "medium", "high"]}
         for m in OFFERED["models"] if m["id"] != "gpt-9-sol"]}))
     held = route(narrow, "J1F1R0C0K0P2V0S0")
-    assert pair(held) == ("terra", "high") and "score/cost" in held["why"]
+    assert pair(held) == ("terra", "high") and "left out below top" in held["why"]
     # A --up retry after a failure still steps up to the premium pair.
     assert pair(route(narrow, "J1F1R0C0K0P2V0S0", "--up", "1")) == ("astra", "high")
     # The risk step is held the same way, and --up still steps.
     risk = route(narrow, "J1F1R0C0K1P0V0S0")
-    assert pair(risk) == ("terra", "high") and "score/cost" in risk["why"]
+    assert pair(risk) == ("terra", "high") and "left out below top" in risk["why"]
     assert pair(route(narrow, "J1F1R0C0K1P0V0S0", "--up", "1")) == ("astra", "high")
-    # A --down retry whose step up lands on a standard pair is not held by the ratio.
+    # A --down retry after a budget stop goes one pair below the held terra high.
     down = route(narrow, "J1F1R0C0K1P2V0S0", "--down", "1")
-    assert pair(down) == ("terra", "high") and "score/cost" not in down["why"]
-    # Within PREMIUM_RATIO_MARGIN the premium pair is taken: 58.5 for 108 is
-    # 0.54, 4.8% below terra high's 0.57; 58.5 for 120 (0.49, 14% below) is not.
-    near = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"run_cost_usd": 108}})
-    assert pair(route(narrow, "J1F1R0C0K0P2V0S0", profiles=near)) == ("astra", "high")
-    far = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"run_cost_usd": 120}})
-    assert pair(route(narrow, "J1F1R0C0K0P2V0S0", profiles=far)) == ("terra", "high")
+    assert pair(down) == ("terra", "low") and not down["premium"]
+    # A premium pair barely costlier than terra high is still left out below top.
+    near = edited_profiles(tmp_path, {("GPT-9 Astra", "high"): {"run_cost_usd": 91}})
+    assert pair(route(narrow, "J1F1R0C0K0P2V0S0", profiles=near)) == ("terra", "high")
+
+
+def test_route_pick_ceilings(tmp_path):
+    # Fable above medium sets the best score the floors measure from but is never
+    # picked: middle and top stay on Opus high, and only top+ and its reviews get
+    # Fable, at low (within 3 points of medium), medium on a --up retry.
+    available = tmp_path / "available.json"
+    available.write_text(json.dumps({**json.loads(AVAILABLE.read_text()), "models": [
+        {"id": m, "efforts": ["low", "medium", "high", "xhigh", "max"]}
+        for m in ("fable", "opus", "sonnet", "haiku")]}))
+    profiles = build_profiles(tmp_path, REPORT)
+    for scores in ("J1F1R0C0K0P0V0S0", "J1F1R1C1K2P0V0S0", "J2F1R1C2K0P2V1S0"):
+        assert pair(route(available, scores, profiles=profiles)) == ("opus", "high"), scores
+    assert pair(route(available, "J0F0R0C0K0P0V0S0", "--review", profiles=profiles)) == ("opus", "high")
+    hardest = "J1F2R2C2K2P2V1S1"
+    assert pair(route(available, hardest, profiles=profiles)) == ("fable", "low")
+    assert pair(route(available, hardest, "--review", profiles=profiles)) == ("fable", "low")
+    assert pair(route(available, hardest, "--up", "3", profiles=profiles)) == ("fable", "medium")
 
 
 def test_route_speed_gain(offered, tmp_path):

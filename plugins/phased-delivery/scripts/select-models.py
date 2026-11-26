@@ -77,6 +77,9 @@ CEILINGS = [
     ("anthropic", "haiku", "xhigh"),  # Haiku: xhigh keeps it a real small option
     ("anthropic", None, "high"),      # other Claude: xhigh and max cost far more
 ]
+# Most thinking a model family is picked at. Pairs above it still set the best
+# score the floors measure from, as premium pairs do once the budget is spent.
+PICK_CEILINGS = {"fable": "medium"}  # Fable above medium is unaffordable
 DEFAULT_EFFORT = "default"  # report row without a thinking-level suffix
 # A pair is premium when its output price is at least this many dollars per
 # million tokens.
@@ -101,10 +104,6 @@ PREFER_COST_RATIO = 1.5
 # A long or wide stage takes a faster pair only at this multiple of the pick's
 # speed: thinking levels of one model differ by a few percent, which is noise.
 SPEED_GAIN = 1.2
-# A premium step-up below top is taken while its score per unit of run cost is
-# no more than this fraction worse than the standard pick's: a near tie goes to
-# the larger model, which may need fewer tokens than the benchmark shows.
-PREMIUM_RATIO_MARGIN = 0.05
 SCORES_FORM = "J F R C K P V S in that order, each followed by 0, 1 or 2, such as J1F1R0C0K0P0V0S0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -194,6 +193,11 @@ def effort_denial(effort, ceiling):
     if EFFORT_ORDER.index(effort) > EFFORT_ORDER.index(ceiling):
         return f"denied: above this model's {ceiling} ceiling"
     return None
+
+
+def over_pick_ceiling(c):
+    words = set(normalize(c["row"]["model"]).split("-"))
+    return any(family in words and effort_denial(c["effort"], cap) for family, cap in PICK_CEILINGS.items())
 
 
 def build_candidates(available, profiles):
@@ -299,17 +303,21 @@ def prefer_cheaper(pick, pool):
 
 def assign_tiers(scored):
     best = max(c["score"] for c in scored)
+    pickable = [c for c in scored if not over_pick_ceiling(c)] or scored
+    # Below top only standard pairs, as route picks them (premium only on a --up retry).
+    standard = [c for c in pickable if not c["row"]["premium"]] or pickable
     tiers = {}
     for tier, floor in FLOORS.items():
-        pick = cheapest([c for c in scored if c["score"] >= floor * best])
-        tiers[tier] = prefer_cheaper(pick, scored)
-    above = [c for c in scored if c["score"] > tiers["middle"]["score"]]
+        pool = pickable if tier == "top+" else standard
+        meeting = [c for c in pool if c["score"] >= floor * best] or [max(pool, key=lambda c: c["score"])]
+        tiers[tier] = prefer_cheaper(cheapest(meeting), pool)
+    above = [c for c in standard if c["score"] > tiers["middle"]["score"]]
     if above:
         pick = min(above, key=lambda c: (c["score"], c["cost"]))
         tiers["middle+"] = prefer_cheaper(pick, above)
     else:
-        tiers["middle+"] = tiers["top+"]
-    tiers["top"] = below_top_plus(frontier(scored), tiers["top+"], tiers["middle+"])
+        tiers["middle+"] = tiers["middle"]
+    tiers["top"] = below_top_plus(frontier(pickable), tiers["top+"], tiers["middle+"])
     return best, tiers
 
 
@@ -533,11 +541,12 @@ def frontier_pick(front, tier, best):
     if tier == "middle+":
         middle = front.index(frontier_pick(front, "middle", best))
         return front[min(middle + 1, len(front) - 1)]
-    if tier == "top":
-        return below_top_plus(front, frontier_pick(front, "top+", best), frontier_pick(front, "middle+", best))
+    if tier == "top":  # never below middle+ as route ends it: on a standard pair
+        standard = [c for c in front if not c["row"]["premium"]] or front
+        return below_top_plus(front, frontier_pick(front, "top+", best), frontier_pick(standard, "middle+", best))
     meeting = meets_floor(front, tier, best)
     if not meeting:
-        return max(front, key=lambda c: c["score"])
+        return prefer_cheaper(max(front, key=lambda c: c["score"]), front)
     return prefer_cheaper(cheapest(meeting), front)
 
 
@@ -573,6 +582,8 @@ def pick_pair(allowed, tier, best, scores, signals, up, down):
         pick = stepped
     # The preferences never go below this score, so they cannot undo the risk step.
     least = pick["score"]
+    # Nor move a standard pick onto a premium pair, whose run cost understates its real spend.
+    meeting = [c for c in meeting if c["row"]["premium"] <= pick["row"]["premium"]]
     if signals and (scores["J"] == 2 or scores["C"] == 2):
         lighter = min([pick] + [c for c in meeting if c["score"] >= least
                                 and c["cost"] <= PREFER_COST_RATIO * pick["cost"]],
@@ -622,7 +633,8 @@ def route_main(args):
             else ("top", "reviews run on top")
     best = max(c["score"] for c in pool)
     over_budget = not options.review and options.premium_spent >= PREMIUM_BUDGET_USD
-    allowed = [c for c in pool if not c["row"]["premium"]] if over_budget else pool
+    allowed = [c for c in pool if not over_pick_ceiling(c)]
+    allowed = [c for c in allowed if not c["row"]["premium"]] if over_budget else allowed
     if not allowed:
         print("no selectable pair within the premium budget", file=sys.stderr)
         return 4
@@ -639,27 +651,16 @@ def route_main(args):
         return 4
     standard = [c for c in allowed if not c["row"]["premium"]]
     if tier not in ("top", "top+") and choice["row"]["premium"] and standard:
-        # Below top a premium pair must beat the standard pick on cost and score,
-        # unless the standard pairs cannot give a step up the stage asked for:
-        # the next model up at low thinking beats more thinking on a smaller one.
+        # Below top no premium pair: benchmark run cost understates its real spend (Fable low
+        # averaged 2.6-4.5x Opus high per stage). Only a --up retry after a failed build, once
+        # the standard pairs run out, takes the cheapest pair above the standard pick.
         other, other_notes, other_short, _ = pick_pair(standard, tier, best, scores, signals, *steps)
-        if other is not None and other_short and choice["score"] > other["score"]:
-            above = next(c for c in front if c["score"] > other["score"])  # front is cheapest first
-            # A step up the plan asked for (middle+ or risk) takes a premium pair only while
-            # its score/cost ratio is within the margin of the standard pick's; a --up retry
-            # after a failure takes it regardless. Cross-multiplied: costs may be 0.
-            if above["row"]["premium"] and not options.up and above["score"] * other["cost"] \
-                    < (1 - PREMIUM_RATIO_MARGIN) * other["score"] * above["cost"]:
-                choice = other
-                notes = other_notes + [f"premium {above['label']} left out below top: its score/cost "
-                                       f"is more than {PREMIUM_RATIO_MARGIN:.0%} below {other['label']}'s"]
-            else:
-                choice = above
-                notes = other_notes + [f"no standard pair above {other['label']} for the step up: "
-                                       f"{choice['label']}, the cheapest pair above it"]
-        elif other is not None and (choice["cost"] > other["cost"] or choice["score"] < other["score"]):
-            notes = other_notes + [f"premium {choice['label']} left out below top: "
-                                   f"{other['label']} costs less or scores at least as well"]
+        if other is not None and other_short and options.up and choice["score"] > other["score"]:
+            choice = next(c for c in front if c["score"] > other["score"])  # front is cheapest first
+            notes = other_notes + [f"--up retry, no standard pair above {other['label']}: "
+                                   f"{choice['label']}, the cheapest pair above it"]
+        elif other is not None:
+            notes = other_notes + [f"premium {choice['label']} left out below top"]
             choice = other
     why += notes
     row = choice["row"]
@@ -683,7 +684,8 @@ def main(argv):
     available, profiles, candidates, excluded, matches = load_offered(
         options["available"], options["profiles"])
     scored, unscored, metric, cost_field = score_and_cost(candidates)
-    excluded += unscored
+    excluded += unscored + [(c["tool_model"], c["effort"], "sets the best score, never picked: above "
+                             "its family's PICK_CEILINGS") for c in scored if over_pick_ceiling(c)]
     if not scored:
         print("no selectable candidate; see the exclusions below", file=sys.stderr)
         for model, effort, reason in excluded:

@@ -50,11 +50,13 @@ raises `middle` to `middle+` (override 2).
 `top` has a step above it for the most extreme complexity: **`top+`** is a
 `top` stage with a total of 12 or more, or with K = 2 (`plan-check.py`'s
 `hardest`). Only `top+` stages, and the reviews of phases that hold one,
-get the most capable pair (Fable high today); other `top` stages get the
-frontier pair one below it (Fable medium), and a failed build there steps
+get the most capable pair (Fable low today); other `top` stages get the
+frontier pair one below it (Opus high), and a failed build there steps
 up with `--up`. (Changed 2026-11-24: `top` on the most capable pair sent
 every review and every total of 9 to Fable high, at about twice Fable
-medium's run cost.)
+medium's run cost. Changed 2026-11-26: Fable still took 148 of 258 scored
+stages, mostly Fable low on `middle+`, at $1.59 a stage against $0.35 to
+$0.61 for Opus high; its benchmark run cost understates its real spend.)
 
 Overrides, which always win over the total:
 
@@ -130,6 +132,9 @@ What the code enforces, so the agent does not:
   models never above `high`, except Haiku, which may use `xhigh`. Higher
   levels, and levels the script cannot place, are denied even if offered
   and charted. The ceilings are the `CEILINGS` table in the script.
+- **Pick ceilings:** Fable is never picked above `medium`. Its higher
+  levels still set the best score the floors are measured from, so the
+  other tiers keep their picks (`PICK_CEILINGS`).
 - Each candidate is scored by the Artificial Analysis Intelligence Index
   (a quarter coding, plus reasoning-heavy science and HLE-Diamond; the free
   data has no separate coding or reasoning score) and costed by the benchmark run cost, which counts
@@ -138,9 +143,10 @@ What the code enforces, so the agent does not:
   best** (the floors are constants at the top of the script). So a large
   model at low thinking beats a small model at high thinking when it scores
   as well for less. `middle+` is the next more capable candidate above
-  `middle`. `top+` takes the floor of 97% of the best score; `top` is the
-  frontier pair one below `top+`'s, or `middle+`'s pick when that scores
-  more.
+  `middle`. Below `top` only standard-price candidates are picked. `top+`
+  takes the floor of 97% of the best score; `top` is the frontier pair one
+  below `top+`'s, or `middle+`'s pick when that scores more. A tier no
+  candidate meets takes the best-scoring one, then the 3-point tie rule.
 - **Within 3 points, the cheaper candidate wins.** After a tier picks, any
   cheaper candidate scoring within 3 index points of the pick replaces it,
   even across a floor (for `middle+`, only candidates still above
@@ -207,21 +213,21 @@ What `route` does, in this order:
 
 | Rule | Pick |
 | --- | --- |
-| Candidates | Offered pairs within the thinking-level ceilings that have a score and a benchmark run cost, minus low-gain thinking steps: a step up gaining under 2 points for more than 1.5 times the run cost of the level below. |
+| Candidates | Offered pairs within the thinking-level ceilings that have a score and a benchmark run cost, minus low-gain thinking steps: a step up gaining under 2 points for more than 1.5 times the run cost of the level below. The best score is taken here; then pairs above their pick ceiling (Fable above `medium`) are left out. |
 | Frontier | Only pairs on the score/cost frontier: a pair another beats on both score and cost is never chosen. |
-| Tier | The tier from the scores with the overrides above, and `top+` for the hardest `top` stages; `--review` uses `top`, or `top+` when its scores are a `top+` stage's. The pick is the cheapest frontier pair meeting the tier's floor, then any cheaper pair within 3 points; `middle+` is the next frontier pair above the `middle` pick; `top` is the frontier pair one below the `top+` pick, never below `middle+`'s. |
+| Tier | The tier from the scores with the overrides above, and `top+` for the hardest `top` stages; `--review` uses `top`, or `top+` when its scores are a `top+` stage's. The pick is the cheapest frontier pair meeting the tier's floor, then any cheaper pair within 3 points; `middle+` is the next frontier pair above the `middle` pick; `top` is the frontier pair one below the `top+` pick, never below `middle+`'s standard pick. |
 | Premium budget | With `--premium-spent` at or above $10, builds leave premium pairs out. |
 | Mechanical (J, P and V all 0, tier above `small`) | Thinking at `medium` or below. `small` stages keep the small model's higher levels. |
 | Long or wide (S, R or F = 2) | Thinking at `high` or below. |
 | Risk (K of 1 or more) | One frontier pair up, below `top` only: K = 2 makes a `top` stage `top+`. |
-| Design or contract (J = 2 or C = 2) | Among pairs meeting the floor that score at least the pick and cost at most 1.5 times it, the lowest thinking level: a larger model at lower thinking. |
+| Design or contract (J = 2 or C = 2) | Among pairs meeting the floor that score at least the pick and cost at most 1.5 times it, the lowest thinking level: a larger model at lower thinking. This and the speed preference never move a standard pick onto a premium pair. |
 | Long or wide (S, R or F = 2) | Among pairs meeting the floor within 3 points of the pick (with K of 1 or more, at least the risk step's score) and costing at most 1.5 times it, the fastest, if at least 1.2 times the pick's speed (thinking levels of one model differ by a few percent). |
-| Premium below `top` | A premium pick below `top` (and `top+`) is routed again without premium pairs; the premium pair stays only if it costs no more than that standard pick and scores at least as well. When the standard pairs run out before a step up the stage asked for (`middle+`, risk, `--up`), the cheapest pair scoring above the standard pick is taken instead (the next model up at low thinking, not more thinking on a smaller model), but only when its score divided by its benchmark run cost is no more than 5% below the standard pick's (`PREMIUM_RATIO_MARGIN`); otherwise the standard pick stays. A `--up` retry after a failed build takes it regardless. |
+| Premium below `top` | A premium pick below `top` (and `top+`) is routed again without premium pairs, and the standard pick is taken: a premium pair's benchmark run cost understates its real spend. Only a `--up` retry after a failed build, when the standard pairs run out before the step, takes the cheapest pair scoring above the standard pick (the next model up at low thinking, not more thinking on a smaller model). |
 | `--down N`, `--up N` | Move N frontier pairs cheaper or dearer from the pick, stopping at either end. N is 0 or more; not both at once. |
 | `--review` | `top`, or `top+` when `--scores` are a `top+` stage's (the driver passes the phase's hardest stage); premium spend and the scores' other signals do not shape it (no caps, risk step or preferences). |
 
 The constants (`LOW_GAIN_POINTS`, `LOW_GAIN_COST_RATIO`, `FLOORS`,
-`TIE_POINTS`, `PREMIUM_BUDGET_USD`, `PREFER_COST_RATIO`, `SPEED_GAIN`, `CAP_TOKENS`) are
+`TIE_POINTS`, `PICK_CEILINGS`, `PREMIUM_BUDGET_USD`, `PREFER_COST_RATIO`, `SPEED_GAIN`, `CAP_TOKENS`) are
 at the top of the script.
 
 ### Limits
