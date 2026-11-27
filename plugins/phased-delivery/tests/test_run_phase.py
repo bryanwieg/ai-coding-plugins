@@ -32,13 +32,13 @@ PHASE_JSON = {"brief": {"role": "r", "why": "w", "how": "h", "before": "nothing.
               "record": {}}
 
 
-def stage(title, order, path, tests=()):
+def stage(title, order, path, tests=(), check=None):
     return {"brief": {"revision": 1, "title": title, "order": order, "lines": "under 30",
                       "files": [{"path": path, "action": "create", "role": "the file"}],
                       "provides": [], "uses": [], "goal": title,
                       "context": {"builds_on": [], "code_read": [], "design": []},
                       "behaviour": [], "external_inputs": [], "tests": list(tests), "done_when": ["it exists"],
-                      "checks": [f"test -f {path}"], "out_of_scope": [],
+                      "checks": [check or f"test -f {path}"], "out_of_scope": [],
                       "model_basis": dict.fromkeys("JFRCKPVS", 0)},
             "record": {}}
 
@@ -46,7 +46,9 @@ def stage(title, order, path, tests=()):
 STAGES = {
     "01.1": stage("Write one", "first", "src/one.txt",
                   [{"test": "src/one.txt", "kind": "outcome", "action": "writes", "proves": "one exists",
-                    "outcome": "O1"}]),
+                    "outcome": "O1"}],
+                  # prints a stdout line then a stderr line, so the test sees the merged output streamed in order
+                  "cat src/one.txt && echo warn >&2"),
     "01.2": stage("Write two", "after 01.1", "src/two.txt"),
 }
 
@@ -139,6 +141,16 @@ def test_builds_phase(repo):
     # the live feed of each call, on stderr
     for line in ("[revise] thinking: fake thinking", "[build-01.1] Bash: true", "result: success, $0.01"):
         assert line in result.stderr, result.stderr
+    # the driver's steps and each check's command and exit, in the order they happen
+    lines = result.stderr.splitlines()
+    wanted = ["[driver] phase 01-demo: start", "[driver] stage 01.1: build", "[driver] stage 01.1: checks",
+              "[check-01.1] $ cat src/one.txt && echo warn >&2", "[check-01.1] one", "[check-01.1] warn",
+              "[check-01.1] exit 0", "[driver] stage 01.1: accepted",
+              "[driver] review: start", "[driver] review: 0 findings", "[driver] finish: built"]
+    assert all(x in lines for x in wanted), result.stderr
+    assert [lines.index(x) for x in wanted] == sorted(lines.index(x) for x in wanted), result.stderr
+    assert any(x.startswith("[driver] stage 01.1: committed ") for x in lines), result.stderr
+    assert "[check-01.2] $ test -f src/two.txt" in lines, result.stderr
 
 
 def test_plan_ignored_by_git(repo):
@@ -201,6 +213,12 @@ def test_revise_then_halt(repo):
     assert two["brief"]["revision"] == 3 and not two["record"].get("commit")
     assert [x["result"] for x in two["record"]["attempts"]] == ["failed"] * 3
     assert "Halt: revise-capped at build 01.2" in result.stdout
+    lines = result.stderr.splitlines()
+    assert "[driver] stage 01.2: failed" in lines, result.stderr
+    assert "[check-01.2] exit 1" in lines, result.stderr
+    revising = next(i for i, x in enumerate(lines) if x.startswith("[driver] stage 01.2: revising: "))
+    assert lines[revising + 1].startswith("[revise] "), result.stderr
+    assert lines[-1] == "[driver] halted at build 01.2: revise-capped", result.stderr
 
 
 def test_resume_after_halt(repo):
@@ -209,6 +227,10 @@ def test_resume_after_halt(repo):
     assert first.returncode == 10, first.stdout + first.stderr
     assert halt(repo) == ("build-error", "01.1")
     assert not (repo / "src/one.txt").exists()  # restored, so the rerun starts from a clean tree
+    # files the user adds or edits between runs are theirs: no restore may delete or revert them
+    (repo / "notes/mine.txt").parent.mkdir()
+    (repo / "notes/mine.txt").write_text("mine\n")
+    (repo / "src/base.txt").write_text("edited\n")
     # the rerun does not revise again, builds 01.1 and halts at 01.2, before any review
     second = drive(repo, [BUILD_ONE, {**BUILD_TWO, "exit": 3}])
     assert second.returncode == 10, second.stdout + second.stderr
@@ -216,6 +238,9 @@ def test_resume_after_halt(repo):
     assert halt(repo) == ("build-error", "01.2")
     assert read(repo, "01.1.json")["record"]["commit"]
     assert not read(repo, "01.2.json")["record"].get("commit")
+    assert (repo / "notes/mine.txt").read_text() == "mine\n"
+    assert (repo / "src/base.txt").read_text() == "edited\n"
+    assert git(repo, "show", "--name-only", "--format=", "HEAD").split() == ["src/one.txt"]
 
 
 def test_refused_commit_rejects_attempt(repo):

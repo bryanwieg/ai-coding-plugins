@@ -157,14 +157,22 @@ def test_failed_check_then_retry(repo):
     (repo / "src/a.txt").write_text("a2\n")
     first = record(repo, "01.1", "haiku", "high", 0, "500", "0.10")
     assert first.returncode == 1
-    assert json.loads(first.stdout)["checks"] == [{"cmd": "test -f src/done.txt", "exit": 1}]
+    assert "[check-" not in first.stderr
+    live = record(repo, "01.1", "sonnet", "high", 0, "600", "0.20", "--live")
+    assert live.returncode == 1
+    assert live.stderr.splitlines() == ["[check-01.1] $ test -f src/done.txt", "[check-01.1] exit 1"]
+    for run in (first, live):
+        assert len(run.stdout.splitlines()) == 1
+        assert json.loads(run.stdout)["checks"] == [{"cmd": "test -f src/done.txt", "exit": 1}]
     (repo / "src/done.txt").write_text("done\n")
     second = record(repo, "01.1", "opus", "medium", 0, "900", "0.30")
     assert second.returncode == 0
+    assert len(second.stdout.splitlines()) == 1
     assert bc(repo, "commit", PHASE, "01.1").returncode == 0
     msg = message(repo)
-    assert "Attempt: 2" in msg
+    assert "Attempt: 3" in msg
     assert "Earlier-Attempt: haiku high 500 check failed" in msg
+    assert "Earlier-Attempt: sonnet high 600 check failed" in msg
 
 
 def test_can_try_refuses_repeat(repo):
