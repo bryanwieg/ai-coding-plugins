@@ -277,17 +277,18 @@ def call(c, label, guide, inputs, pair, keep_briefs, what, *flags):
 def record(c, what, pair, res, *flags):
     """build-check.py record --live: its [check-] lines go to stderr as it writes them; the result keeps the rest."""
     stage = what not in ("review", "revise")
-    if stage and res["exit"] == 0:  # record runs checks only for a build that exited 0
-        say(f"stage {what}: checks")
     cmd = [sys.executable, os.path.join(HERE, "build-check.py"), "record", c.pdir, what, "--tool", "claude-code",
            "--model", pair["model"], "--effort", pair["effort"], "--exit", res["exit"], "--tokens", res["tokens"],
            "--cost", res["cost"], "--cap", pair["cap_usd"], *(["--premium"] if pair["premium"] else []), *flags,
            "--repo", c.top, "--live"]
     # bytes, not text=True: universal newlines would split a check's '\r' progress into lines without [check-
     with subprocess.Popen([str(x) for x in cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as p:
-        kept = []
+        kept, checking = [], False
         for line in (raw.decode() for raw in p.stderr):
             if line.startswith("[check-"):
+                if not checking:  # only record knows whether checks run (not after a failed build or outside paths)
+                    say(f"stage {what}: checks")
+                    checking = True
                 print(line, end="", file=sys.stderr, flush=True)
             else:
                 kept.append(line)
