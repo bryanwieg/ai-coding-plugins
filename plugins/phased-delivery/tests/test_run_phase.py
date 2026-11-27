@@ -32,13 +32,13 @@ PHASE_JSON = {"brief": {"role": "r", "why": "w", "how": "h", "before": "nothing.
               "record": {}}
 
 
-def stage(title, order, path, tests=()):
+def stage(title, order, path, tests=(), check=None):
     return {"brief": {"revision": 1, "title": title, "order": order, "lines": "under 30",
                       "files": [{"path": path, "action": "create", "role": "the file"}],
                       "provides": [], "uses": [], "goal": title,
                       "context": {"builds_on": [], "code_read": [], "design": []},
                       "behaviour": [], "external_inputs": [], "tests": list(tests), "done_when": ["it exists"],
-                      "checks": [f"test -f {path}"], "out_of_scope": [],
+                      "checks": [check or f"test -f {path}"], "out_of_scope": [],
                       "model_basis": dict.fromkeys("JFRCKPVS", 0)},
             "record": {}}
 
@@ -46,7 +46,9 @@ def stage(title, order, path, tests=()):
 STAGES = {
     "01.1": stage("Write one", "first", "src/one.txt",
                   [{"test": "src/one.txt", "kind": "outcome", "action": "writes", "proves": "one exists",
-                    "outcome": "O1"}]),
+                    "outcome": "O1"}],
+                  # prints a stdout line then a stderr line, so the test sees the merged output streamed in order
+                  "cat src/one.txt && echo warn >&2"),
     "01.2": stage("Write two", "after 01.1", "src/two.txt"),
 }
 
@@ -142,7 +144,8 @@ def test_builds_phase(repo):
     # the driver's steps and each check's command and exit, in the order they happen
     lines = result.stderr.splitlines()
     wanted = ["[driver] phase 01-demo: start", "[driver] stage 01.1: build", "[driver] stage 01.1: checks",
-              "[check-01.1] $ test -f src/one.txt", "[check-01.1] exit 0", "[driver] stage 01.1: accepted",
+              "[check-01.1] $ cat src/one.txt && echo warn >&2", "[check-01.1] one", "[check-01.1] warn",
+              "[check-01.1] exit 0", "[driver] stage 01.1: accepted",
               "[driver] review: start", "[driver] review: 0 findings", "[driver] finish: built"]
     assert all(x in lines for x in wanted), result.stderr
     assert [lines.index(x) for x in wanted] == sorted(lines.index(x) for x in wanted), result.stderr
