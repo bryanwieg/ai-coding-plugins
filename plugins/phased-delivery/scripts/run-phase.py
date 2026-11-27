@@ -283,14 +283,15 @@ def record(c, what, pair, res, *flags):
            "--model", pair["model"], "--effort", pair["effort"], "--exit", res["exit"], "--tokens", res["tokens"],
            "--cost", res["cost"], "--cap", pair["cap_usd"], *(["--premium"] if pair["premium"] else []), *flags,
            "--repo", c.top, "--live"]
-    with subprocess.Popen([str(x) for x in cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as p:
+    # bytes, not text=True: universal newlines would split a check's '\r' progress into lines without [check-
+    with subprocess.Popen([str(x) for x in cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as p:
         kept = []
-        for line in p.stderr:
+        for line in (raw.decode() for raw in p.stderr):
             if line.startswith("[check-"):
                 print(line, end="", file=sys.stderr, flush=True)
             else:
                 kept.append(line)
-        out = p.stdout.read()  # one JSON line, written after the checks
+        out = p.stdout.read().decode()  # one JSON line, written after the checks
     if stage and p.returncode in (0, 1, 3, 4):
         logged = json.loads(last(out))
         say(f"stage {what}: {logged['result']}" + (f", outside: {', '.join(logged['outside'])}" if logged["outside"] else ""))
